@@ -5,43 +5,56 @@ import { ChangeEvent, useId, useState } from "react";
 import { compressImage } from "@/lib/imageCompression";
 
 type PlantPhotoUploaderProps = {
-  file: File | null;
-  onChange: (file: File | null) => void;
+  files: File[];
+  onChange: (files: File[]) => void;
 };
 
-export function PlantPhotoUploader({ file, onChange }: PlantPhotoUploaderProps) {
+type PreviewPhoto = {
+  name: string;
+  url: string;
+};
+
+export function PlantPhotoUploader({ files, onChange }: PlantPhotoUploaderProps) {
   const inputId = useId();
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previews, setPreviews] = useState<PreviewPhoto[]>([]);
   const [isCompressing, setIsCompressing] = useState(false);
   const [error, setError] = useState("");
 
   async function handleChange(event: ChangeEvent<HTMLInputElement>) {
-    const selected = event.target.files?.[0] ?? null;
+    const selected = Array.from(event.target.files ?? []);
     setError("");
 
-    if (!selected) {
-      onChange(null);
-      setPreviewUrl(null);
+    if (!selected.length) {
+      onChange([]);
+      setPreviews((current) => {
+        current.forEach((preview) => URL.revokeObjectURL(preview.url));
+        return [];
+      });
       return;
     }
 
-    if (!selected.type.startsWith("image/")) {
+    const imageFiles = selected.filter((file) => file.type.startsWith("image/"));
+    if (imageFiles.length !== selected.length) {
       setError("이미지 파일만 선택할 수 있습니다.");
       return;
     }
 
     setIsCompressing(true);
     try {
-      const compressed = await compressImage(selected);
-      onChange(compressed);
-      setPreviewUrl((current) => {
-        if (current) URL.revokeObjectURL(current);
-        return URL.createObjectURL(compressed);
+      const compressedFiles = await Promise.all(imageFiles.map((file) => compressImage(file)));
+      onChange(compressedFiles);
+      setPreviews((current) => {
+        current.forEach((preview) => URL.revokeObjectURL(preview.url));
+        return compressedFiles.map((file) => ({
+          name: file.name,
+          url: URL.createObjectURL(file),
+        }));
       });
     } catch (compressionError) {
       setError(compressionError instanceof Error ? compressionError.message : "사진 처리에 실패했습니다.");
     } finally {
       setIsCompressing(false);
+      event.target.value = "";
     }
   }
 
@@ -51,31 +64,43 @@ export function PlantPhotoUploader({ file, onChange }: PlantPhotoUploaderProps) 
         htmlFor={inputId}
         className="flex min-h-56 cursor-pointer flex-col items-center justify-center rounded-[1.5rem] bg-gradient-to-br from-emerald-50 to-lime-50 px-4 text-center"
       >
-        {previewUrl ? (
-          <Image
-            src={previewUrl}
-            alt={file?.name ?? "업로드한 식물 사진"}
-            width={320}
-            height={320}
-            className="h-48 w-full rounded-[1.25rem] object-cover"
-            unoptimized
-          />
+        {previews.length ? (
+          <div className="grid w-full grid-cols-2 gap-2">
+            {previews.slice(0, 4).map((preview, index) => (
+              <div key={preview.url} className="relative h-28 overflow-hidden rounded-[1.25rem] bg-white">
+                <Image
+                  src={preview.url}
+                  alt={preview.name}
+                  width={180}
+                  height={180}
+                  className="h-full w-full object-cover"
+                  unoptimized
+                />
+                {index === 3 && previews.length > 4 ? (
+                  <div className="absolute inset-0 grid place-items-center bg-stone-950/50 text-lg font-bold text-white">
+                    +{previews.length - 4}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="grid h-24 w-24 place-items-center rounded-[1.75rem] bg-white text-4xl shadow-sm">
             🌿
           </div>
         )}
         <span className="mt-4 text-base font-semibold text-stone-950">
-          {file ? "사진 다시 선택" : "식물 사진 선택"}
+          {files.length ? "사진 다시 선택" : "식물 사진 선택"}
         </span>
         <span className="mt-1 text-sm text-stone-500">
-          {isCompressing ? "사진 압축 중..." : "카메라 또는 갤러리에서 선택"}
+          {isCompressing ? "사진 압축 중..." : files.length ? `${files.length}장 선택됨` : "여러 장을 한 번에 선택할 수 있어요"}
         </span>
       </label>
       <input
         id={inputId}
         type="file"
         accept="image/*"
+        multiple
         className="sr-only"
         onChange={handleChange}
       />

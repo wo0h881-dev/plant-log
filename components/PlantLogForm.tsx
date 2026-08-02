@@ -10,7 +10,7 @@ const RECENT_PLANTS_KEY = "plant-log:recent-plants";
 
 export function PlantLogForm() {
   const [plants, setPlants] = useState<Plant[]>([]);
-  const [photo, setPhoto] = useState<File | null>(null);
+  const [photos, setPhotos] = useState<File[]>([]);
   const [selectedPlant, setSelectedPlant] = useState("");
   const [query, setQuery] = useState("");
   const [note, setNote] = useState("");
@@ -37,7 +37,10 @@ export function PlantLogForm() {
     });
   }, []);
 
-  const canSave = useMemo(() => Boolean(photo && selectedPlant && saveState !== "saving"), [photo, selectedPlant, saveState]);
+  const canSave = useMemo(
+    () => Boolean(photos.length && selectedPlant && saveState !== "saving"),
+    [photos.length, selectedPlant, saveState],
+  );
 
   function selectPlant(plantName: string) {
     setSelectedPlant(plantName);
@@ -53,7 +56,7 @@ export function PlantLogForm() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!photo) {
+    if (!photos.length) {
       setMessage("사진을 선택하세요.");
       setSaveState("error");
       return;
@@ -69,7 +72,7 @@ export function PlantLogForm() {
     setMessage("");
 
     const formData = new FormData();
-    formData.append("photo", photo);
+    photos.forEach((photo) => formData.append("photos", photo));
     formData.append("plantName", selectedPlant);
     formData.append("note", note);
     formData.append("createdAt", new Date().toISOString());
@@ -109,7 +112,7 @@ export function PlantLogForm() {
         </header>
 
         <div className="flex flex-1 flex-col gap-5">
-          <PlantPhotoUploader file={photo} onChange={setPhoto} />
+          <PlantPhotoUploader files={photos} onChange={setPhotos} />
 
           <PlantSelect
             plants={plants}

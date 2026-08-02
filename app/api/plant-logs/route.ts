@@ -17,7 +17,7 @@ export async function POST(request: Request) {
 
   try {
     const formData = await request.formData();
-    const photo = formData.get("photo");
+    const photos = formData.getAll("photos").filter((photo): photo is File => photo instanceof File);
     const plantName = String(formData.get("plantName") ?? "").trim();
     const note = String(formData.get("note") ?? "").trim();
     const createdAt = String(formData.get("createdAt") ?? new Date().toISOString());
@@ -26,26 +26,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "식물명을 선택하세요." }, { status: 400 });
     }
 
-    if (!(photo instanceof File)) {
+    if (!photos.length) {
       return NextResponse.json({ message: "사진 파일을 선택하세요." }, { status: 400 });
     }
 
+    if (photos.some((photo) => !photo.type.startsWith("image/"))) {
+      return NextResponse.json({ message: "이미지 파일만 업로드할 수 있습니다." }, { status: 400 });
+    }
+
     const parentId = configuredDataSourceId || (await resolveDataSourceId(token, databaseId));
-    const fileUploadId = await uploadFileToNotion(token, photo);
+    const uploadedPhotos = [];
+
+    for (const photo of photos) {
+      uploadedPhotos.push(await uploadFileToNotion(token, photo));
+    }
+
     const page = await createPlantLogPage({
       token,
       parentId,
       plantName,
       note,
       createdAt,
-      fileUploadId,
-      fileName: photo.name,
+      photos: uploadedPhotos,
     });
 
     return NextResponse.json({
       pageId: page.id,
       pageUrl: page.url,
-      photoUrl: fileUploadId,
+      photoCount: uploadedPhotos.length,
       plantName,
       note,
       createdAt,

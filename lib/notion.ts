@@ -12,14 +12,18 @@ type NotionDatabase = {
   data_sources?: Array<{ id: string }>;
 };
 
+type UploadedPlantPhoto = {
+  id: string;
+  name: string;
+};
+
 type CreatePlantLogPageParams = {
   token: string;
   parentId: string;
   plantName: string;
   note: string;
   createdAt: string;
-  fileUploadId: string;
-  fileName: string;
+  photos: UploadedPlantPhoto[];
 };
 
 function notionHeaders(token: string, contentType = "application/json") {
@@ -75,7 +79,7 @@ export async function uploadFileToNotion(token: string, file: File) {
     throw new Error("Notion 파일 업로드가 완료되지 않았습니다.");
   }
 
-  return uploaded.id;
+  return { id: uploaded.id, name: file.name };
 }
 
 export async function resolveDataSourceId(token: string, databaseId: string) {
@@ -100,8 +104,7 @@ export async function createPlantLogPage({
   plantName,
   note,
   createdAt,
-  fileUploadId,
-  fileName,
+  photos,
 }: CreatePlantLogPageParams) {
   return readNotionJson<{ id: string; url?: string }>(
     await fetch(`${NOTION_API_BASE}/pages`, {
@@ -114,13 +117,11 @@ export async function createPlantLogPage({
             title: [{ text: { content: plantName } }],
           },
           Files: {
-            files: [
-              {
-                type: "file_upload",
-                file_upload: { id: fileUploadId },
-                name: fileName,
-              },
-            ],
+            files: photos.map((photo) => ({
+              type: "file_upload",
+              file_upload: { id: photo.id },
+              name: photo.name,
+            })),
           },
           Text: {
             rich_text: note ? [{ text: { content: note } }] : [],
