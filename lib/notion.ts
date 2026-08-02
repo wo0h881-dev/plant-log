@@ -113,20 +113,20 @@ export async function createPlantLogPage({
       body: JSON.stringify({
         parent: { type: "data_source_id", data_source_id: parentId },
         properties: {
-          Name: {
+          식물명: {
             title: [{ text: { content: plantName } }],
           },
-          Files: {
+          사진: {
             files: photos.map((photo) => ({
               type: "file_upload",
               file_upload: { id: photo.id },
               name: photo.name,
             })),
           },
-          Text: {
+          관찰일지: {
             rich_text: note ? [{ text: { content: note } }] : [],
           },
-          Date: {
+          관찰일: {
             date: { start: createdAt },
           },
         },
