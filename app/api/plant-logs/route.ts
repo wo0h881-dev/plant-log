@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { createPlantLogPage, uploadFileToNotion } from "@/lib/notion";
+import { createPlantLogPage, resolveDataSourceId, uploadFileToNotion } from "@/lib/notion";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const token = process.env.NOTION_TOKEN;
   const databaseId = process.env.NOTION_DATABASE_ID;
+  const configuredDataSourceId = process.env.NOTION_DATA_SOURCE_ID;
 
   if (!token || !databaseId) {
     return NextResponse.json(
@@ -29,10 +30,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "사진 파일을 선택하세요." }, { status: 400 });
     }
 
+    const parentId = configuredDataSourceId || (await resolveDataSourceId(token, databaseId));
     const fileUploadId = await uploadFileToNotion(token, photo);
     const page = await createPlantLogPage({
       token,
-      databaseId,
+      parentId,
       plantName,
       note,
       createdAt,

@@ -7,9 +7,14 @@ type NotionFileUpload = {
   status: "pending" | "uploaded" | "expired" | "failed";
 };
 
+type NotionDatabase = {
+  id: string;
+  data_sources?: Array<{ id: string }>;
+};
+
 type CreatePlantLogPageParams = {
   token: string;
-  databaseId: string;
+  parentId: string;
   plantName: string;
   note: string;
   createdAt: string;
@@ -73,9 +78,25 @@ export async function uploadFileToNotion(token: string, file: File) {
   return uploaded.id;
 }
 
+export async function resolveDataSourceId(token: string, databaseId: string) {
+  const database = await readNotionJson<NotionDatabase>(
+    await fetch(`${NOTION_API_BASE}/databases/${databaseId}`, {
+      method: "GET",
+      headers: notionHeaders(token),
+    }),
+  );
+
+  const dataSourceId = database.data_sources?.[0]?.id;
+  if (!dataSourceId) {
+    throw new Error("Notion 데이터 소스를 찾을 수 없습니다.");
+  }
+
+  return dataSourceId;
+}
+
 export async function createPlantLogPage({
   token,
-  databaseId,
+  parentId,
   plantName,
   note,
   createdAt,
@@ -87,7 +108,7 @@ export async function createPlantLogPage({
       method: "POST",
       headers: notionHeaders(token),
       body: JSON.stringify({
-        parent: { database_id: databaseId },
+        parent: { type: "data_source_id", data_source_id: parentId },
         properties: {
           Name: {
             title: [{ text: { content: plantName } }],
