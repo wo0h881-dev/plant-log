@@ -19,11 +19,16 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const photos = formData.getAll("photos").filter((photo): photo is File => photo instanceof File);
     const plantName = String(formData.get("plantName") ?? "").trim();
+    const plantCategory = String(formData.get("plantCategory") ?? "").trim();
     const note = String(formData.get("note") ?? "").trim();
     const createdAt = String(formData.get("createdAt") ?? new Date().toISOString());
 
     if (!plantName) {
       return NextResponse.json({ message: "식물명을 선택하세요." }, { status: 400 });
+    }
+
+    if (!plantCategory) {
+      return NextResponse.json({ message: "분류를 선택하세요." }, { status: 400 });
     }
 
     if (!photos.length) {
@@ -45,6 +50,7 @@ export async function POST(request: Request) {
       token,
       parentId,
       plantName,
+      plantCategory,
       note,
       createdAt,
       photos: uploadedPhotos,
@@ -55,6 +61,7 @@ export async function POST(request: Request) {
       pageUrl: page.url,
       photoCount: uploadedPhotos.length,
       plantName,
+      plantCategory,
       note,
       createdAt,
     });

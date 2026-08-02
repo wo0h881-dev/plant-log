@@ -20,7 +20,7 @@ function formatPlantName(plant: Plant) {
 export function PlantLogForm() {
   const [plants, setPlants] = useState<Plant[]>(fallbackPlants);
   const [photos, setPhotos] = useState<File[]>([]);
-  const [selectedPlant, setSelectedPlant] = useState(formatPlantName(fallbackPlants[0]));
+  const [selectedPlant, setSelectedPlant] = useState<Plant>(fallbackPlants[0]);
   const [query, setQuery] = useState("");
   const [note, setNote] = useState("");
   const [recentPlants, setRecentPlants] = useState<string[]>(() => {
@@ -43,24 +43,23 @@ export function PlantLogForm() {
       .then((response) => response.json() as Promise<PlantsResponse>)
       .then((payload) => {
         const nextPlants = payload.plants.length ? payload.plants : fallbackPlants;
-        const firstPlant = nextPlants[0];
         setPlants(nextPlants);
-        setSelectedPlant(formatPlantName(firstPlant));
+        setSelectedPlant(nextPlants[0]);
       })
       .catch(() => {
         setPlants(fallbackPlants);
-        setSelectedPlant(formatPlantName(fallbackPlants[0]));
+        setSelectedPlant(fallbackPlants[0]);
       });
   }, []);
 
+  const selectedPlantLabel = formatPlantName(selectedPlant);
   const canSave = useMemo(
-    () => Boolean(photos.length && selectedPlant && saveState !== "saving"),
-    [photos.length, selectedPlant, saveState],
+    () => Boolean(photos.length && selectedPlant.name && saveState !== "saving"),
+    [photos.length, selectedPlant.name, saveState],
   );
 
   function selectPlant(plant: Plant) {
-    const plantName = formatPlantName(plant);
-    setSelectedPlant(plantName);
+    setSelectedPlant(plant);
     setQuery(plant.name);
   }
 
@@ -79,7 +78,7 @@ export function PlantLogForm() {
       return;
     }
 
-    if (!selectedPlant) {
+    if (!selectedPlant.name) {
       setMessage("식물을 선택하세요.");
       setSaveState("error");
       return;
@@ -90,7 +89,8 @@ export function PlantLogForm() {
 
     const formData = new FormData();
     photos.forEach((photo) => formData.append("photos", photo));
-    formData.append("plantName", selectedPlant);
+    formData.append("plantName", selectedPlant.name);
+    formData.append("plantCategory", selectedPlant.category);
     formData.append("note", note);
     formData.append("createdAt", new Date().toISOString());
 
@@ -105,7 +105,7 @@ export function PlantLogForm() {
         throw new Error(payload.message ?? "저장에 실패했습니다.");
       }
 
-      storeRecentPlant(selectedPlant);
+      storeRecentPlant(selectedPlantLabel);
       setSaveState("success");
       setMessage("Notion에 저장했습니다.");
       setNote("");
@@ -133,7 +133,7 @@ export function PlantLogForm() {
 
           <PlantSelect
             plants={plants}
-            value={selectedPlant}
+            value={selectedPlantLabel}
             query={query}
             recentPlants={recentPlants}
             onQueryChange={setQuery}

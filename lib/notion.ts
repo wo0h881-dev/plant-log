@@ -21,6 +21,7 @@ type CreatePlantLogPageParams = {
   token: string;
   parentId: string;
   plantName: string;
+  plantCategory: string;
   note: string;
   createdAt: string;
   photos: UploadedPlantPhoto[];
@@ -106,6 +107,7 @@ export async function createPlantLogPage({
   token,
   parentId,
   plantName,
+  plantCategory,
   note,
   createdAt,
   photos,
@@ -119,6 +121,9 @@ export async function createPlantLogPage({
         properties: {
           식물명: {
             title: [{ text: { content: plantName } }],
+          },
+          분류: {
+            select: { name: plantCategory },
           },
           사진: {
             files: photos.map((photo) => ({
