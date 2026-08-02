@@ -139,6 +139,14 @@ export async function createPlantLogPage({
             date: { start: createdAt },
           },
         },
+        children: photos.map((photo) => ({
+          type: "image",
+          image: {
+            caption: [{ type: "text", text: { content: photo.name } }],
+            type: "file_upload",
+            file_upload: { id: photo.id },
+          },
+        })),
       }),
     }),
   );
