@@ -3,15 +3,24 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { PlantPhotoUploader } from "@/components/PlantPhotoUploader";
 import { PlantSelect } from "@/components/PlantSelect";
-import { getPlants } from "@/lib/plants";
+import { fallbackPlants } from "@/lib/plants";
 import type { Plant, SaveState } from "@/types/plant";
 
 const RECENT_PLANTS_KEY = "plant-log:recent-plants";
 
+type PlantsResponse = {
+  plants: Plant[];
+  source: "notion" | "fallback";
+};
+
+function formatPlantName(plant: Plant) {
+  return `${plant.category} - ${plant.name}`;
+}
+
 export function PlantLogForm() {
-  const [plants, setPlants] = useState<Plant[]>([]);
+  const [plants, setPlants] = useState<Plant[]>(fallbackPlants);
   const [photos, setPhotos] = useState<File[]>([]);
-  const [selectedPlant, setSelectedPlant] = useState("");
+  const [selectedPlant, setSelectedPlant] = useState(formatPlantName(fallbackPlants[0]));
   const [query, setQuery] = useState("");
   const [note, setNote] = useState("");
   const [recentPlants, setRecentPlants] = useState<string[]>(() => {
@@ -30,11 +39,18 @@ export function PlantLogForm() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    getPlants().then((items) => {
-      setPlants(items);
-      setSelectedPlant(items[0]?.name ?? "");
-      setQuery(items[0]?.name ?? "");
-    });
+    fetch("/api/plants")
+      .then((response) => response.json() as Promise<PlantsResponse>)
+      .then((payload) => {
+        const nextPlants = payload.plants.length ? payload.plants : fallbackPlants;
+        const firstPlant = nextPlants[0];
+        setPlants(nextPlants);
+        setSelectedPlant(formatPlantName(firstPlant));
+      })
+      .catch(() => {
+        setPlants(fallbackPlants);
+        setSelectedPlant(formatPlantName(fallbackPlants[0]));
+      });
   }, []);
 
   const canSave = useMemo(
@@ -42,9 +58,10 @@ export function PlantLogForm() {
     [photos.length, selectedPlant, saveState],
   );
 
-  function selectPlant(plantName: string) {
+  function selectPlant(plant: Plant) {
+    const plantName = formatPlantName(plant);
     setSelectedPlant(plantName);
-    setQuery(plantName);
+    setQuery(plant.name);
   }
 
   function storeRecentPlant(plantName: string) {

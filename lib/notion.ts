@@ -34,7 +34,7 @@ function notionHeaders(token: string, contentType = "application/json") {
   };
 }
 
-async function readNotionJson<T>(response: Response): Promise<T> {
+export async function readNotionJson<T>(response: Response): Promise<T> {
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
@@ -46,6 +46,10 @@ async function readNotionJson<T>(response: Response): Promise<T> {
   }
 
   return payload as T;
+}
+
+export function createNotionHeaders(token: string, contentType = "application/json") {
+  return notionHeaders(token, contentType);
 }
 
 export async function uploadFileToNotion(token: string, file: File) {
