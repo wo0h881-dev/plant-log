@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { BatchWatering } from "@/components/BatchWatering";
 import { PlantPhotoUploader } from "@/components/PlantPhotoUploader";
 import { PlantSelect } from "@/components/PlantSelect";
 import { fallbackPlants } from "@/lib/plants";
@@ -137,6 +138,8 @@ export function PlantLogForm() {
         </header>
 
         <div className="flex flex-1 flex-col gap-5">
+          <BatchWatering plants={plants} />
+
           <PlantPhotoUploader files={photos} onChange={setPhotos} />
 
           <PlantSelect
