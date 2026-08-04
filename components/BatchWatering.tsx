@@ -11,10 +11,21 @@ function formatPlantName(plant: Plant) {
   return `${plant.category} - ${plant.name}`;
 }
 
+function getTodayValue() {
+  const today = new Date();
+  const offsetDate = new Date(today.getTime() - today.getTimezoneOffset() * 60_000);
+  return offsetDate.toISOString().slice(0, 10);
+}
+
+function toDateTime(dateValue: string) {
+  return new Date(`${dateValue}T12:00:00`).toISOString();
+}
+
 export function BatchWatering({ plants }: BatchWateringProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [query, setQuery] = useState("");
+  const [wateredDate, setWateredDate] = useState(getTodayValue);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [message, setMessage] = useState("");
 
@@ -38,6 +49,12 @@ export function BatchWatering({ plants }: BatchWateringProps) {
       return;
     }
 
+    if (!wateredDate) {
+      setSaveState("error");
+      setMessage("물 준 날짜를 선택하세요.");
+      return;
+    }
+
     setSaveState("saving");
     setMessage("");
 
@@ -46,10 +63,11 @@ export function BatchWatering({ plants }: BatchWateringProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          wateredAt: new Date().toISOString(),
+          wateredAt: toDateTime(wateredDate),
           plants: selectedPlants.map((plant) => ({
             id: plant.id,
             name: plant.name,
+            category: plant.category,
           })),
         }),
       });
@@ -79,7 +97,7 @@ export function BatchWatering({ plants }: BatchWateringProps) {
         <span>
           <span className="block text-base font-bold text-stone-900">여러 식물 물주기</span>
           <span className="block text-sm text-stone-500">
-            {isOpen ? "오늘 물 준 식물을 쭉 체크하세요" : "눌러서 체크리스트 열기"}
+            {isOpen ? "물 준 날짜와 식물을 체크하세요" : "눌러서 체크리스트 열기"}
           </span>
         </span>
         <span className="flex items-center gap-2">
@@ -92,6 +110,16 @@ export function BatchWatering({ plants }: BatchWateringProps) {
 
       {isOpen ? (
         <div className="mt-4">
+          <label className="mb-3 block">
+            <span className="mb-2 block text-sm font-semibold text-stone-700">물 준 날짜</span>
+            <input
+              type="date"
+              value={wateredDate}
+              onChange={(event) => setWateredDate(event.target.value)}
+              className="h-11 w-full rounded-2xl bg-stone-50 px-4 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
+            />
+          </label>
+
           <input
             type="search"
             value={query}
@@ -113,7 +141,9 @@ export function BatchWatering({ plants }: BatchWateringProps) {
                 >
                   <span>
                     <span className="block font-semibold">{plant.name}</span>
-                    <span className={isSelected ? "text-white/75" : "text-stone-500"}>{plant.category}</span>
+                    <span className={isSelected ? "text-white/75" : "text-stone-500"}>
+                      {plant.category}
+                    </span>
                   </span>
                   <input
                     type="checkbox"
@@ -142,7 +172,7 @@ export function BatchWatering({ plants }: BatchWateringProps) {
             disabled={!selectedIds.length || saveState === "saving"}
             className="mt-3 min-h-12 w-full rounded-[1.1rem] bg-emerald-800 px-5 text-base font-bold text-white shadow-md shadow-emerald-950/15 transition active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500 disabled:shadow-none"
           >
-            {saveState === "saving" ? "물주기 저장 중..." : "선택한 식물 물줌 저장"}
+            {saveState === "saving" ? "물주기 저장 중..." : "선택한 식물 물주기 저장"}
           </button>
         </div>
       ) : null}

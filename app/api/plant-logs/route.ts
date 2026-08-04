@@ -71,6 +71,7 @@ export async function POST(request: Request) {
         token,
         parentId: wateringParentId,
         plantId,
+        plantName,
         wateredAt,
         note,
       });
