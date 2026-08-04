@@ -18,6 +18,7 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
     const photos = formData.getAll("photos").filter((photo): photo is File => photo instanceof File);
+    const plantId = String(formData.get("plantId") ?? "").trim();
     const plantName = String(formData.get("plantName") ?? "").trim();
     const plantCategory = String(formData.get("plantCategory") ?? "").trim();
     const note = String(formData.get("note") ?? "").trim();
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
     const page = await createPlantLogPage({
       token,
       parentId,
+      plantId,
       plantName,
       plantCategory,
       note,
@@ -62,6 +64,7 @@ export async function POST(request: Request) {
       pageId: page.id,
       pageUrl: page.url,
       photoCount: uploadedPhotos.length,
+      plantId,
       plantName,
       plantCategory,
       wateredAt,

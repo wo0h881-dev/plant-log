@@ -92,6 +92,7 @@ export function PlantLogForm() {
     const createdAt = new Date().toISOString();
     const formData = new FormData();
     photos.forEach((photo) => formData.append("photos", photo));
+    formData.append("plantId", selectedPlant.id);
     formData.append("plantName", selectedPlant.name);
     formData.append("plantCategory", selectedPlant.category);
     formData.append("note", note);

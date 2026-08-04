@@ -1,5 +1,6 @@
 const NOTION_VERSION = "2026-03-11";
 const NOTION_API_BASE = "https://api.notion.com/v1";
+const NOTION_PAGE_ID_PATTERN = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
 
 type NotionFileUpload = {
   id: string;
@@ -20,6 +21,7 @@ type UploadedPlantPhoto = {
 type CreatePlantLogPageParams = {
   token: string;
   parentId: string;
+  plantId?: string;
   plantName: string;
   plantCategory: string;
   note: string;
@@ -107,6 +109,7 @@ export async function resolveDataSourceId(token: string, databaseId: string) {
 export async function createPlantLogPage({
   token,
   parentId,
+  plantId,
   plantName,
   plantCategory,
   note,
@@ -114,6 +117,8 @@ export async function createPlantLogPage({
   wateredAt,
   photos,
 }: CreatePlantLogPageParams) {
+  const hasPlantRelation = plantId ? NOTION_PAGE_ID_PATTERN.test(plantId) : false;
+
   return readNotionJson<{ id: string; url?: string }>(
     await fetch(`${NOTION_API_BASE}/pages`, {
       method: "POST",
@@ -121,6 +126,13 @@ export async function createPlantLogPage({
       body: JSON.stringify({
         parent: { type: "data_source_id", data_source_id: parentId },
         properties: {
+          ...(hasPlantRelation
+            ? {
+                식물: {
+                  relation: [{ id: plantId }],
+                },
+              }
+            : {}),
           식물명: {
             title: [{ text: { content: plantName } }],
           },
