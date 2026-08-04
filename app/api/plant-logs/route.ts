@@ -68,13 +68,12 @@ export async function POST(request: Request) {
         configuredWateringDataSourceId || (await resolveDataSourceId(token, wateringDatabaseId));
 
       wateringPage = await createWateringLogPage({
-        token,
-        parentId: wateringParentId,
-        plantId,
-        plantName,
-        wateredAt,
-        note,
-      });
+      token,
+      parentId: wateringParentId,
+      plantId,
+      wateredAt,
+      note,
+    });
     }
 
     return NextResponse.json({

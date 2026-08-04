@@ -34,7 +34,6 @@ type CreateWateringLogPageParams = {
   token: string;
   parentId: string;
   plantId?: string;
-  plantName: string;
   wateredAt: string;
   note: string;
 };
@@ -191,7 +190,6 @@ export async function createWateringLogPage({
   token,
   parentId,
   plantId,
-  plantName,
   wateredAt,
   note,
 }: CreateWateringLogPageParams) {
@@ -203,7 +201,7 @@ export async function createWateringLogPage({
         parent: { type: "data_source_id", data_source_id: parentId },
         properties: {
           이름: {
-            title: [{ text: { content: `${plantName} 물줌` } }],
+            title: [{ text: { content: "💧🌱" } }],
           },
           날짜: {
             date: { start: wateredAt },
