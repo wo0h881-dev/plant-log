@@ -30,12 +30,25 @@ type CreatePlantLogPageParams = {
   photos: UploadedPlantPhoto[];
 };
 
+type CreateWateringLogPageParams = {
+  token: string;
+  parentId: string;
+  plantId?: string;
+  plantName: string;
+  wateredAt: string;
+  note: string;
+};
+
 function notionHeaders(token: string, contentType = "application/json") {
   return {
     Authorization: `Bearer ${token}`,
     "Notion-Version": NOTION_VERSION,
     "Content-Type": contentType,
   };
+}
+
+function hasNotionPageId(id?: string) {
+  return id ? NOTION_PAGE_ID_PATTERN.test(id) : false;
 }
 
 export async function readNotionJson<T>(response: Response): Promise<T> {
@@ -117,8 +130,6 @@ export async function createPlantLogPage({
   wateredAt,
   photos,
 }: CreatePlantLogPageParams) {
-  const hasPlantRelation = plantId ? NOTION_PAGE_ID_PATTERN.test(plantId) : false;
-
   return readNotionJson<{ id: string; url?: string }>(
     await fetch(`${NOTION_API_BASE}/pages`, {
       method: "POST",
@@ -126,7 +137,7 @@ export async function createPlantLogPage({
       body: JSON.stringify({
         parent: { type: "data_source_id", data_source_id: parentId },
         properties: {
-          ...(hasPlantRelation
+          ...(hasNotionPageId(plantId)
             ? {
                 식물: {
                   relation: [{ id: plantId }],
@@ -171,6 +182,46 @@ export async function createPlantLogPage({
             file_upload: { id: photo.id },
           },
         })),
+      }),
+    }),
+  );
+}
+
+export async function createWateringLogPage({
+  token,
+  parentId,
+  plantId,
+  plantName,
+  wateredAt,
+  note,
+}: CreateWateringLogPageParams) {
+  return readNotionJson<{ id: string; url?: string }>(
+    await fetch(`${NOTION_API_BASE}/pages`, {
+      method: "POST",
+      headers: notionHeaders(token),
+      body: JSON.stringify({
+        parent: { type: "data_source_id", data_source_id: parentId },
+        properties: {
+          이름: {
+            title: [{ text: { content: `${plantName} 물줌` } }],
+          },
+          날짜: {
+            date: { start: wateredAt },
+          },
+          ...(hasNotionPageId(plantId)
+            ? {
+                식물: {
+                  relation: [{ id: plantId }],
+                },
+              }
+            : {}),
+          물줌: {
+            checkbox: true,
+          },
+          메모: {
+            rich_text: note ? [{ text: { content: note } }] : [],
+          },
+        },
       }),
     }),
   );

@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
-import { createPlantLogPage, resolveDataSourceId, uploadFileToNotion } from "@/lib/notion";
+import { createPlantLogPage, createWateringLogPage, resolveDataSourceId, uploadFileToNotion } from "@/lib/notion";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const token = process.env.NOTION_TOKEN;
   const databaseId = process.env.NOTION_DATABASE_ID;
+  const wateringDatabaseId = process.env.NOTION_WATERING_DATABASE_ID;
   const configuredDataSourceId = process.env.NOTION_DATA_SOURCE_ID;
+  const configuredWateringDataSourceId = process.env.NOTION_WATERING_DATA_SOURCE_ID;
 
   if (!token || !databaseId) {
     return NextResponse.json(
@@ -60,9 +62,26 @@ export async function POST(request: Request) {
       photos: uploadedPhotos,
     });
 
+    let wateringPage = null;
+    if (wateredAt && wateringDatabaseId) {
+      const wateringParentId =
+        configuredWateringDataSourceId || (await resolveDataSourceId(token, wateringDatabaseId));
+
+      wateringPage = await createWateringLogPage({
+        token,
+        parentId: wateringParentId,
+        plantId,
+        plantName,
+        wateredAt,
+        note,
+      });
+    }
+
     return NextResponse.json({
       pageId: page.id,
       pageUrl: page.url,
+      wateringPageId: wateringPage?.id,
+      wateringPageUrl: wateringPage?.url,
       photoCount: uploadedPhotos.length,
       plantId,
       plantName,
