@@ -24,6 +24,7 @@ type CreatePlantLogPageParams = {
   plantCategory: string;
   note: string;
   createdAt: string;
+  wateredAt?: string;
   photos: UploadedPlantPhoto[];
 };
 
@@ -110,6 +111,7 @@ export async function createPlantLogPage({
   plantCategory,
   note,
   createdAt,
+  wateredAt,
   photos,
 }: CreatePlantLogPageParams) {
   return readNotionJson<{ id: string; url?: string }>(
@@ -138,6 +140,16 @@ export async function createPlantLogPage({
           관찰일: {
             date: { start: createdAt },
           },
+          ...(wateredAt
+            ? {
+                물줌: {
+                  checkbox: true,
+                },
+                물준날: {
+                  date: { start: wateredAt },
+                },
+              }
+            : {}),
         },
         children: photos.map((photo) => ({
           type: "image",

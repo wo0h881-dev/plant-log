@@ -23,6 +23,7 @@ export function PlantLogForm() {
   const [selectedPlant, setSelectedPlant] = useState<Plant>(fallbackPlants[0]);
   const [query, setQuery] = useState("");
   const [note, setNote] = useState("");
+  const [wateredToday, setWateredToday] = useState(false);
   const [recentPlants, setRecentPlants] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
 
@@ -53,9 +54,10 @@ export function PlantLogForm() {
   }, []);
 
   const selectedPlantLabel = formatPlantName(selectedPlant);
+  const hasRecordContent = photos.length > 0 || note.trim().length > 0 || wateredToday;
   const canSave = useMemo(
-    () => Boolean(photos.length && selectedPlant.name && saveState !== "saving"),
-    [photos.length, selectedPlant.name, saveState],
+    () => Boolean(selectedPlant.name && hasRecordContent && saveState !== "saving"),
+    [selectedPlant.name, hasRecordContent, saveState],
   );
 
   function selectPlant(plant: Plant) {
@@ -72,14 +74,14 @@ export function PlantLogForm() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!photos.length) {
-      setMessage("사진을 선택하세요.");
+    if (!selectedPlant.name) {
+      setMessage("식물을 선택하세요.");
       setSaveState("error");
       return;
     }
 
-    if (!selectedPlant.name) {
-      setMessage("식물을 선택하세요.");
+    if (!hasRecordContent) {
+      setMessage("사진, 메모, 물 줌 기록 중 하나는 입력하세요.");
       setSaveState("error");
       return;
     }
@@ -87,12 +89,16 @@ export function PlantLogForm() {
     setSaveState("saving");
     setMessage("");
 
+    const createdAt = new Date().toISOString();
     const formData = new FormData();
     photos.forEach((photo) => formData.append("photos", photo));
     formData.append("plantName", selectedPlant.name);
     formData.append("plantCategory", selectedPlant.category);
     formData.append("note", note);
-    formData.append("createdAt", new Date().toISOString());
+    formData.append("createdAt", createdAt);
+    if (wateredToday) {
+      formData.append("wateredAt", createdAt);
+    }
 
     try {
       const response = await fetch("/api/plant-logs", {
@@ -109,6 +115,7 @@ export function PlantLogForm() {
       setSaveState("success");
       setMessage("Notion에 저장했습니다.");
       setNote("");
+      setWateredToday(false);
     } catch (error) {
       setSaveState("error");
       setMessage(error instanceof Error ? error.message : "저장에 실패했습니다.");
@@ -139,6 +146,21 @@ export function PlantLogForm() {
             onQueryChange={setQuery}
             onSelect={selectPlant}
           />
+
+          <section className="rounded-[1.5rem] border border-stone-200 bg-white p-4 shadow-sm shadow-stone-950/5">
+            <label className="flex min-h-12 items-center justify-between gap-4">
+              <span>
+                <span className="block text-sm font-semibold text-stone-800">물 준 기록</span>
+                <span className="block text-sm text-stone-500">체크하면 오늘 날짜가 물준날로 저장돼요</span>
+              </span>
+              <input
+                type="checkbox"
+                checked={wateredToday}
+                onChange={(event) => setWateredToday(event.target.checked)}
+                className="h-6 w-6 accent-emerald-900"
+              />
+            </label>
+          </section>
 
           <section className="space-y-2">
             <label htmlFor="note" className="text-sm font-semibold text-stone-800">

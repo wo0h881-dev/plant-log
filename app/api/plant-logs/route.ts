@@ -22,6 +22,7 @@ export async function POST(request: Request) {
     const plantCategory = String(formData.get("plantCategory") ?? "").trim();
     const note = String(formData.get("note") ?? "").trim();
     const createdAt = String(formData.get("createdAt") ?? new Date().toISOString());
+    const wateredAt = String(formData.get("wateredAt") ?? "").trim();
 
     if (!plantName) {
       return NextResponse.json({ message: "식물명을 선택하세요." }, { status: 400 });
@@ -31,8 +32,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "분류를 선택하세요." }, { status: 400 });
     }
 
-    if (!photos.length) {
-      return NextResponse.json({ message: "사진 파일을 선택하세요." }, { status: 400 });
+    if (!photos.length && !note && !wateredAt) {
+      return NextResponse.json({ message: "사진, 메모, 물 줌 기록 중 하나는 입력하세요." }, { status: 400 });
     }
 
     if (photos.some((photo) => !photo.type.startsWith("image/"))) {
@@ -53,6 +54,7 @@ export async function POST(request: Request) {
       plantCategory,
       note,
       createdAt,
+      wateredAt: wateredAt || undefined,
       photos: uploadedPhotos,
     });
 
@@ -62,6 +64,7 @@ export async function POST(request: Request) {
       photoCount: uploadedPhotos.length,
       plantName,
       plantCategory,
+      wateredAt,
       note,
       createdAt,
     });
