@@ -120,13 +120,25 @@ export function BatchWatering({ plants }: BatchWateringProps) {
             />
           </label>
 
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="물 준 식물 검색"
-            className="mb-3 h-11 w-full rounded-2xl bg-stone-50 px-4 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
-          />
+          <div className="relative mb-3">
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="물 준 식물 검색"
+              className="h-11 w-full rounded-2xl bg-stone-50 px-4 pr-12 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
+            />
+            {query ? (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label="검색어 지우기"
+                className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-stone-200 text-sm font-bold text-stone-600 transition active:scale-95"
+              >
+                x
+              </button>
+            ) : null}
+          </div>
 
           <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
             {filteredPlants.map((plant) => {

@@ -41,14 +41,26 @@ export function PlantSelect({
       </div>
 
       <div className="rounded-[1.5rem] border border-stone-200 bg-white p-3 shadow-sm shadow-stone-950/5">
-        <input
-          id="plant-search"
-          type="search"
-          value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="식물 이름 검색"
-          className="h-12 w-full rounded-2xl bg-stone-50 px-4 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
-        />
+        <div className="relative">
+          <input
+            id="plant-search"
+            type="search"
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            placeholder="식물 이름 검색"
+            className="h-12 w-full rounded-2xl bg-stone-50 px-4 pr-12 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
+          />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => onQueryChange("")}
+              aria-label="검색어 지우기"
+              className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-stone-200 text-sm font-bold text-stone-600 transition active:scale-95"
+            >
+              x
+            </button>
+          ) : null}
+        </div>
 
         <div className="mt-3 max-h-56 space-y-2 overflow-y-auto pr-1">
           {filteredPlants.map((plant) => {
