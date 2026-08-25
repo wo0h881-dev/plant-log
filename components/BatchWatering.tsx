@@ -7,6 +7,20 @@ type BatchWateringProps = {
   plants: Plant[];
 };
 
+type WateringResult = {
+  plantId: string;
+  plantName: string;
+  ok: boolean;
+  message?: string;
+};
+
+type WateringResponse = {
+  successCount?: number;
+  failureCount?: number;
+  results?: WateringResult[];
+  message?: string;
+};
+
 function formatPlantName(plant: Plant) {
   return `${plant.category} - ${plant.name}`;
 }
@@ -28,8 +42,11 @@ export function BatchWatering({ plants }: BatchWateringProps) {
   const [wateredDate, setWateredDate] = useState(getTodayValue);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [message, setMessage] = useState("");
+  const [results, setResults] = useState<WateringResult[]>([]);
 
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const successfulResults = results.filter((result) => result.ok);
+  const failedResults = results.filter((result) => !result.ok);
   const filteredPlants = plants.filter((plant) =>
     formatPlantName(plant).toLowerCase().includes(query.trim().toLowerCase()),
   );
@@ -57,6 +74,7 @@ export function BatchWatering({ plants }: BatchWateringProps) {
 
     setSaveState("saving");
     setMessage("");
+    setResults([]);
 
     try {
       const response = await fetch("/api/watering-logs", {
@@ -71,15 +89,25 @@ export function BatchWatering({ plants }: BatchWateringProps) {
           })),
         }),
       });
-      const payload = await response.json();
+      const payload = (await response.json()) as WateringResponse;
 
       if (!response.ok) {
         throw new Error(payload.message ?? "물주기 기록 저장에 실패했습니다.");
       }
 
-      setSelectedIds([]);
-      setSaveState("success");
-      setMessage(`${selectedPlants.length}개 식물의 물주기를 저장했습니다.`);
+      const nextResults = payload.results ?? [];
+      const failedIds = nextResults.filter((result) => !result.ok).map((result) => result.plantId);
+      const successCount = payload.successCount ?? nextResults.filter((result) => result.ok).length;
+      const failureCount = payload.failureCount ?? failedIds.length;
+
+      setResults(nextResults);
+      setSelectedIds(failedIds);
+      setSaveState(failureCount ? "error" : "success");
+      setMessage(
+        failureCount
+          ? `${successCount}개 저장, ${failureCount}개 실패했습니다.`
+          : `${successCount}개 식물의 물주기를 저장했습니다.`,
+      );
     } catch (error) {
       setSaveState("error");
       setMessage(error instanceof Error ? error.message : "물주기 기록 저장에 실패했습니다.");
@@ -169,13 +197,38 @@ export function BatchWatering({ plants }: BatchWateringProps) {
           </div>
 
           {message ? (
-            <p
+            <div
               className={`mt-3 rounded-2xl px-4 py-3 text-sm font-medium ${
                 saveState === "error" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-800"
               }`}
             >
-              {message}
-            </p>
+              <p>{message}</p>
+              {results.length ? (
+                <div className="mt-3 space-y-3">
+                  {successfulResults.length ? (
+                    <div>
+                      <p className="text-xs font-bold">성공 {successfulResults.length}개</p>
+                      <ul className="mt-1 space-y-1">
+                        {successfulResults.map((result) => (
+                          <li key={`success-${result.plantId}`}>✓ {result.plantName}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  {failedResults.length ? (
+                    <div>
+                      <p className="text-xs font-bold">실패 {failedResults.length}개</p>
+                      <ul className="mt-1 space-y-1">
+                        {failedResults.map((result) => (
+                          <li key={`failed-${result.plantId}`}>! {result.plantName}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           ) : null}
 
           <button
@@ -184,7 +237,11 @@ export function BatchWatering({ plants }: BatchWateringProps) {
             disabled={!selectedIds.length || saveState === "saving"}
             className="mt-3 min-h-12 w-full rounded-[1.1rem] bg-emerald-800 px-5 text-base font-bold text-white shadow-md shadow-emerald-950/15 transition active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500 disabled:shadow-none"
           >
-            {saveState === "saving" ? "물주기 저장 중..." : "선택한 식물 물주기 저장"}
+            {saveState === "saving"
+              ? "물주기 저장 중..."
+              : failedResults.length
+                ? "실패한 식물만 다시 저장"
+                : "선택한 식물 물주기 저장"}
           </button>
         </div>
       ) : null}

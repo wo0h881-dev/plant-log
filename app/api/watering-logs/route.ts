@@ -6,7 +6,32 @@ type WateringPlant = {
   name: string;
 };
 
+type WateringResult = {
+  plantId: string;
+  plantName: string;
+  ok: boolean;
+  pageId?: string;
+  message?: string;
+};
+
 export const runtime = "nodejs";
+
+async function createWateringLogWithRetry(
+  params: Parameters<typeof createWateringLogPage>[0],
+  retries = 2,
+) {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await createWateringLogPage(params);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
 
 export async function POST(request: Request) {
   const token = process.env.NOTION_TOKEN;
@@ -36,24 +61,40 @@ export async function POST(request: Request) {
 
     const wateringParentId =
       configuredWateringDataSourceId || (await resolveDataSourceId(token, wateringDatabaseId));
-    const pages = [];
+    const results: WateringResult[] = [];
 
     for (const plant of plants) {
-      pages.push(
-        await createWateringLogPage({
+      try {
+        const page = await createWateringLogWithRetry({
           token,
           parentId: wateringParentId,
           plantId: plant.id,
           plantName: plant.name,
           wateredAt,
           note,
-        }),
-      );
+        });
+
+        results.push({
+          plantId: plant.id,
+          plantName: plant.name,
+          ok: true,
+          pageId: page.id,
+        });
+      } catch (error) {
+        results.push({
+          plantId: plant.id,
+          plantName: plant.name,
+          ok: false,
+          message: error instanceof Error ? error.message : "저장에 실패했습니다.",
+        });
+      }
     }
 
     return NextResponse.json({
-      count: pages.length,
-      pageIds: pages.map((page) => page.id),
+      count: results.length,
+      successCount: results.filter((result) => result.ok).length,
+      failureCount: results.filter((result) => !result.ok).length,
+      results,
       wateredAt,
     });
   } catch (error) {
