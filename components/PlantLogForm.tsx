@@ -18,12 +18,20 @@ function formatPlantName(plant: Plant) {
   return `${plant.category} - ${plant.name}`;
 }
 
+function getTodayValue() {
+  const today = new Date();
+  const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60_000);
+  return localDate.toISOString().slice(0, 10);
+}
+
 export function PlantLogForm() {
   const [plants, setPlants] = useState<Plant[]>(fallbackPlants);
   const [photos, setPhotos] = useState<File[]>([]);
   const [selectedPlant, setSelectedPlant] = useState<Plant>(fallbackPlants[0]);
   const [query, setQuery] = useState("");
   const [note, setNote] = useState("");
+  const [observedDate, setObservedDate] = useState(getTodayValue);
+  const [dateSource, setDateSource] = useState<"capture" | "today">("today");
   const [wateredToday, setWateredToday] = useState(false);
   const [recentPlants, setRecentPlants] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
@@ -72,6 +80,11 @@ export function PlantLogForm() {
     window.localStorage.setItem(RECENT_PLANTS_KEY, JSON.stringify(next));
   }
 
+  function updateCaptureDate(captureDate: string | null) {
+    setObservedDate(captureDate ?? getTodayValue());
+    setDateSource(captureDate ? "capture" : "today");
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -90,16 +103,15 @@ export function PlantLogForm() {
     setSaveState("saving");
     setMessage("");
 
-    const createdAt = new Date().toISOString();
     const formData = new FormData();
     photos.forEach((photo) => formData.append("photos", photo));
     formData.append("plantId", selectedPlant.id);
     formData.append("plantName", selectedPlant.name);
     formData.append("plantCategory", selectedPlant.category);
     formData.append("note", note);
-    formData.append("createdAt", createdAt);
+    formData.append("createdAt", observedDate);
     if (wateredToday) {
-      formData.append("wateredAt", createdAt);
+      formData.append("wateredAt", observedDate);
     }
 
     try {
@@ -140,7 +152,11 @@ export function PlantLogForm() {
         <div className="flex flex-1 flex-col gap-5">
           <BatchWatering plants={plants} />
 
-          <PlantPhotoUploader files={photos} onChange={setPhotos} />
+          <PlantPhotoUploader
+            files={photos}
+            onChange={setPhotos}
+            onCaptureDateChange={updateCaptureDate}
+          />
 
           <PlantSelect
             plants={plants}
@@ -151,11 +167,20 @@ export function PlantLogForm() {
             onSelect={selectPlant}
           />
 
+          <section className="rounded-[1.5rem] border border-stone-200 bg-white px-4 py-3 shadow-sm shadow-stone-950/5">
+            <p className="text-sm font-semibold text-stone-800">관찰 날짜 · {observedDate}</p>
+            <p className="mt-1 text-sm text-stone-500">
+              {dateSource === "capture"
+                ? "첫 번째 사진의 촬영일을 자동으로 불러왔어요."
+                : "사진에 촬영정보가 없어 오늘 날짜를 사용해요."}
+            </p>
+          </section>
+
           <section className="rounded-[1.5rem] border border-stone-200 bg-white p-4 shadow-sm shadow-stone-950/5">
             <label className="flex min-h-12 items-center justify-between gap-4">
               <span>
                 <span className="block text-sm font-semibold text-stone-800">물 준 기록</span>
-                <span className="block text-sm text-stone-500">체크하면 오늘 날짜가 물준날로 저장돼요</span>
+                <span className="block text-sm text-stone-500">체크하면 관찰 날짜가 물준날로 저장돼요</span>
               </span>
               <input
                 type="checkbox"

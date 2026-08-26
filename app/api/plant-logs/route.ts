@@ -27,6 +27,14 @@ export async function POST(request: Request) {
     const createdAt = String(formData.get("createdAt") ?? new Date().toISOString());
     const wateredAt = String(formData.get("wateredAt") ?? "").trim();
 
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(createdAt) || Number.isNaN(Date.parse(`${createdAt}T00:00:00Z`))) {
+      return NextResponse.json({ message: "올바른 관찰 날짜를 선택하세요." }, { status: 400 });
+    }
+
+    if (wateredAt && wateredAt !== createdAt) {
+      return NextResponse.json({ message: "물 준 날짜가 관찰 날짜와 일치하지 않습니다." }, { status: 400 });
+    }
+
     if (!plantName) {
       return NextResponse.json({ message: "식물명을 선택하세요." }, { status: 400 });
     }

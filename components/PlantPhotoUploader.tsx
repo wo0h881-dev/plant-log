@@ -2,11 +2,13 @@
 
 import Image from "next/image";
 import { ChangeEvent, useId, useState } from "react";
+import { parse } from "exifr";
 import { compressImage } from "@/lib/imageCompression";
 
 type PlantPhotoUploaderProps = {
   files: File[];
   onChange: (files: File[]) => void;
+  onCaptureDateChange: (date: string | null) => void;
 };
 
 type PreviewPhoto = {
@@ -14,7 +16,21 @@ type PreviewPhoto = {
   url: string;
 };
 
-export function PlantPhotoUploader({ files, onChange }: PlantPhotoUploaderProps) {
+function formatLocalDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+async function readCaptureDate(file: File) {
+  const metadata = await parse(file, ["DateTimeOriginal", "CreateDate"]);
+  const value = metadata?.DateTimeOriginal ?? metadata?.CreateDate;
+  const date = value instanceof Date ? value : value ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime()) ? formatLocalDate(date) : null;
+}
+
+export function PlantPhotoUploader({ files, onChange, onCaptureDateChange }: PlantPhotoUploaderProps) {
   const inputId = useId();
   const [previews, setPreviews] = useState<PreviewPhoto[]>([]);
   const [isCompressing, setIsCompressing] = useState(false);
@@ -26,6 +42,7 @@ export function PlantPhotoUploader({ files, onChange }: PlantPhotoUploaderProps)
 
     if (!selected.length) {
       onChange([]);
+      onCaptureDateChange(null);
       setPreviews((current) => {
         current.forEach((preview) => URL.revokeObjectURL(preview.url));
         return [];
@@ -41,8 +58,10 @@ export function PlantPhotoUploader({ files, onChange }: PlantPhotoUploaderProps)
 
     setIsCompressing(true);
     try {
+      const captureDate = await readCaptureDate(imageFiles[0]).catch(() => null);
       const compressedFiles = await Promise.all(imageFiles.map((file) => compressImage(file)));
       onChange(compressedFiles);
+      onCaptureDateChange(captureDate);
       setPreviews((current) => {
         current.forEach((preview) => URL.revokeObjectURL(preview.url));
         return compressedFiles.map((file) => ({
