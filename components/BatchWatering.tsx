@@ -41,6 +41,7 @@ function canShowInWateringList(plant: Plant) {
 }
 
 export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
+  const [isDueOpen, setIsDueOpen] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dismissedDueIds, setDismissedDueIds] = useState<string[]>([]);
@@ -151,22 +152,40 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
   return (
     <div className="space-y-3">
       <section className="rounded-[1.5rem] border border-amber-100 bg-white p-4 shadow-sm shadow-amber-950/5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-base font-bold text-stone-900">물줄 때 된 식물</p>
-            <p className="text-sm text-stone-500">
+        <button
+          type="button"
+          onClick={() => setIsDueOpen((current) => !current)}
+          className="flex min-h-12 w-full items-center justify-between gap-3 text-left"
+          aria-expanded={isDueOpen}
+        >
+          <span>
+            <span className="block text-base font-bold text-stone-900">물줄 때 된 식물</span>
+            <span className="block text-sm text-stone-500">
               {duePlants.length ? "체크하고 바로 물주기 기록을 저장하세요" : "지금 알림이 있는 식물이 없습니다"}
-            </p>
-          </div>
-          {duePlants.length ? (
-            <span className="rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-900">
-              {duePlants.length}개
             </span>
-          ) : null}
-        </div>
+          </span>
+          <span className="flex items-center gap-2">
+            {duePlants.length ? (
+              <span className="rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-900">
+                {duePlants.length}개
+              </span>
+            ) : null}
+            <span className="text-xl font-bold text-amber-900">{isDueOpen ? "−" : "+"}</span>
+          </span>
+        </button>
 
-        {duePlants.length ? (
+        {isDueOpen && duePlants.length ? (
           <div className="mt-3">
+            <label className="mb-3 block">
+              <span className="mb-2 block text-sm font-semibold text-stone-700">물 준 날짜</span>
+              <input
+                type="date"
+                value={wateredDate}
+                onChange={(event) => setWateredDate(event.target.value)}
+                className="h-11 w-full rounded-2xl bg-amber-50 px-4 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
+              />
+            </label>
+
             <button
               type="button"
               onClick={toggleAllDuePlants}
@@ -234,9 +253,9 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
             {isOpen ? "물 준 날짜와 식물을 체크하세요" : "눌러서 체크리스트 열기"}
           </span>
         </span>
-        <span className="flex items-center gap-2">
-          <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-900">
-            {duePlants.length ? `알림 ${duePlants.length}` : `${selectedIds.length}개`}
+          <span className="flex items-center gap-2">
+            <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-900">
+            {selectedIds.length}개
           </span>
           <span className="text-xl font-bold text-emerald-900">{isOpen ? "−" : "+"}</span>
         </span>
