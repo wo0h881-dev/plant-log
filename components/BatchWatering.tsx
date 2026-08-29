@@ -36,6 +36,10 @@ function toDateTime(dateValue: string) {
   return new Date(`${dateValue}T12:00:00`).toISOString();
 }
 
+function canShowInWateringList(plant: Plant) {
+  return !["자구", "사망"].includes(plant.category.trim());
+}
+
 export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -50,10 +54,11 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
   const dismissedDueIdSet = useMemo(() => new Set(dismissedDueIds), [dismissedDueIds]);
   const successfulResults = results.filter((result) => result.ok);
   const failedResults = results.filter((result) => !result.ok);
-  const duePlants = plants.filter(
+  const wateringPlants = plants.filter(canShowInWateringList);
+  const duePlants = wateringPlants.filter(
     (plant) => plant.isWateringDue && !dismissedDueIdSet.has(plant.id),
   ).sort((a, b) => (b.daysSinceWatered ?? 0) - (a.daysSinceWatered ?? 0));
-  const filteredPlants = plants.filter((plant) =>
+  const filteredPlants = wateringPlants.filter((plant) =>
     formatPlantName(plant).toLowerCase().includes(query.trim().toLowerCase()),
   );
 
@@ -63,8 +68,15 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
     );
   }
 
+  function selectAllDuePlants() {
+    setSelectedIds((current) => [
+      ...new Set([...current, ...duePlants.map((plant) => plant.id)]),
+    ]);
+    setIsOpen(true);
+  }
+
   async function saveWateringLogs() {
-    const selectedPlants = plants.filter((plant) => selectedIdSet.has(plant.id));
+    const selectedPlants = wateringPlants.filter((plant) => selectedIdSet.has(plant.id));
 
     if (!selectedPlants.length) {
       setSaveState("error");
@@ -131,7 +143,68 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
   }
 
   return (
-    <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm shadow-emerald-950/5">
+    <div className="space-y-3">
+      <section className="rounded-[1.5rem] border border-amber-100 bg-white p-4 shadow-sm shadow-amber-950/5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-base font-bold text-stone-900">물줄 때 된 식물</p>
+            <p className="text-sm text-stone-500">
+              {duePlants.length ? "체크하고 바로 물주기 기록을 저장하세요" : "지금 알림이 있는 식물이 없습니다"}
+            </p>
+          </div>
+          {duePlants.length ? (
+            <span className="rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-900">
+              {duePlants.length}개
+            </span>
+          ) : null}
+        </div>
+
+        {duePlants.length ? (
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={selectAllDuePlants}
+              className="mb-3 min-h-10 w-full rounded-2xl bg-amber-100 px-4 text-sm font-bold text-amber-950 transition active:scale-[0.99]"
+            >
+              전체선택
+            </button>
+
+            <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
+              {duePlants.map((plant) => {
+                const isSelected = selectedIdSet.has(plant.id);
+                const daysText =
+                  typeof plant.daysSinceWatered === "number"
+                    ? `물 안 준 지 ${plant.daysSinceWatered}일`
+                    : "물준 기록 없음";
+
+                return (
+                  <label
+                    key={`due-${plant.id}`}
+                    className={`flex min-h-14 items-center justify-between gap-3 rounded-2xl px-3 text-sm transition ${
+                      isSelected ? "bg-amber-200/80" : "bg-amber-50"
+                    }`}
+                  >
+                    <span>
+                      <span className="block font-semibold text-stone-900">{plant.name}</span>
+                      <span className="block text-xs text-stone-600">
+                        관수 주기 {plant.wateringCycleDays}일 · {daysText}
+                      </span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => togglePlant(plant.id)}
+                      className="h-5 w-5 accent-emerald-900"
+                    />
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm shadow-emerald-950/5">
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
@@ -154,50 +227,6 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
 
       {isOpen ? (
         <div className="mt-4">
-          {duePlants.length ? (
-            <div className="mb-4 rounded-[1.25rem] bg-amber-50 p-3 text-sm text-amber-950">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="font-bold">물줄 때 된 식물</p>
-                <span className="text-xs font-semibold">{duePlants.length}개</span>
-              </div>
-              <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
-                {duePlants.map((plant) => {
-                  const isSelected = selectedIdSet.has(plant.id);
-                  const daysText =
-                    typeof plant.daysSinceWatered === "number"
-                      ? `물 안 준 지 ${plant.daysSinceWatered}일`
-                      : "물준 기록 없음";
-
-                  return (
-                    <label
-                      key={`due-${plant.id}`}
-                      className={`flex min-h-14 items-center justify-between gap-3 rounded-2xl px-3 transition ${
-                        isSelected ? "bg-amber-200/80" : "bg-white"
-                      }`}
-                    >
-                      <span>
-                        <span className="block font-semibold text-stone-900">{plant.name}</span>
-                        <span className="block text-xs text-stone-600">
-                          관수 주기 {plant.wateringCycleDays}일 · {daysText}
-                        </span>
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => togglePlant(plant.id)}
-                        className="h-5 w-5 accent-emerald-900"
-                      />
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            <div className="mb-4 rounded-[1.25rem] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">
-              지금 물주기 알림이 있는 식물이 없습니다.
-            </div>
-          )}
-
           <label className="mb-3 block">
             <span className="mb-2 block text-sm font-semibold text-stone-700">물 준 날짜</span>
             <input
@@ -305,6 +334,7 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
           </button>
         </div>
       ) : null}
-    </section>
+      </section>
+    </div>
   );
 }
