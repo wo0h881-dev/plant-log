@@ -58,6 +58,9 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
   const duePlants = wateringPlants.filter(
     (plant) => plant.isWateringDue && !dismissedDueIdSet.has(plant.id),
   ).sort((a, b) => (b.daysSinceWatered ?? 0) - (a.daysSinceWatered ?? 0));
+  const dueSelectedCount = duePlants.filter((plant) => selectedIdSet.has(plant.id)).length;
+  const hasDueSelection = dueSelectedCount > 0;
+  const areAllDuePlantsSelected = duePlants.length > 0 && dueSelectedCount === duePlants.length;
   const filteredPlants = wateringPlants.filter((plant) =>
     formatPlantName(plant).toLowerCase().includes(query.trim().toLowerCase()),
   );
@@ -68,11 +71,14 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
     );
   }
 
-  function selectAllDuePlants() {
-    setSelectedIds((current) => [
-      ...new Set([...current, ...duePlants.map((plant) => plant.id)]),
-    ]);
-    setIsOpen(true);
+  function toggleAllDuePlants() {
+    const dueIds = duePlants.map((plant) => plant.id);
+
+    setSelectedIds((current) =>
+      areAllDuePlantsSelected
+        ? current.filter((id) => !dueIds.includes(id))
+        : [...new Set([...current, ...dueIds])],
+    );
   }
 
   async function saveWateringLogs() {
@@ -163,10 +169,10 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
           <div className="mt-3">
             <button
               type="button"
-              onClick={selectAllDuePlants}
+              onClick={toggleAllDuePlants}
               className="mb-3 min-h-10 w-full rounded-2xl bg-amber-100 px-4 text-sm font-bold text-amber-950 transition active:scale-[0.99]"
             >
-              전체선택
+              {areAllDuePlantsSelected ? "전체해제" : "전체선택"}
             </button>
 
             <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
@@ -200,6 +206,17 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
                 );
               })}
             </div>
+
+            {hasDueSelection ? (
+              <button
+                type="button"
+                onClick={saveWateringLogs}
+                disabled={saveState === "saving"}
+                className="mt-3 min-h-12 w-full rounded-[1.1rem] bg-emerald-800 px-5 text-base font-bold text-white shadow-md shadow-emerald-950/15 transition active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500 disabled:shadow-none"
+              >
+                {saveState === "saving" ? "물주기 저장 중..." : `${dueSelectedCount}개 물주기 저장`}
+              </button>
+            ) : null}
           </div>
         ) : null}
       </section>
@@ -285,41 +302,6 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
             })}
           </div>
 
-          {message ? (
-            <div
-              className={`mt-3 rounded-2xl px-4 py-3 text-sm font-medium ${
-                saveState === "error" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-800"
-              }`}
-            >
-              <p>{message}</p>
-              {results.length ? (
-                <div className="mt-3 space-y-3">
-                  {successfulResults.length ? (
-                    <div>
-                      <p className="text-xs font-bold">성공 {successfulResults.length}개</p>
-                      <ul className="mt-1 space-y-1">
-                        {successfulResults.map((result) => (
-                          <li key={`success-${result.plantId}`}>✓ {result.plantName}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-
-                  {failedResults.length ? (
-                    <div>
-                      <p className="text-xs font-bold">실패 {failedResults.length}개</p>
-                      <ul className="mt-1 space-y-1">
-                        {failedResults.map((result) => (
-                          <li key={`failed-${result.plantId}`}>! {result.plantName}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-
           <button
             type="button"
             onClick={saveWateringLogs}
@@ -335,6 +317,41 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
         </div>
       ) : null}
       </section>
+
+      {message ? (
+        <div
+          className={`rounded-2xl px-4 py-3 text-sm font-medium ${
+            saveState === "error" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-800"
+          }`}
+        >
+          <p>{message}</p>
+          {results.length ? (
+            <div className="mt-3 space-y-3">
+              {successfulResults.length ? (
+                <div>
+                  <p className="text-xs font-bold">성공 {successfulResults.length}개</p>
+                  <ul className="mt-1 space-y-1">
+                    {successfulResults.map((result) => (
+                      <li key={`success-${result.plantId}`}>✓ {result.plantName}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {failedResults.length ? (
+                <div>
+                  <p className="text-xs font-bold">실패 {failedResults.length}개</p>
+                  <ul className="mt-1 space-y-1">
+                    {failedResults.map((result) => (
+                      <li key={`failed-${result.plantId}`}>! {result.plantName}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
