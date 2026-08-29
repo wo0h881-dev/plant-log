@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { BatchWatering } from "@/components/BatchWatering";
 import { PlantPhotoUploader } from "@/components/PlantPhotoUploader";
 import { PlantSelect } from "@/components/PlantSelect";
@@ -48,19 +48,27 @@ export function PlantLogForm() {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
+  const refreshPlants = useCallback(() => {
     fetch("/api/plants")
       .then((response) => response.json() as Promise<PlantsResponse>)
       .then((payload) => {
         const nextPlants = payload.plants.length ? payload.plants : fallbackPlants;
         setPlants(nextPlants);
-        setSelectedPlant(nextPlants[0]);
+        setSelectedPlant(
+          (current) => nextPlants.find((plant) => plant.id === current.id) ?? nextPlants[0],
+        );
       })
       .catch(() => {
         setPlants(fallbackPlants);
-        setSelectedPlant(fallbackPlants[0]);
+        setSelectedPlant(
+          (current) => fallbackPlants.find((plant) => plant.id === current.id) ?? fallbackPlants[0],
+        );
       });
   }, []);
+
+  useEffect(() => {
+    refreshPlants();
+  }, [refreshPlants]);
 
   const selectedPlantLabel = formatPlantName(selectedPlant);
   const hasRecordContent = photos.length > 0 || note.trim().length > 0 || wateredToday;
@@ -150,7 +158,7 @@ export function PlantLogForm() {
         </header>
 
         <div className="flex flex-1 flex-col gap-5">
-          <BatchWatering plants={plants} />
+          <BatchWatering plants={plants} onWateringSaved={refreshPlants} />
 
           <PlantPhotoUploader
             files={photos}

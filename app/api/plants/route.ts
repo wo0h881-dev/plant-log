@@ -9,6 +9,7 @@ type NotionQueryResponse = {
 };
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const token = process.env.NOTION_TOKEN;
@@ -16,7 +17,10 @@ export async function GET() {
   const configuredDataSourceId = process.env.NOTION_PLANTS_DATA_SOURCE_ID;
 
   if (!token || !plantsDatabaseId) {
-    return NextResponse.json({ plants: fallbackPlants, source: "fallback" });
+    return NextResponse.json(
+      { plants: fallbackPlants, source: "fallback" },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   try {
@@ -36,11 +40,17 @@ export async function GET() {
       .filter((plant) => plant !== null)
       .sort((a, b) => `${a.category} ${a.name}`.localeCompare(`${b.category} ${b.name}`, "ko"));
 
-    return NextResponse.json({
-      plants: plants.length ? plants : fallbackPlants,
-      source: plants.length ? "notion" : "fallback",
-    });
+    return NextResponse.json(
+      {
+        plants: plants.length ? plants : fallbackPlants,
+        source: plants.length ? "notion" : "fallback",
+      },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch {
-    return NextResponse.json({ plants: fallbackPlants, source: "fallback" });
+    return NextResponse.json(
+      { plants: fallbackPlants, source: "fallback" },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   }
 }

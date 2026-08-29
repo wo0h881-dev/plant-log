@@ -5,6 +5,7 @@ import type { Plant, SaveState } from "@/types/plant";
 
 type BatchWateringProps = {
   plants: Plant[];
+  onWateringSaved?: () => void;
 };
 
 type WateringResult = {
@@ -35,9 +36,10 @@ function toDateTime(dateValue: string) {
   return new Date(`${dateValue}T12:00:00`).toISOString();
 }
 
-export function BatchWatering({ plants }: BatchWateringProps) {
+export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [dismissedDueIds, setDismissedDueIds] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [wateredDate, setWateredDate] = useState(getTodayValue);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -45,8 +47,12 @@ export function BatchWatering({ plants }: BatchWateringProps) {
   const [results, setResults] = useState<WateringResult[]>([]);
 
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const dismissedDueIdSet = useMemo(() => new Set(dismissedDueIds), [dismissedDueIds]);
   const successfulResults = results.filter((result) => result.ok);
   const failedResults = results.filter((result) => !result.ok);
+  const duePlants = plants.filter(
+    (plant) => plant.isWateringDue && !dismissedDueIdSet.has(plant.id),
+  ).sort((a, b) => (b.daysSinceWatered ?? 0) - (a.daysSinceWatered ?? 0));
   const filteredPlants = plants.filter((plant) =>
     formatPlantName(plant).toLowerCase().includes(query.trim().toLowerCase()),
   );
@@ -102,12 +108,22 @@ export function BatchWatering({ plants }: BatchWateringProps) {
 
       setResults(nextResults);
       setSelectedIds(failedIds);
+      setDismissedDueIds((current) => [
+        ...new Set([
+          ...current,
+          ...nextResults.filter((result) => result.ok).map((result) => result.plantId),
+        ]),
+      ]);
       setSaveState(failureCount ? "error" : "success");
       setMessage(
         failureCount
           ? `${successCount}개 저장, ${failureCount}개 실패했습니다.`
           : `${successCount}개 식물의 물주기를 저장했습니다.`,
       );
+
+      if (successCount) {
+        onWateringSaved?.();
+      }
     } catch (error) {
       setSaveState("error");
       setMessage(error instanceof Error ? error.message : "물주기 기록 저장에 실패했습니다.");
@@ -130,7 +146,7 @@ export function BatchWatering({ plants }: BatchWateringProps) {
         </span>
         <span className="flex items-center gap-2">
           <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-900">
-            {selectedIds.length}개
+            {duePlants.length ? `알림 ${duePlants.length}` : `${selectedIds.length}개`}
           </span>
           <span className="text-xl font-bold text-emerald-900">{isOpen ? "−" : "+"}</span>
         </span>
@@ -138,6 +154,50 @@ export function BatchWatering({ plants }: BatchWateringProps) {
 
       {isOpen ? (
         <div className="mt-4">
+          {duePlants.length ? (
+            <div className="mb-4 rounded-[1.25rem] bg-amber-50 p-3 text-sm text-amber-950">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="font-bold">물줄 때 된 식물</p>
+                <span className="text-xs font-semibold">{duePlants.length}개</span>
+              </div>
+              <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
+                {duePlants.map((plant) => {
+                  const isSelected = selectedIdSet.has(plant.id);
+                  const daysText =
+                    typeof plant.daysSinceWatered === "number"
+                      ? `물 안 준 지 ${plant.daysSinceWatered}일`
+                      : "물준 기록 없음";
+
+                  return (
+                    <label
+                      key={`due-${plant.id}`}
+                      className={`flex min-h-14 items-center justify-between gap-3 rounded-2xl px-3 transition ${
+                        isSelected ? "bg-amber-200/80" : "bg-white"
+                      }`}
+                    >
+                      <span>
+                        <span className="block font-semibold text-stone-900">{plant.name}</span>
+                        <span className="block text-xs text-stone-600">
+                          관수 주기 {plant.wateringCycleDays}일 · {daysText}
+                        </span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => togglePlant(plant.id)}
+                        className="h-5 w-5 accent-emerald-900"
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="mb-4 rounded-[1.25rem] bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900">
+              지금 물주기 알림이 있는 식물이 없습니다.
+            </div>
+          )}
+
           <label className="mb-3 block">
             <span className="mb-2 block text-sm font-semibold text-stone-700">물 준 날짜</span>
             <input
