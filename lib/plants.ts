@@ -172,7 +172,7 @@ export function parseNotionPlantPage(page: NotionPlantPage): Plant | null {
   const daysSinceWatered = calculateDaysSince(lastWateredAt);
   const isWateringDue =
     typeof wateringCycleDays === "number" &&
-    (typeof daysSinceWatered === "number" ? daysSinceWatered >= wateringCycleDays + 1 : true);
+    (typeof daysSinceWatered === "number" ? daysSinceWatered >= wateringCycleDays : true);
 
   return {
     id: page.id,
