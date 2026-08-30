@@ -6,6 +6,8 @@ const NOTION_API_BASE = "https://api.notion.com/v1";
 
 type NotionQueryResponse = {
   results: Array<Parameters<typeof parseNotionPlantPage>[0]>;
+  has_more: boolean;
+  next_cursor: string | null;
 };
 
 export const runtime = "nodejs";
@@ -25,17 +27,26 @@ export async function GET() {
 
   try {
     const dataSourceId = configuredDataSourceId || (await resolveDataSourceId(token, plantsDatabaseId));
-    const payload = await readNotionJson<NotionQueryResponse>(
-      await fetch(`${NOTION_API_BASE}/data_sources/${dataSourceId}/query`, {
-        method: "POST",
-        headers: createNotionHeaders(token),
-        body: JSON.stringify({
-          page_size: 100,
-        }),
-      }),
-    );
+    const pages: NotionQueryResponse["results"] = [];
+    let startCursor: string | null = null;
 
-    const plants = payload.results
+    do {
+      const payload: NotionQueryResponse = await readNotionJson<NotionQueryResponse>(
+        await fetch(`${NOTION_API_BASE}/data_sources/${dataSourceId}/query`, {
+          method: "POST",
+          headers: createNotionHeaders(token),
+          body: JSON.stringify({
+            page_size: 100,
+            ...(startCursor ? { start_cursor: startCursor } : {}),
+          }),
+        }),
+      );
+
+      pages.push(...payload.results);
+      startCursor = payload.has_more ? payload.next_cursor : null;
+    } while (startCursor);
+
+    const plants = pages
       .map((page) => parseNotionPlantPage(page))
       .filter((plant) => plant !== null)
       .sort((a, b) => `${a.category} ${a.name}`.localeCompare(`${b.category} ${b.name}`, "ko"));
