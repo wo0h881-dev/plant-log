@@ -8,20 +8,27 @@ import { fallbackPlants } from "@/lib/plants";
 import type { Plant, SaveState } from "@/types/plant";
 
 const RECENT_PLANTS_KEY = "plant-log:recent-plants";
-const OBSERVATION_TAGS = ["신엽", "하엽", "상태이상", "잎끝 갈변", "응애", "분갈이 필요"];
+const DEFAULT_OBSERVATION_TAGS = ["신엽", "하엽", "상태이상", "잎끝 갈변", "응애", "분갈이 필요"];
 const CARE_PANELS = [
   { id: "water", label: "물", icon: "💧" },
   { id: "light", label: "빛", icon: "☀️" },
   { id: "soil", label: "흙", icon: "🌱" },
   { id: "pot", label: "화분", icon: "🪴" },
 ] as const;
-const SOIL_OPTIONS = ["배흙", "수태", "세라미스", "펄라이트"];
-const POT_OPTIONS = ["슬릿분", "토분", "플분", "투명분", "행잉분", "기타"];
+const DEFAULT_SOIL_OPTIONS = ["배흙", "수태", "세라미스", "펄라이트"];
+const DEFAULT_POT_OPTIONS = ["슬릿분", "토분", "플분", "투명분", "행잉분", "기타"];
 
 type CarePanel = (typeof CARE_PANELS)[number]["id"];
 
 type PlantsResponse = {
   plants: Plant[];
+  source: "notion" | "fallback";
+};
+
+type OptionsResponse = {
+  observationTags: string[];
+  soilOptions: string[];
+  potOptions: string[];
   source: "notion" | "fallback";
 };
 
@@ -50,6 +57,9 @@ export function PlantLogForm() {
   const [observedDate, setObservedDate] = useState(getTodayValue);
   const [dateSource, setDateSource] = useState<"capture" | "today">("today");
   const [activeCarePanel, setActiveCarePanel] = useState<CarePanel>("water");
+  const [observationTags, setObservationTags] = useState<string[]>(DEFAULT_OBSERVATION_TAGS);
+  const [soilOptions, setSoilOptions] = useState<string[]>(DEFAULT_SOIL_OPTIONS);
+  const [potOptions, setPotOptions] = useState<string[]>(DEFAULT_POT_OPTIONS);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [waterMemo, setWaterMemo] = useState("");
   const [lightSource, setLightSource] = useState("");
@@ -98,14 +108,25 @@ export function PlantLogForm() {
     refreshPlants();
   }, [refreshPlants]);
 
+  useEffect(() => {
+    fetch("/api/options")
+      .then((response) => response.json() as Promise<OptionsResponse>)
+      .then((payload) => {
+        setObservationTags(payload.observationTags.length ? payload.observationTags : DEFAULT_OBSERVATION_TAGS);
+        setSoilOptions(payload.soilOptions.length ? payload.soilOptions : DEFAULT_SOIL_OPTIONS);
+        setPotOptions(payload.potOptions.length ? payload.potOptions : DEFAULT_POT_OPTIONS);
+      })
+      .catch(() => {
+        setObservationTags(DEFAULT_OBSERVATION_TAGS);
+        setSoilOptions(DEFAULT_SOIL_OPTIONS);
+        setPotOptions(DEFAULT_POT_OPTIONS);
+      });
+  }, []);
+
   const selectedPlantLabel = formatPlantName(selectedPlant);
   const hasWaterMemo = waterMemo.trim().length > 0;
   const structuredNote = useMemo(() => {
     const lines: string[] = [];
-
-    if (selectedTags.length) {
-      lines.push(`기록 태그: ${selectedTags.join(", ")}`);
-    }
 
     if (hasWaterMemo) {
       lines.push(`물: ${waterMemo.trim()}`);
@@ -116,17 +137,13 @@ export function PlantLogForm() {
     }
 
     return lines.join("\n");
-  }, [
-    selectedTags,
-    hasWaterMemo,
-    waterMemo,
-    note,
-  ]);
+  }, [hasWaterMemo, waterMemo, note]);
   const hasSettingsContent =
     (settingChanges.light && (lightSource.trim().length > 0 || lightWatt.trim().length > 0)) ||
     (settingChanges.soil && selectedSoils.length > 0) ||
     (settingChanges.pot && potType.trim().length > 0);
-  const hasRecordContent = photos.length > 0 || structuredNote.length > 0 || hasSettingsContent;
+  const hasRecordContent =
+    photos.length > 0 || selectedTags.length > 0 || structuredNote.length > 0 || hasSettingsContent;
   const canSave = useMemo(
     () => Boolean(selectedPlant.name && hasRecordContent && saveState !== "saving"),
     [selectedPlant.name, hasRecordContent, saveState],
@@ -191,6 +208,7 @@ export function PlantLogForm() {
     formData.append("plantCategory", selectedPlant.category);
     formData.append("note", structuredNote);
     formData.append("createdAt", observedDate);
+    formData.append("observationTags", JSON.stringify(selectedTags));
     if (hasWaterMemo) {
       formData.append("wateredAt", observedDate);
     }
@@ -329,7 +347,7 @@ export function PlantLogForm() {
             {activeCarePanel === "soil" ? (
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2">
-                  {SOIL_OPTIONS.map((soil) => {
+                  {soilOptions.map((soil) => {
                     const isSelected = selectedSoils.includes(soil);
 
                     return (
@@ -355,7 +373,7 @@ export function PlantLogForm() {
             {activeCarePanel === "pot" ? (
               <div className="space-y-3">
                 <datalist id="pot-options">
-                  {POT_OPTIONS.map((pot) => (
+                  {potOptions.map((pot) => (
                     <option key={pot} value={pot} />
                   ))}
                 </datalist>
@@ -398,7 +416,7 @@ export function PlantLogForm() {
               <p className="mt-1 text-sm text-stone-500">자주 쓰는 기록을 눌러서 추가하세요</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {OBSERVATION_TAGS.map((tag) => {
+              {observationTags.map((tag) => {
                 const isSelected = selectedTags.includes(tag);
 
                 return (

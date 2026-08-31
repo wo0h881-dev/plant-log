@@ -34,17 +34,25 @@ export async function POST(request: Request) {
     const note = String(formData.get("note") ?? "").trim();
     const createdAt = String(formData.get("createdAt") ?? new Date().toISOString());
     const wateredAt = String(formData.get("wateredAt") ?? "").trim();
+    const observationTagsValue = String(formData.get("observationTags") ?? "").trim();
     const settingLightName = String(formData.get("settingLightName") ?? "").trim();
     const settingLightWattValue = String(formData.get("settingLightWatt") ?? "").trim();
     const settingSoilsValue = String(formData.get("settingSoils") ?? "").trim();
     const settingPotName = String(formData.get("settingPotName") ?? "").trim();
     const settingLightWatt = settingLightWattValue ? Number(settingLightWattValue) : undefined;
     let settingSoils: unknown = [];
+    let observationTags: unknown = [];
 
     try {
       settingSoils = settingSoilsValue ? JSON.parse(settingSoilsValue) : [];
     } catch {
       return NextResponse.json({ message: "흙 선택값이 올바르지 않습니다." }, { status: 400 });
+    }
+
+    try {
+      observationTags = observationTagsValue ? JSON.parse(observationTagsValue) : [];
+    } catch {
+      return NextResponse.json({ message: "관찰태그 선택값이 올바르지 않습니다." }, { status: 400 });
     }
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(createdAt) || Number.isNaN(Date.parse(`${createdAt}T00:00:00Z`))) {
@@ -71,8 +79,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "흙 선택값이 올바르지 않습니다." }, { status: 400 });
     }
 
+    if (!Array.isArray(observationTags) || observationTags.some((tag) => typeof tag !== "string")) {
+      return NextResponse.json({ message: "관찰태그 선택값이 올바르지 않습니다." }, { status: 400 });
+    }
+
     const selectedSoils = settingSoils.map((soil) => soil.trim()).filter(Boolean);
-    const hasObservationContent = photos.length > 0 || Boolean(note) || Boolean(wateredAt);
+    const selectedObservationTags = observationTags.map((tag) => tag.trim()).filter(Boolean);
+    const hasObservationContent =
+      photos.length > 0 || Boolean(note) || Boolean(wateredAt) || selectedObservationTags.length > 0;
     const hasLightSettings = Boolean(settingLightName) || typeof settingLightWatt === "number";
     const hasSoilSettings = selectedSoils.length > 0;
     const hasPotSettings = Boolean(settingPotName);
@@ -121,6 +135,7 @@ export async function POST(request: Request) {
           note,
           createdAt,
           wateredAt: wateredAt || undefined,
+          tags: selectedObservationTags,
           photos: uploadedPhotos,
         })
       : null;

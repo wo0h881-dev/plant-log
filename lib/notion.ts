@@ -13,6 +13,21 @@ type NotionDatabase = {
   data_sources?: Array<{ id: string }>;
 };
 
+type NotionOption = {
+  name?: string;
+};
+
+type NotionDataSourceProperty = {
+  type: string;
+  select?: { options?: NotionOption[] };
+  multi_select?: { options?: NotionOption[] };
+};
+
+type NotionDataSource = {
+  id: string;
+  properties?: Record<string, NotionDataSourceProperty>;
+};
+
 type UploadedPlantPhoto = {
   id: string;
   name: string;
@@ -27,6 +42,7 @@ type CreatePlantLogPageParams = {
   note: string;
   createdAt: string;
   wateredAt?: string;
+  tags: string[];
   photos: UploadedPlantPhoto[];
 };
 
@@ -143,6 +159,30 @@ export async function resolveDataSourceId(token: string, databaseId: string) {
   return dataSourceId;
 }
 
+export async function getDataSourceOptions(token: string, dataSourceId: string, propertyName: string) {
+  const dataSource = await readNotionJson<NotionDataSource>(
+    await fetch(`${NOTION_API_BASE}/data_sources/${dataSourceId}`, {
+      method: "GET",
+      headers: notionHeaders(token),
+    }),
+  );
+
+  const property = dataSource.properties?.[propertyName];
+  const options =
+    property?.type === "multi_select"
+      ? property.multi_select?.options
+      : property?.type === "select"
+        ? property.select?.options
+        : [];
+
+  return options?.map((option) => option.name?.trim() ?? "").filter(Boolean) ?? [];
+}
+
+export async function getDatabasePropertyOptions(token: string, databaseId: string, propertyName: string) {
+  const dataSourceId = await resolveDataSourceId(token, databaseId);
+  return getDataSourceOptions(token, dataSourceId, propertyName);
+}
+
 export async function createPlantLogPage({
   token,
   parentId,
@@ -152,6 +192,7 @@ export async function createPlantLogPage({
   note,
   createdAt,
   wateredAt,
+  tags,
   photos,
 }: CreatePlantLogPageParams) {
   return readNotionJson<{ id: string; url?: string }>(
@@ -183,6 +224,9 @@ export async function createPlantLogPage({
           },
           관찰일지: {
             rich_text: note ? [{ text: { content: note } }] : [],
+          },
+          관찰태그: {
+            multi_select: tags.map((name) => ({ name })),
           },
           관찰일: {
             date: { start: createdAt },
