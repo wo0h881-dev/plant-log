@@ -7,6 +7,11 @@ export type Plant = {
   daysSinceWatered?: number;
   isWateringDue?: boolean;
   wateringAlert?: string;
+  currentLightName?: string;
+  currentLightWatt?: number;
+  currentSoils?: string[];
+  currentPot?: string;
+  lastSettingChangedAt?: string;
 };
 
 export type PlantLogPayload = {

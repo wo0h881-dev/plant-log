@@ -15,12 +15,20 @@ const CARE_PANELS = [
   { id: "soil", label: "흙", icon: "🌱" },
   { id: "pot", label: "화분", icon: "🪴" },
 ] as const;
+const SOIL_OPTIONS = ["배흙", "수태", "세라미스", "펄라이트"];
+const POT_OPTIONS = ["슬릿분", "토분", "플분", "투명분", "행잉분", "기타"];
 
 type CarePanel = (typeof CARE_PANELS)[number]["id"];
 
 type PlantsResponse = {
   plants: Plant[];
   source: "notion" | "fallback";
+};
+
+type SettingChanges = {
+  light: boolean;
+  soil: boolean;
+  pot: boolean;
 };
 
 function formatPlantName(plant: Plant) {
@@ -45,15 +53,14 @@ export function PlantLogForm() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [waterMemo, setWaterMemo] = useState("");
   const [lightSource, setLightSource] = useState("");
-  const [lightDistance, setLightDistance] = useState("");
   const [lightWatt, setLightWatt] = useState("");
-  const [lightMemo, setLightMemo] = useState("");
-  const [soilType, setSoilType] = useState("");
-  const [soilMix, setSoilMix] = useState("");
-  const [soilMemo, setSoilMemo] = useState("");
+  const [selectedSoils, setSelectedSoils] = useState<string[]>([]);
   const [potType, setPotType] = useState("");
-  const [potSize, setPotSize] = useState("");
-  const [potMemo, setPotMemo] = useState("");
+  const [settingChanges, setSettingChanges] = useState<SettingChanges>({
+    light: false,
+    soil: false,
+    pot: false,
+  });
   const [recentPlants, setRecentPlants] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
 
@@ -104,37 +111,6 @@ export function PlantLogForm() {
       lines.push(`물: ${waterMemo.trim()}`);
     }
 
-    if (lightSource.trim() || lightDistance.trim() || lightWatt.trim() || lightMemo.trim()) {
-      lines.push(
-        `빛: ${[
-          lightSource.trim() ? `식물등 ${lightSource.trim()}` : "",
-          lightDistance.trim() ? `거리 ${lightDistance.trim()}` : "",
-          lightWatt.trim() ? `와트 ${lightWatt.trim()}` : "",
-          lightMemo.trim(),
-        ].filter(Boolean).join(" · ")}`,
-      );
-    }
-
-    if (soilType.trim() || soilMix.trim() || soilMemo.trim()) {
-      lines.push(
-        `흙: ${[
-          soilType.trim() ? `종류 ${soilType.trim()}` : "",
-          soilMix.trim() ? `배합 ${soilMix.trim()}` : "",
-          soilMemo.trim(),
-        ].filter(Boolean).join(" · ")}`,
-      );
-    }
-
-    if (potType.trim() || potSize.trim() || potMemo.trim()) {
-      lines.push(
-        `화분: ${[
-          potType.trim() ? `종류 ${potType.trim()}` : "",
-          potSize.trim() ? `크기 ${potSize.trim()}` : "",
-          potMemo.trim(),
-        ].filter(Boolean).join(" · ")}`,
-      );
-    }
-
     if (note.trim()) {
       lines.push(note.trim());
     }
@@ -144,19 +120,13 @@ export function PlantLogForm() {
     selectedTags,
     hasWaterMemo,
     waterMemo,
-    lightSource,
-    lightDistance,
-    lightWatt,
-    lightMemo,
-    soilType,
-    soilMix,
-    soilMemo,
-    potType,
-    potSize,
-    potMemo,
     note,
   ]);
-  const hasRecordContent = photos.length > 0 || structuredNote.length > 0;
+  const hasSettingsContent =
+    (settingChanges.light && (lightSource.trim().length > 0 || lightWatt.trim().length > 0)) ||
+    (settingChanges.soil && selectedSoils.length > 0) ||
+    (settingChanges.pot && potType.trim().length > 0);
+  const hasRecordContent = photos.length > 0 || structuredNote.length > 0 || hasSettingsContent;
   const canSave = useMemo(
     () => Boolean(selectedPlant.name && hasRecordContent && saveState !== "saving"),
     [selectedPlant.name, hasRecordContent, saveState],
@@ -165,6 +135,11 @@ export function PlantLogForm() {
   function selectPlant(plant: Plant) {
     setSelectedPlant(plant);
     setQuery(plant.name);
+    setLightSource(plant.currentLightName ?? "");
+    setLightWatt(typeof plant.currentLightWatt === "number" ? String(plant.currentLightWatt) : "");
+    setSelectedSoils(plant.currentSoils ?? []);
+    setPotType(plant.currentPot ?? "");
+    setSettingChanges({ light: false, soil: false, pot: false });
   }
 
   function storeRecentPlant(plantName: string) {
@@ -176,6 +151,13 @@ export function PlantLogForm() {
   function toggleTag(tag: string) {
     setSelectedTags((current) =>
       current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag],
+    );
+  }
+
+  function toggleSoil(soil: string) {
+    setSettingChanges((current) => ({ ...current, soil: true }));
+    setSelectedSoils((current) =>
+      current.includes(soil) ? current.filter((item) => item !== soil) : [...current, soil],
     );
   }
 
@@ -194,7 +176,7 @@ export function PlantLogForm() {
     }
 
     if (!hasRecordContent) {
-      setMessage("사진, 메모, 물 줌 기록 중 하나는 입력하세요.");
+      setMessage("사진, 메모, 물 줌 기록, 세팅 변경 중 하나는 입력하세요.");
       setSaveState("error");
       return;
     }
@@ -212,6 +194,10 @@ export function PlantLogForm() {
     if (hasWaterMemo) {
       formData.append("wateredAt", observedDate);
     }
+    formData.append("settingLightName", settingChanges.light ? lightSource.trim() : "");
+    formData.append("settingLightWatt", settingChanges.light ? lightWatt.trim() : "");
+    formData.append("settingSoils", settingChanges.soil ? JSON.stringify(selectedSoils) : "[]");
+    formData.append("settingPotName", settingChanges.pot ? potType.trim() : "");
 
     try {
       const response = await fetch("/api/plant-logs", {
@@ -231,15 +217,11 @@ export function PlantLogForm() {
       setSelectedTags([]);
       setWaterMemo("");
       setLightSource("");
-      setLightDistance("");
       setLightWatt("");
-      setLightMemo("");
-      setSoilType("");
-      setSoilMix("");
-      setSoilMemo("");
+      setSelectedSoils([]);
       setPotType("");
-      setPotSize("");
-      setPotMemo("");
+      setSettingChanges({ light: false, soil: false, pot: false });
+      refreshPlants();
     } catch (error) {
       setSaveState("error");
       setMessage(error instanceof Error ? error.message : "저장에 실패했습니다.");
@@ -317,88 +299,80 @@ export function PlantLogForm() {
 
             {activeCarePanel === "light" ? (
               <div className="space-y-3">
-                <input
-                  type="text"
-                  value={lightSource}
-                  onChange={(event) => setLightSource(event.target.value)}
-                  placeholder="식물등 이름 또는 위치"
-                  className="h-12 w-full rounded-2xl bg-stone-50 px-4 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
-                />
                 <div className="grid grid-cols-2 gap-2">
                   <input
                     type="text"
-                    value={lightDistance}
-                    onChange={(event) => setLightDistance(event.target.value)}
-                    placeholder="거리"
+                    value={lightSource}
+                    onChange={(event) => {
+                      setSettingChanges((current) => ({ ...current, light: true }));
+                      setLightSource(event.target.value);
+                    }}
+                    placeholder="식물등 이름"
                     className="h-12 rounded-2xl bg-stone-50 px-4 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
                   />
                   <input
-                    type="text"
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
                     value={lightWatt}
-                    onChange={(event) => setLightWatt(event.target.value)}
+                    onChange={(event) => {
+                      setSettingChanges((current) => ({ ...current, light: true }));
+                      setLightWatt(event.target.value);
+                    }}
                     placeholder="와트"
                     className="h-12 rounded-2xl bg-stone-50 px-4 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
                   />
                 </div>
-                <input
-                  type="text"
-                  value={lightMemo}
-                  onChange={(event) => setLightMemo(event.target.value)}
-                  placeholder="빛 변화 메모"
-                  className="h-12 w-full rounded-2xl bg-stone-50 px-4 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
-                />
               </div>
             ) : null}
 
             {activeCarePanel === "soil" ? (
               <div className="space-y-3">
-                <input
-                  type="text"
-                  value={soilType}
-                  onChange={(event) => setSoilType(event.target.value)}
-                  placeholder="흙 종류"
-                  className="h-12 w-full rounded-2xl bg-stone-50 px-4 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
-                />
-                <input
-                  type="text"
-                  value={soilMix}
-                  onChange={(event) => setSoilMix(event.target.value)}
-                  placeholder="배합 예: 상토 5 펄라이트 3 바크 2"
-                  className="h-12 w-full rounded-2xl bg-stone-50 px-4 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
-                />
-                <input
-                  type="text"
-                  value={soilMemo}
-                  onChange={(event) => setSoilMemo(event.target.value)}
-                  placeholder="흙 상태 메모"
-                  className="h-12 w-full rounded-2xl bg-stone-50 px-4 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
-                />
+                <div className="flex flex-wrap gap-2">
+                  {SOIL_OPTIONS.map((soil) => {
+                    const isSelected = selectedSoils.includes(soil);
+
+                    return (
+                      <button
+                        key={soil}
+                        type="button"
+                        onClick={() => toggleSoil(soil)}
+                        className={`min-h-11 rounded-full px-4 text-sm font-bold transition active:scale-[0.98] ${
+                          isSelected ? "bg-emerald-900 text-white" : "bg-stone-50 text-stone-700"
+                        }`}
+                      >
+                        {soil}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs font-medium text-stone-500">
+                  선택한 흙 조합이 식물분류 DB의 현재 흙과 세팅 변경 기록에 저장됩니다.
+                </p>
               </div>
             ) : null}
 
             {activeCarePanel === "pot" ? (
               <div className="space-y-3">
+                <datalist id="pot-options">
+                  {POT_OPTIONS.map((pot) => (
+                    <option key={pot} value={pot} />
+                  ))}
+                </datalist>
                 <input
                   type="text"
+                  list="pot-options"
                   value={potType}
-                  onChange={(event) => setPotType(event.target.value)}
-                  placeholder="화분 종류"
+                  onChange={(event) => {
+                    setSettingChanges((current) => ({ ...current, pot: true }));
+                    setPotType(event.target.value);
+                  }}
+                  placeholder="화분 선택 또는 새 이름 입력"
                   className="h-12 w-full rounded-2xl bg-stone-50 px-4 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
                 />
-                <input
-                  type="text"
-                  value={potSize}
-                  onChange={(event) => setPotSize(event.target.value)}
-                  placeholder="크기 예: 12cm, 슬릿분 105호"
-                  className="h-12 w-full rounded-2xl bg-stone-50 px-4 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
-                />
-                <input
-                  type="text"
-                  value={potMemo}
-                  onChange={(event) => setPotMemo(event.target.value)}
-                  placeholder="화분 메모"
-                  className="h-12 w-full rounded-2xl bg-stone-50 px-4 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
-                />
+                <p className="text-xs font-medium text-stone-500">
+                  새 이름을 입력하면 Notion 선택 옵션으로 같이 저장됩니다.
+                </p>
               </div>
             ) : null}
           </section>

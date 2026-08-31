@@ -21,6 +21,7 @@ type NotionProperty = {
   title?: RichText[];
   rich_text?: RichText[];
   select?: { name?: string } | null;
+  multi_select?: Array<{ name?: string }>;
   number?: number | null;
   date?: { start?: string | null } | null;
   formula?: {
@@ -59,6 +60,16 @@ function readTextProperty(property: NotionProperty | undefined) {
   }
 
   return "";
+}
+
+function readMultiSelectProperty(property: NotionProperty | undefined) {
+  if (property?.type !== "multi_select") return [];
+
+  return (
+    property.multi_select
+      ?.map((option) => option.name?.trim() ?? "")
+      .filter((name): name is string => Boolean(name)) ?? []
+  );
 }
 
 function readNumberProperty(property: NotionProperty | undefined): number | undefined {
@@ -173,6 +184,11 @@ export function parseNotionPlantPage(page: NotionPlantPage): Plant | null {
   const isWateringDue =
     typeof wateringCycleDays === "number" &&
     (typeof daysSinceWatered === "number" ? daysSinceWatered >= wateringCycleDays : true);
+  const currentLightName = readTextProperty(page.properties["현재 식물등"]) || undefined;
+  const currentLightWatt = readNumberProperty(page.properties["현재 와트"]);
+  const currentSoils = readMultiSelectProperty(page.properties["현재 흙"]);
+  const currentPot = readTextProperty(page.properties["현재 화분"]) || undefined;
+  const lastSettingChangedAt = readDateProperty(page.properties["마지막 세팅 변경일"]);
 
   return {
     id: page.id,
@@ -183,5 +199,10 @@ export function parseNotionPlantPage(page: NotionPlantPage): Plant | null {
     daysSinceWatered,
     isWateringDue,
     wateringAlert,
+    currentLightName,
+    currentLightWatt,
+    currentSoils,
+    currentPot,
+    lastSettingChangedAt,
   };
 }

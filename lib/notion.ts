@@ -39,6 +39,30 @@ type CreateWateringLogPageParams = {
   note: string;
 };
 
+type UpdatePlantSettingsPageParams = {
+  token: string;
+  plantId: string;
+  changedAt: string;
+  lightName?: string;
+  lightWatt?: number;
+  soils?: string[];
+  potName?: string;
+};
+
+type CreateSettingChangePageParams = {
+  token: string;
+  parentId: string;
+  plantId: string;
+  plantName: string;
+  changedAt: string;
+  type: "빛" | "흙" | "화분";
+  lightName?: string;
+  lightWatt?: number;
+  soils?: string[];
+  potName?: string;
+  note?: string;
+};
+
 function notionHeaders(token: string, contentType = "application/json") {
   return {
     Authorization: `Bearer ${token}`,
@@ -47,7 +71,7 @@ function notionHeaders(token: string, contentType = "application/json") {
   };
 }
 
-function hasNotionPageId(id?: string) {
+export function hasNotionPageId(id?: string) {
   return id ? NOTION_PAGE_ID_PATTERN.test(id) : false;
 }
 
@@ -218,6 +242,123 @@ export async function createWateringLogPage({
           물줌: {
             checkbox: true,
           },
+          메모: {
+            rich_text: note ? [{ text: { content: note } }] : [],
+          },
+        },
+      }),
+    }),
+  );
+}
+
+export async function updatePlantSettingsPage({
+  token,
+  plantId,
+  changedAt,
+  lightName,
+  lightWatt,
+  soils,
+  potName,
+}: UpdatePlantSettingsPageParams) {
+  const properties: Record<string, unknown> = {
+    "마지막 세팅 변경일": {
+      date: { start: changedAt },
+    },
+  };
+
+  if (lightName) {
+    properties["현재 식물등"] = {
+      rich_text: [{ text: { content: lightName } }],
+    };
+  }
+
+  if (typeof lightWatt === "number") {
+    properties["현재 와트"] = {
+      number: lightWatt,
+    };
+  }
+
+  if (soils?.length) {
+    properties["현재 흙"] = {
+      multi_select: soils.map((name) => ({ name })),
+    };
+  }
+
+  if (potName) {
+    properties["현재 화분"] = {
+      select: { name: potName },
+    };
+  }
+
+  return readNotionJson<{ id: string; url?: string }>(
+    await fetch(`${NOTION_API_BASE}/pages/${plantId}`, {
+      method: "PATCH",
+      headers: notionHeaders(token),
+      body: JSON.stringify({ properties }),
+    }),
+  );
+}
+
+export async function createSettingChangePage({
+  token,
+  parentId,
+  plantId,
+  plantName,
+  changedAt,
+  type,
+  lightName,
+  lightWatt,
+  soils,
+  potName,
+  note,
+}: CreateSettingChangePageParams) {
+  return readNotionJson<{ id: string; url?: string }>(
+    await fetch(`${NOTION_API_BASE}/pages`, {
+      method: "POST",
+      headers: notionHeaders(token),
+      body: JSON.stringify({
+        parent: { type: "data_source_id", data_source_id: parentId },
+        properties: {
+          이름: {
+            title: [{ text: { content: `${plantName} ${type} 변경` } }],
+          },
+          날짜: {
+            date: { start: changedAt },
+          },
+          식물: {
+            relation: [{ id: plantId }],
+          },
+          유형: {
+            select: { name: type },
+          },
+          ...(lightName
+            ? {
+                식물등: {
+                  rich_text: [{ text: { content: lightName } }],
+                },
+              }
+            : {}),
+          ...(typeof lightWatt === "number"
+            ? {
+                와트: {
+                  number: lightWatt,
+                },
+              }
+            : {}),
+          ...(soils?.length
+            ? {
+                흙: {
+                  multi_select: soils.map((name) => ({ name })),
+                },
+              }
+            : {}),
+          ...(potName
+            ? {
+                화분: {
+                  select: { name: potName },
+                },
+              }
+            : {}),
           메모: {
             rich_text: note ? [{ text: { content: note } }] : [],
           },
