@@ -261,31 +261,11 @@ export function PlantLogForm() {
         </header>
 
         <div className="flex flex-1 flex-col gap-5">
-          <BatchWatering plants={plants} onWateringSaved={refreshPlants} />
-
-          <PlantPhotoUploader
-            files={photos}
-            onChange={setPhotos}
-            onCaptureDateChange={updateCaptureDate}
-          />
-
-          <PlantSelect
+          <BatchWatering
             plants={plants}
-            value={selectedPlantLabel}
-            query={query}
-            recentPlants={recentPlants}
-            onQueryChange={setQuery}
-            onSelect={selectPlant}
+            onWateringSaved={refreshPlants}
+            showManualWatering={false}
           />
-
-          <section className="rounded-[1.5rem] border border-stone-200 bg-white px-4 py-3 shadow-sm shadow-stone-950/5">
-            <p className="text-sm font-semibold text-stone-800">관찰 날짜 · {observedDate}</p>
-            <p className="mt-1 text-sm text-stone-500">
-              {dateSource === "capture"
-                ? "첫 번째 사진의 촬영일을 자동으로 불러왔어요."
-                : "사진에 촬영정보가 없어 오늘 날짜를 사용해요."}
-            </p>
-          </section>
 
           <section className="space-y-3 rounded-[1.5rem] border border-stone-200 bg-white p-4 shadow-sm shadow-stone-950/5">
             <div className="grid grid-cols-4 gap-2">
@@ -330,6 +310,11 @@ export function PlantLogForm() {
                   onChange={(event) => setWaterMemo(event.target.value)}
                   placeholder="물 양, 저면관수, 샤워 등"
                   className="h-12 w-full rounded-2xl bg-stone-50 px-4 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
+                />
+                <BatchWatering
+                  plants={plants}
+                  onWateringSaved={refreshPlants}
+                  showDueAlerts={false}
                 />
               </div>
             ) : null}
@@ -420,6 +405,30 @@ export function PlantLogForm() {
                 />
               </div>
             ) : null}
+          </section>
+
+          <PlantPhotoUploader
+            files={photos}
+            onChange={setPhotos}
+            onCaptureDateChange={updateCaptureDate}
+          />
+
+          <PlantSelect
+            plants={plants}
+            value={selectedPlantLabel}
+            query={query}
+            recentPlants={recentPlants}
+            onQueryChange={setQuery}
+            onSelect={selectPlant}
+          />
+
+          <section className="rounded-[1.5rem] border border-stone-200 bg-white px-4 py-3 shadow-sm shadow-stone-950/5">
+            <p className="text-sm font-semibold text-stone-800">관찰 날짜 · {observedDate}</p>
+            <p className="mt-1 text-sm text-stone-500">
+              {dateSource === "capture"
+                ? "첫 번째 사진의 촬영일을 자동으로 불러왔어요."
+                : "사진에 촬영정보가 없어 오늘 날짜를 사용해요."}
+            </p>
           </section>
 
           <section className="space-y-3 rounded-[1.5rem] border border-stone-200 bg-white p-4 shadow-sm shadow-stone-950/5">

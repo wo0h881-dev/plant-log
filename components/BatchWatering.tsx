@@ -6,6 +6,8 @@ import type { Plant, SaveState } from "@/types/plant";
 type BatchWateringProps = {
   plants: Plant[];
   onWateringSaved?: () => void;
+  showDueAlerts?: boolean;
+  showManualWatering?: boolean;
 };
 
 type WateringResult = {
@@ -40,7 +42,12 @@ function canShowInWateringList(plant: Plant) {
   return !["자구", "사망"].includes(plant.category.trim());
 }
 
-export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
+export function BatchWatering({
+  plants,
+  onWateringSaved,
+  showDueAlerts = true,
+  showManualWatering = true,
+}: BatchWateringProps) {
   const [isDueOpen, setIsDueOpen] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -151,7 +158,8 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
 
   return (
     <div className="space-y-3">
-      <section className="rounded-[1.5rem] border border-amber-100 bg-white p-4 shadow-sm shadow-amber-950/5">
+      {showDueAlerts ? (
+        <section className="rounded-[1.5rem] border border-amber-100 bg-white p-4 shadow-sm shadow-amber-950/5">
         <button
           type="button"
           onClick={() => setIsDueOpen((current) => !current)}
@@ -238,9 +246,11 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
             ) : null}
           </div>
         ) : null}
-      </section>
+        </section>
+      ) : null}
 
-      <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm shadow-emerald-950/5">
+      {showManualWatering ? (
+        <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm shadow-emerald-950/5">
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
@@ -335,7 +345,8 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
           </button>
         </div>
       ) : null}
-      </section>
+        </section>
+      ) : null}
 
       {message ? (
         <div
