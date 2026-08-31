@@ -43,7 +43,6 @@ export function PlantLogForm() {
   const [dateSource, setDateSource] = useState<"capture" | "today">("today");
   const [activeCarePanel, setActiveCarePanel] = useState<CarePanel>("water");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [wateredToday, setWateredToday] = useState(false);
   const [waterMemo, setWaterMemo] = useState("");
   const [lightSource, setLightSource] = useState("");
   const [lightDistance, setLightDistance] = useState("");
@@ -93,6 +92,7 @@ export function PlantLogForm() {
   }, [refreshPlants]);
 
   const selectedPlantLabel = formatPlantName(selectedPlant);
+  const hasWaterMemo = waterMemo.trim().length > 0;
   const structuredNote = useMemo(() => {
     const lines: string[] = [];
 
@@ -100,8 +100,8 @@ export function PlantLogForm() {
       lines.push(`기록 태그: ${selectedTags.join(", ")}`);
     }
 
-    if (wateredToday || waterMemo.trim()) {
-      lines.push(`물: ${[wateredToday ? "물 줌" : "", waterMemo.trim()].filter(Boolean).join(" · ")}`);
+    if (hasWaterMemo) {
+      lines.push(`물: ${waterMemo.trim()}`);
     }
 
     if (lightSource.trim() || lightDistance.trim() || lightWatt.trim() || lightMemo.trim()) {
@@ -142,7 +142,7 @@ export function PlantLogForm() {
     return lines.join("\n");
   }, [
     selectedTags,
-    wateredToday,
+    hasWaterMemo,
     waterMemo,
     lightSource,
     lightDistance,
@@ -156,7 +156,7 @@ export function PlantLogForm() {
     potMemo,
     note,
   ]);
-  const hasRecordContent = photos.length > 0 || structuredNote.length > 0 || wateredToday;
+  const hasRecordContent = photos.length > 0 || structuredNote.length > 0;
   const canSave = useMemo(
     () => Boolean(selectedPlant.name && hasRecordContent && saveState !== "saving"),
     [selectedPlant.name, hasRecordContent, saveState],
@@ -209,7 +209,7 @@ export function PlantLogForm() {
     formData.append("plantCategory", selectedPlant.category);
     formData.append("note", structuredNote);
     formData.append("createdAt", observedDate);
-    if (wateredToday) {
+    if (hasWaterMemo) {
       formData.append("wateredAt", observedDate);
     }
 
@@ -229,7 +229,6 @@ export function PlantLogForm() {
       setMessage("Notion에 저장했습니다.");
       setNote("");
       setSelectedTags([]);
-      setWateredToday(false);
       setWaterMemo("");
       setLightSource("");
       setLightDistance("");
@@ -267,6 +266,15 @@ export function PlantLogForm() {
             showManualWatering={false}
           />
 
+          <PlantSelect
+            plants={plants}
+            value={selectedPlantLabel}
+            query={query}
+            recentPlants={recentPlants}
+            onQueryChange={setQuery}
+            onSelect={selectPlant}
+          />
+
           <section className="space-y-3 rounded-[1.5rem] border border-stone-200 bg-white p-4 shadow-sm shadow-stone-950/5">
             <div className="grid grid-cols-4 gap-2">
               {CARE_PANELS.map((panel) => {
@@ -292,18 +300,6 @@ export function PlantLogForm() {
 
             {activeCarePanel === "water" ? (
               <div className="space-y-3">
-                <label className="flex min-h-12 items-center justify-between gap-4 rounded-2xl bg-stone-50 px-4 py-3">
-                  <span>
-                    <span className="block text-sm font-semibold text-stone-800">물 준 기록</span>
-                    <span className="block text-sm text-stone-500">관찰 날짜가 물준날로 저장돼요</span>
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={wateredToday}
-                    onChange={(event) => setWateredToday(event.target.checked)}
-                    className="h-6 w-6 accent-emerald-900"
-                  />
-                </label>
                 <input
                   type="text"
                   value={waterMemo}
@@ -411,15 +407,6 @@ export function PlantLogForm() {
             files={photos}
             onChange={setPhotos}
             onCaptureDateChange={updateCaptureDate}
-          />
-
-          <PlantSelect
-            plants={plants}
-            value={selectedPlantLabel}
-            query={query}
-            recentPlants={recentPlants}
-            onQueryChange={setQuery}
-            onSelect={selectPlant}
           />
 
           <section className="rounded-[1.5rem] border border-stone-200 bg-white px-4 py-3 shadow-sm shadow-stone-950/5">
