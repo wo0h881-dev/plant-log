@@ -183,7 +183,7 @@ export function parseNotionPlantPage(page: NotionPlantPage): Plant | null {
   const daysSinceWatered = calculateDaysSince(lastWateredAt);
   const isWateringDue =
     typeof wateringCycleDays === "number" &&
-    (typeof daysSinceWatered === "number" ? daysSinceWatered >= wateringCycleDays + 1 : true);
+    (typeof daysSinceWatered === "number" ? daysSinceWatered >= wateringCycleDays : true);
   const currentLightName = readTextProperty(page.properties["현재 식물등"]) || undefined;
   const currentLightWatt = readNumberProperty(page.properties["현재 와트"]);
   const currentSoils = readMultiSelectProperty(page.properties["현재 흙"]);
