@@ -6,6 +6,7 @@ import { BatchWatering } from "@/components/BatchWatering";
 import { PlantPhotoUploader } from "@/components/PlantPhotoUploader";
 import { PlantOverview } from "@/components/PlantOverview";
 import { PlantSelect } from "@/components/PlantSelect";
+import { RecentObservedPlants } from "@/components/RecentObservedPlants";
 import { fallbackPlants } from "@/lib/plants";
 import type { Plant, RecentObservedPlant, SaveState } from "@/types/plant";
 
@@ -50,6 +51,8 @@ export function PlantLogForm() {
   const [selectedPlant, setSelectedPlant] = useState<Plant>(fallbackPlants[0]);
   const [activeTab, setActiveTab] = useState<RecordTab>("observation");
   const [query, setQuery] = useState("");
+  const [profileQuery, setProfileQuery] = useState("");
+  const [profilePlantId, setProfilePlantId] = useState("");
   const [recentPlants, setRecentPlants] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
     const stored = window.localStorage.getItem(RECENT_PLANTS_KEY);
@@ -106,6 +109,7 @@ export function PlantLogForm() {
   }, []);
 
   const selectedPlantLabel = formatPlantName(selectedPlant);
+  const profilePlant = plants.find((plant) => plant.id === profilePlantId);
   const dueCount = useMemo(
     () => plants.filter((plant) => plant.isWateringDue && !["자구", "사망"].includes(plant.category.trim())).length,
     [plants],
@@ -121,6 +125,12 @@ export function PlantLogForm() {
     setSelectedPlant(plant);
     setQuery(plant.name);
     setObservationMessage("");
+  }
+
+  function selectProfilePlant(plant: Plant) {
+    setSelectedPlant(plant);
+    setProfilePlantId(plant.id);
+    setProfileQuery(plant.name);
   }
 
   function storeRecentPlant() {
@@ -257,8 +267,22 @@ export function PlantLogForm() {
 
         {activeTab === "profile" ? (
           <div className="space-y-5">
-            <PlantSelect plants={plants} value={selectedPlantLabel} query={query} recentPlants={recentPlants} featuredPlants={recentObservedPlants} onQueryChange={setQuery} onSelect={selectPlant} />
-            <PlantOverview key={selectedPlant.id} plant={selectedPlant} />
+            <PlantSelect
+              plants={plants}
+              value={profilePlant ? formatPlantName(profilePlant) : ""}
+              query={profileQuery}
+              recentPlants={[]}
+              onQueryChange={(value) => {
+                setProfileQuery(value);
+                if (!value) setProfilePlantId("");
+              }}
+              onSelect={selectProfilePlant}
+            />
+            {profilePlant ? (
+              <PlantOverview key={profilePlant.id} plant={profilePlant} />
+            ) : (
+              <RecentObservedPlants plants={plants} recentPlants={recentObservedPlants} onSelect={selectProfilePlant} />
+            )}
           </div>
         ) : null}
       </div>
