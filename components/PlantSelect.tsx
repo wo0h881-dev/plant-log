@@ -41,7 +41,7 @@ export function PlantSelect({
         <span className="text-xs font-medium text-stone-500">{selectedCategory}</span>
       </div>
 
-      <div className="rounded-lg border border-stone-200 bg-white p-3">
+      <div className="rounded-lg border border-emerald-100 bg-[#f8fbf5] p-3">
         <div className="relative">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" aria-hidden="true" />
           <input
@@ -50,7 +50,7 @@ export function PlantSelect({
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder="식물 이름 검색"
-            className="h-12 w-full rounded-lg border border-stone-200 bg-stone-50 pl-10 pr-11 text-base outline-none transition focus:border-emerald-700"
+            className="h-12 w-full rounded-lg border border-emerald-100 bg-white pl-10 pr-11 text-base outline-none transition focus:border-emerald-700"
           />
           {query ? (
             <button
@@ -77,7 +77,7 @@ export function PlantSelect({
                 className={`flex min-h-11 w-full items-center justify-between rounded-lg px-4 text-left text-sm transition ${
                   isSelected
                     ? "bg-emerald-900 text-white"
-                    : "bg-stone-50 text-stone-700 hover:bg-emerald-50 hover:text-emerald-950"
+                    : "bg-white text-stone-700 hover:bg-emerald-50 hover:text-emerald-950"
                 }`}
               >
                 <span>{plant.name}</span>

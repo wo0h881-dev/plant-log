@@ -22,3 +22,11 @@ export type PlantLogPayload = {
 };
 
 export type SaveState = "idle" | "saving" | "success" | "error";
+
+export type PlantObservationSummary = {
+  id: string;
+  date?: string;
+  note: string;
+  tags: string[];
+  url?: string;
+};

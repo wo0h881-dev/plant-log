@@ -70,10 +70,10 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange }: Pla
   }
 
   return (
-    <section className="rounded-lg border border-dashed border-stone-300 bg-white p-3">
+    <section className="rounded-lg border border-dashed border-emerald-200 bg-[#edf8ef] p-3">
       <label
         htmlFor={inputId}
-        className="flex min-h-52 cursor-pointer flex-col items-center justify-center rounded-md bg-[#f2f6ef] px-4 text-center transition active:bg-emerald-50"
+        className="flex min-h-52 cursor-pointer flex-col items-center justify-center rounded-md bg-white/75 px-4 text-center transition active:bg-emerald-50"
       >
         {previews.length ? (
           <div className="grid w-full grid-cols-2 gap-2">
@@ -96,12 +96,12 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange }: Pla
             ))}
           </div>
         ) : (
-          <div className="grid h-16 w-16 place-items-center rounded-lg border border-emerald-100 bg-white text-emerald-800 shadow-sm">
+          <div className="grid h-16 w-16 place-items-center rounded-full border border-amber-100 bg-[#fff1b8] text-emerald-800 shadow-sm">
             <ImagePlus size={28} aria-hidden="true" />
           </div>
         )}
         <span className="mt-4 text-base font-semibold text-stone-950">
-          {files.length ? "사진 다시 선택" : "식물 사진 선택"}
+          {files.length ? "사진 다시 고르기" : "오늘의 식물을 보여주세요"}
         </span>
         <span className="mt-1 text-sm text-stone-500">
           {isCompressing ? "사진 압축 중..." : files.length ? `${files.length}장 선택됨` : "여러 장을 한 번에 선택할 수 있어요"}
