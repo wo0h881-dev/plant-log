@@ -189,6 +189,7 @@ export function parseNotionPlantPage(page: NotionPlantPage): Plant | null {
   const currentSoils = readMultiSelectProperty(page.properties["현재 흙"]);
   const currentPot = readTextProperty(page.properties["현재 화분"]) || undefined;
   const lastSettingChangedAt = readDateProperty(page.properties["마지막 세팅 변경일"]);
+  const lastRepottedAt = readDateProperty(page.properties["최근 분갈이날"]);
 
   return {
     id: page.id,
@@ -204,5 +205,6 @@ export function parseNotionPlantPage(page: NotionPlantPage): Plant | null {
     currentSoils,
     currentPot,
     lastSettingChangedAt,
+    lastRepottedAt,
   };
 }

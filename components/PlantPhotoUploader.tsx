@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { ChangeEvent, useId, useState } from "react";
+import { ChangeEvent, useEffect, useId, useMemo, useState } from "react";
+import { ImagePlus } from "lucide-react";
 import { parse } from "exifr";
 import { compressImage } from "@/lib/imageCompression";
 
@@ -9,11 +10,6 @@ type PlantPhotoUploaderProps = {
   files: File[];
   onChange: (files: File[]) => void;
   onCaptureDateChange: (date: string | null) => void;
-};
-
-type PreviewPhoto = {
-  name: string;
-  url: string;
 };
 
 function formatLocalDate(date: Date) {
@@ -32,9 +28,16 @@ async function readCaptureDate(file: File) {
 
 export function PlantPhotoUploader({ files, onChange, onCaptureDateChange }: PlantPhotoUploaderProps) {
   const inputId = useId();
-  const [previews, setPreviews] = useState<PreviewPhoto[]>([]);
   const [isCompressing, setIsCompressing] = useState(false);
   const [error, setError] = useState("");
+  const previews = useMemo(
+    () => files.map((file) => ({ name: file.name, url: URL.createObjectURL(file) })),
+    [files],
+  );
+
+  useEffect(() => {
+    return () => previews.forEach((preview) => URL.revokeObjectURL(preview.url));
+  }, [previews]);
 
   async function handleChange(event: ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(event.target.files ?? []);
@@ -43,10 +46,6 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange }: Pla
     if (!selected.length) {
       onChange([]);
       onCaptureDateChange(null);
-      setPreviews((current) => {
-        current.forEach((preview) => URL.revokeObjectURL(preview.url));
-        return [];
-      });
       return;
     }
 
@@ -62,13 +61,6 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange }: Pla
       const compressedFiles = await Promise.all(imageFiles.map((file) => compressImage(file)));
       onChange(compressedFiles);
       onCaptureDateChange(captureDate);
-      setPreviews((current) => {
-        current.forEach((preview) => URL.revokeObjectURL(preview.url));
-        return compressedFiles.map((file) => ({
-          name: file.name,
-          url: URL.createObjectURL(file),
-        }));
-      });
     } catch (compressionError) {
       setError(compressionError instanceof Error ? compressionError.message : "사진 처리에 실패했습니다.");
     } finally {
@@ -78,15 +70,15 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange }: Pla
   }
 
   return (
-    <section className="rounded-[2rem] border border-dashed border-emerald-200 bg-white/80 p-4 shadow-sm shadow-emerald-950/5">
+    <section className="rounded-lg border border-dashed border-stone-300 bg-white p-3">
       <label
         htmlFor={inputId}
-        className="flex min-h-56 cursor-pointer flex-col items-center justify-center rounded-[1.5rem] bg-gradient-to-br from-emerald-50 to-lime-50 px-4 text-center"
+        className="flex min-h-52 cursor-pointer flex-col items-center justify-center rounded-md bg-[#f2f6ef] px-4 text-center transition active:bg-emerald-50"
       >
         {previews.length ? (
           <div className="grid w-full grid-cols-2 gap-2">
             {previews.slice(0, 4).map((preview, index) => (
-              <div key={preview.url} className="relative h-28 overflow-hidden rounded-[1.25rem] bg-white">
+              <div key={preview.url} className="relative h-28 overflow-hidden rounded-md bg-white">
                 <Image
                   src={preview.url}
                   alt={preview.name}
@@ -104,8 +96,8 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange }: Pla
             ))}
           </div>
         ) : (
-          <div className="grid h-24 w-24 place-items-center rounded-[1.75rem] bg-white text-4xl shadow-sm">
-            🌿
+          <div className="grid h-16 w-16 place-items-center rounded-lg border border-emerald-100 bg-white text-emerald-800 shadow-sm">
+            <ImagePlus size={28} aria-hidden="true" />
           </div>
         )}
         <span className="mt-4 text-base font-semibold text-stone-950">

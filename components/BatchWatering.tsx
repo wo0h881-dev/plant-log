@@ -1,22 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AlertCircle, Check, ChevronDown, Droplets, Search, X } from "lucide-react";
 import type { Plant, SaveState } from "@/types/plant";
 
 type BatchWateringProps = {
   plants: Plant[];
   onWateringSaved?: () => void;
-  showDueAlerts?: boolean;
-  showManualWatering?: boolean;
 };
 
-type WateringResult = {
-  plantId: string;
-  plantName: string;
-  ok: boolean;
-  message?: string;
-};
-
+type WateringResult = { plantId: string; plantName: string; ok: boolean; message?: string };
 type WateringResponse = {
   successCount?: number;
   failureCount?: number;
@@ -24,34 +17,24 @@ type WateringResponse = {
   message?: string;
 };
 
-function formatPlantName(plant: Plant) {
-  return `${plant.category} - ${plant.name}`;
-}
-
 function getTodayValue() {
   const today = new Date();
-  const offsetDate = new Date(today.getTime() - today.getTimezoneOffset() * 60_000);
-  return offsetDate.toISOString().slice(0, 10);
-}
-
-function toDateTime(dateValue: string) {
-  return new Date(`${dateValue}T12:00:00`).toISOString();
+  const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60_000);
+  return localDate.toISOString().slice(0, 10);
 }
 
 function canShowInWateringList(plant: Plant) {
   return !["자구", "사망"].includes(plant.category.trim());
 }
 
-export function BatchWatering({
-  plants,
-  onWateringSaved,
-  showDueAlerts = true,
-  showManualWatering = true,
-}: BatchWateringProps) {
-  const [isDueOpen, setIsDueOpen] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
+function formatPlantName(plant: Plant) {
+  return `${plant.category} ${plant.name}`.toLowerCase();
+}
+
+export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dismissedDueIds, setDismissedDueIds] = useState<string[]>([]);
+  const [isOtherOpen, setIsOtherOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [wateredDate, setWateredDate] = useState(getTodayValue);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -60,18 +43,24 @@ export function BatchWatering({
 
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const dismissedDueIdSet = useMemo(() => new Set(dismissedDueIds), [dismissedDueIds]);
+  const wateringPlants = useMemo(() => plants.filter(canShowInWateringList), [plants]);
+  const duePlants = useMemo(
+    () => wateringPlants
+      .filter((plant) => plant.isWateringDue && !dismissedDueIdSet.has(plant.id))
+      .sort((a, b) => (b.daysSinceWatered ?? 0) - (a.daysSinceWatered ?? 0)),
+    [dismissedDueIdSet, wateringPlants],
+  );
+  const otherPlants = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const dueIds = new Set(duePlants.map((plant) => plant.id));
+    return wateringPlants.filter(
+      (plant) => !dueIds.has(plant.id) && formatPlantName(plant).includes(normalizedQuery),
+    );
+  }, [duePlants, query, wateringPlants]);
+  const dueSelectedCount = duePlants.filter((plant) => selectedIdSet.has(plant.id)).length;
+  const areAllDueSelected = duePlants.length > 0 && dueSelectedCount === duePlants.length;
   const successfulResults = results.filter((result) => result.ok);
   const failedResults = results.filter((result) => !result.ok);
-  const wateringPlants = plants.filter(canShowInWateringList);
-  const duePlants = wateringPlants.filter(
-    (plant) => plant.isWateringDue && !dismissedDueIdSet.has(plant.id),
-  ).sort((a, b) => (b.daysSinceWatered ?? 0) - (a.daysSinceWatered ?? 0));
-  const dueSelectedCount = duePlants.filter((plant) => selectedIdSet.has(plant.id)).length;
-  const hasDueSelection = dueSelectedCount > 0;
-  const areAllDuePlantsSelected = duePlants.length > 0 && dueSelectedCount === duePlants.length;
-  const filteredPlants = wateringPlants.filter((plant) =>
-    formatPlantName(plant).toLowerCase().includes(query.trim().toLowerCase()),
-  );
 
   function togglePlant(plantId: string) {
     setSelectedIds((current) =>
@@ -81,9 +70,8 @@ export function BatchWatering({
 
   function toggleAllDuePlants() {
     const dueIds = duePlants.map((plant) => plant.id);
-
     setSelectedIds((current) =>
-      areAllDuePlantsSelected
+      areAllDueSelected
         ? current.filter((id) => !dueIds.includes(id))
         : [...new Set([...current, ...dueIds])],
     );
@@ -91,18 +79,7 @@ export function BatchWatering({
 
   async function saveWateringLogs() {
     const selectedPlants = wateringPlants.filter((plant) => selectedIdSet.has(plant.id));
-
-    if (!selectedPlants.length) {
-      setSaveState("error");
-      setMessage("물 준 식물을 선택하세요.");
-      return;
-    }
-
-    if (!wateredDate) {
-      setSaveState("error");
-      setMessage("물 준 날짜를 선택하세요.");
-      return;
-    }
+    if (!selectedPlants.length) return;
 
     setSaveState("saving");
     setMessage("");
@@ -113,274 +90,176 @@ export function BatchWatering({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          wateredAt: toDateTime(wateredDate),
-          plants: selectedPlants.map((plant) => ({
-            id: plant.id,
-            name: plant.name,
-            category: plant.category,
-          })),
+          wateredAt: wateredDate,
+          plants: selectedPlants.map(({ id, name }) => ({ id, name })),
         }),
       });
       const payload = (await response.json()) as WateringResponse;
-
-      if (!response.ok) {
-        throw new Error(payload.message ?? "물주기 기록 저장에 실패했습니다.");
-      }
+      if (!response.ok) throw new Error(payload.message ?? "물주기 기록 저장에 실패했습니다.");
 
       const nextResults = payload.results ?? [];
       const failedIds = nextResults.filter((result) => !result.ok).map((result) => result.plantId);
-      const successCount = payload.successCount ?? nextResults.filter((result) => result.ok).length;
+      const succeededIds = nextResults.filter((result) => result.ok).map((result) => result.plantId);
+      const successCount = payload.successCount ?? succeededIds.length;
       const failureCount = payload.failureCount ?? failedIds.length;
 
       setResults(nextResults);
       setSelectedIds(failedIds);
-      setDismissedDueIds((current) => [
-        ...new Set([
-          ...current,
-          ...nextResults.filter((result) => result.ok).map((result) => result.plantId),
-        ]),
-      ]);
+      setDismissedDueIds((current) => [...new Set([...current, ...succeededIds])]);
       setSaveState(failureCount ? "error" : "success");
       setMessage(
         failureCount
           ? `${successCount}개 저장, ${failureCount}개 실패했습니다.`
           : `${successCount}개 식물의 물주기를 저장했습니다.`,
       );
-
-      if (successCount) {
-        onWateringSaved?.();
-      }
+      if (successCount) onWateringSaved?.();
     } catch (error) {
       setSaveState("error");
       setMessage(error instanceof Error ? error.message : "물주기 기록 저장에 실패했습니다.");
     }
   }
 
+  function renderPlantRow(plant: Plant, due = false) {
+    const isSelected = selectedIdSet.has(plant.id);
+    const daysText = typeof plant.daysSinceWatered === "number"
+      ? `${plant.daysSinceWatered}일 전 물줌`
+      : "물준 기록 없음";
+
+    return (
+      <label
+        key={plant.id}
+        className={`flex min-h-14 items-center justify-between gap-3 rounded-lg border px-3 py-2 transition ${
+          isSelected
+            ? "border-emerald-800 bg-emerald-50"
+            : due ? "border-amber-200 bg-amber-50" : "border-stone-200 bg-white"
+        }`}
+      >
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-semibold text-stone-900">{plant.name}</span>
+          <span className="block text-xs text-stone-500">
+            {due && typeof plant.wateringCycleDays === "number"
+              ? `주기 ${plant.wateringCycleDays}일 · ${daysText}`
+              : plant.category}
+          </span>
+        </span>
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => togglePlant(plant.id)}
+          className="h-5 w-5 shrink-0 accent-emerald-800"
+        />
+      </label>
+    );
+  }
+
   return (
-    <div className="space-y-3">
-      {showDueAlerts ? (
-        <section className="rounded-[1.5rem] border border-amber-100 bg-white p-4 shadow-sm shadow-amber-950/5">
-        <button
-          type="button"
-          onClick={() => setIsDueOpen((current) => !current)}
-          className="flex min-h-12 w-full items-center justify-between gap-3 text-left"
-          aria-expanded={isDueOpen}
-        >
-          <span>
-            <span className="block text-base font-bold text-stone-900">물줄 때 된 식물</span>
-            <span className="block text-sm text-stone-500">
-              {duePlants.length ? "체크하고 바로 물주기 기록을 저장하세요" : "지금 알림이 있는 식물이 없습니다"}
+    <div className="space-y-4">
+      <label className="block">
+        <span className="mb-2 block text-sm font-semibold text-stone-700">물 준 날짜</span>
+        <input
+          type="date"
+          value={wateredDate}
+          onChange={(event) => setWateredDate(event.target.value)}
+          className="h-12 w-full rounded-lg border border-stone-200 bg-white px-3 text-base outline-none transition focus:border-emerald-700"
+        />
+      </label>
+
+      <section className="rounded-lg border border-amber-200 bg-[#fffaf0] p-4">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div className="flex gap-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-amber-100 text-amber-800">
+              <Droplets size={19} aria-hidden="true" />
             </span>
-          </span>
-          <span className="flex items-center gap-2">
-            {duePlants.length ? (
-              <span className="rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-900">
-                {duePlants.length}개
-              </span>
-            ) : null}
-            <span className="text-xl font-bold text-amber-900">{isDueOpen ? "−" : "+"}</span>
-          </span>
-        </button>
-
-        {isDueOpen && duePlants.length ? (
-          <div className="mt-3">
-            <label className="mb-3 block">
-              <span className="mb-2 block text-sm font-semibold text-stone-700">물 준 날짜</span>
-              <input
-                type="date"
-                value={wateredDate}
-                onChange={(event) => setWateredDate(event.target.value)}
-                className="h-11 w-full rounded-2xl bg-amber-50 px-4 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
-              />
-            </label>
-
+            <div>
+              <h2 className="text-base font-bold text-stone-900">물줄 때 된 식물</h2>
+              <p className="mt-0.5 text-xs text-stone-600">
+                {duePlants.length ? `${duePlants.length}개의 기록이 필요해요` : "지금은 모두 괜찮아요"}
+              </p>
+            </div>
+          </div>
+          {duePlants.length ? (
             <button
               type="button"
               onClick={toggleAllDuePlants}
-              className="mb-3 min-h-10 w-full rounded-2xl bg-amber-100 px-4 text-sm font-bold text-amber-950 transition active:scale-[0.99]"
+              className="min-h-9 shrink-0 rounded-lg border border-amber-300 bg-white px-3 text-xs font-bold text-amber-900"
             >
-              {areAllDuePlantsSelected ? "전체해제" : "전체선택"}
+              {areAllDueSelected ? "전체해제" : "전체선택"}
             </button>
-
-            <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
-              {duePlants.map((plant) => {
-                const isSelected = selectedIdSet.has(plant.id);
-                const daysText =
-                  typeof plant.daysSinceWatered === "number"
-                    ? `물 안 준 지 ${plant.daysSinceWatered}일`
-                    : "물준 기록 없음";
-
-                return (
-                  <label
-                    key={`due-${plant.id}`}
-                    className={`flex min-h-14 items-center justify-between gap-3 rounded-2xl px-3 text-sm transition ${
-                      isSelected ? "bg-amber-200/80" : "bg-amber-50"
-                    }`}
-                  >
-                    <span>
-                      <span className="block font-semibold text-stone-900">{plant.name}</span>
-                      <span className="block text-xs text-stone-600">
-                        관수 주기 {plant.wateringCycleDays}일 · {daysText}
-                      </span>
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => togglePlant(plant.id)}
-                      className="h-5 w-5 accent-emerald-900"
-                    />
-                  </label>
-                );
-              })}
-            </div>
-
-            {hasDueSelection ? (
-              <button
-                type="button"
-                onClick={saveWateringLogs}
-                disabled={saveState === "saving"}
-                className="mt-3 min-h-12 w-full rounded-[1.1rem] bg-emerald-800 px-5 text-base font-bold text-white shadow-md shadow-emerald-950/15 transition active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500 disabled:shadow-none"
-              >
-                {saveState === "saving" ? "물주기 저장 중..." : `${dueSelectedCount}개 물주기 저장`}
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-        </section>
-      ) : null}
-
-      {showManualWatering ? (
-        <section className="rounded-[1.5rem] border border-emerald-100 bg-white p-4 shadow-sm shadow-emerald-950/5">
-      <button
-        type="button"
-        onClick={() => setIsOpen((current) => !current)}
-        className="flex min-h-12 w-full items-center justify-between gap-3 text-left"
-        aria-expanded={isOpen}
-      >
-        <span>
-          <span className="block text-base font-bold text-stone-900">여러 식물 물주기</span>
-          <span className="block text-sm text-stone-500">
-            {isOpen ? "물 준 날짜와 식물을 체크하세요" : "눌러서 체크리스트 열기"}
-          </span>
-        </span>
-          <span className="flex items-center gap-2">
-            <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-900">
-            {selectedIds.length}개
-          </span>
-          <span className="text-xl font-bold text-emerald-900">{isOpen ? "−" : "+"}</span>
-        </span>
-      </button>
-
-      {isOpen ? (
-        <div className="mt-4">
-          <label className="mb-3 block">
-            <span className="mb-2 block text-sm font-semibold text-stone-700">물 준 날짜</span>
-            <input
-              type="date"
-              value={wateredDate}
-              onChange={(event) => setWateredDate(event.target.value)}
-              className="h-11 w-full rounded-2xl bg-stone-50 px-4 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
-            />
-          </label>
-
-          <div className="relative mb-3">
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="물 준 식물 검색"
-              className="h-11 w-full rounded-2xl bg-stone-50 px-4 pr-12 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
-            />
-            {query ? (
-              <button
-                type="button"
-                onClick={() => setQuery("")}
-                aria-label="검색어 지우기"
-                className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-stone-200 text-sm font-bold text-stone-600 transition active:scale-95"
-              >
-                x
-              </button>
-            ) : null}
-          </div>
-
-          <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
-            {filteredPlants.map((plant) => {
-              const isSelected = selectedIdSet.has(plant.id);
-
-              return (
-                <label
-                  key={plant.id}
-                  className={`flex min-h-12 items-center justify-between gap-3 rounded-2xl px-4 text-sm transition ${
-                    isSelected ? "bg-emerald-900 text-white" : "bg-stone-50 text-stone-700"
-                  }`}
-                >
-                  <span>
-                    <span className="block font-semibold">{plant.name}</span>
-                    <span className={isSelected ? "text-white/75" : "text-stone-500"}>
-                      {plant.category}
-                    </span>
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => togglePlant(plant.id)}
-                    className="h-5 w-5 accent-emerald-900"
-                  />
-                </label>
-              );
-            })}
-          </div>
-
-          <button
-            type="button"
-            onClick={saveWateringLogs}
-            disabled={!selectedIds.length || saveState === "saving"}
-            className="mt-3 min-h-12 w-full rounded-[1.1rem] bg-emerald-800 px-5 text-base font-bold text-white shadow-md shadow-emerald-950/15 transition active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-stone-300 disabled:text-stone-500 disabled:shadow-none"
-          >
-            {saveState === "saving"
-              ? "물주기 저장 중..."
-              : failedResults.length
-                ? "실패한 식물만 다시 저장"
-                : "선택한 식물 물주기 저장"}
-          </button>
-        </div>
-      ) : null}
-        </section>
-      ) : null}
-
-      {message ? (
-        <div
-          className={`rounded-2xl px-4 py-3 text-sm font-medium ${
-            saveState === "error" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-800"
-          }`}
-        >
-          <p>{message}</p>
-          {results.length ? (
-            <div className="mt-3 space-y-3">
-              {successfulResults.length ? (
-                <div>
-                  <p className="text-xs font-bold">성공 {successfulResults.length}개</p>
-                  <ul className="mt-1 space-y-1">
-                    {successfulResults.map((result) => (
-                      <li key={`success-${result.plantId}`}>✓ {result.plantName}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-
-              {failedResults.length ? (
-                <div>
-                  <p className="text-xs font-bold">실패 {failedResults.length}개</p>
-                  <ul className="mt-1 space-y-1">
-                    {failedResults.map((result) => (
-                      <li key={`failed-${result.plantId}`}>! {result.plantName}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </div>
           ) : null}
         </div>
+
+        {duePlants.length ? (
+          <div className="max-h-72 space-y-2 overflow-y-auto">{duePlants.map((plant) => renderPlantRow(plant, true))}</div>
+        ) : (
+          <div className="flex items-center gap-2 rounded-lg bg-white px-3 py-3 text-sm text-stone-600">
+            <Check size={17} className="text-emerald-700" aria-hidden="true" />
+            오늘 확인할 물주기 알림이 없습니다.
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-lg border border-stone-200 bg-white">
+        <button
+          type="button"
+          onClick={() => setIsOtherOpen((current) => !current)}
+          className="flex min-h-14 w-full items-center justify-between px-4 text-left"
+          aria-expanded={isOtherOpen}
+        >
+          <span>
+            <span className="block text-sm font-bold text-stone-900">다른 식물 물주기</span>
+            <span className="block text-xs text-stone-500">알림이 없어도 직접 선택할 수 있어요</span>
+          </span>
+          <ChevronDown size={20} className={`text-stone-500 transition ${isOtherOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+        </button>
+
+        {isOtherOpen ? (
+          <div className="border-t border-stone-200 p-3">
+            <div className="relative mb-3">
+              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" aria-hidden="true" />
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="식물 이름 검색"
+                className="h-11 w-full rounded-lg border border-stone-200 bg-stone-50 pl-10 pr-10 text-base outline-none focus:border-emerald-700"
+              />
+              {query ? (
+                <button type="button" onClick={() => setQuery("")} aria-label="검색어 지우기" className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center text-stone-500">
+                  <X size={17} aria-hidden="true" />
+                </button>
+              ) : null}
+            </div>
+            <div className="max-h-72 space-y-2 overflow-y-auto">
+              {otherPlants.length ? otherPlants.map((plant) => renderPlantRow(plant)) : (
+                <p className="py-5 text-center text-sm text-stone-500">검색 결과가 없습니다.</p>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </section>
+
+      {message ? (
+        <div className={`rounded-lg px-4 py-3 text-sm ${saveState === "error" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-800"}`}>
+          <div className="flex items-start gap-2">
+            {saveState === "error" ? <AlertCircle size={17} className="mt-0.5 shrink-0" aria-hidden="true" /> : <Check size={17} className="mt-0.5 shrink-0" aria-hidden="true" />}
+            <div>
+              <p className="font-semibold">{message}</p>
+              {successfulResults.length ? <p className="mt-1">성공: {successfulResults.map((result) => result.plantName).join(", ")}</p> : null}
+              {failedResults.length ? <p className="mt-1">실패: {failedResults.map((result) => result.plantName).join(", ")}</p> : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {selectedIds.length ? (
+        <button
+          type="button"
+          onClick={saveWateringLogs}
+          disabled={saveState === "saving"}
+          className="min-h-14 w-full rounded-lg bg-emerald-900 px-5 text-base font-bold text-white shadow-lg shadow-emerald-950/15 transition active:scale-[0.99] disabled:bg-stone-300"
+        >
+          {saveState === "saving" ? "저장 중..." : failedResults.length ? `실패한 ${selectedIds.length}개 다시 저장` : `${selectedIds.length}개 물주기 저장`}
+        </button>
       ) : null}
     </div>
   );

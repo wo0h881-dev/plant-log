@@ -1,5 +1,6 @@
 "use client";
 
+import { Search, X } from "lucide-react";
 import type { Plant } from "@/types/plant";
 
 type PlantSelectProps = {
@@ -40,24 +41,25 @@ export function PlantSelect({
         <span className="text-xs font-medium text-stone-500">{selectedCategory}</span>
       </div>
 
-      <div className="rounded-[1.5rem] border border-stone-200 bg-white p-3 shadow-sm shadow-stone-950/5">
+      <div className="rounded-lg border border-stone-200 bg-white p-3">
         <div className="relative">
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" aria-hidden="true" />
           <input
             id="plant-search"
             type="search"
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder="식물 이름 검색"
-            className="h-12 w-full rounded-2xl bg-stone-50 px-4 pr-12 text-base outline-none ring-1 ring-transparent transition focus:ring-emerald-500"
+            className="h-12 w-full rounded-lg border border-stone-200 bg-stone-50 pl-10 pr-11 text-base outline-none transition focus:border-emerald-700"
           />
           {query ? (
             <button
               type="button"
               onClick={() => onQueryChange("")}
               aria-label="검색어 지우기"
-              className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-stone-200 text-sm font-bold text-stone-600 transition active:scale-95"
+              className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center text-stone-500 transition active:scale-95"
             >
-              x
+              <X size={17} aria-hidden="true" />
             </button>
           ) : null}
         </div>
@@ -72,7 +74,7 @@ export function PlantSelect({
                 key={plant.id}
                 type="button"
                 onClick={() => onSelect(plant)}
-                className={`flex min-h-11 w-full items-center justify-between rounded-2xl px-4 text-left text-sm transition ${
+                className={`flex min-h-11 w-full items-center justify-between rounded-lg px-4 text-left text-sm transition ${
                   isSelected
                     ? "bg-emerald-900 text-white"
                     : "bg-stone-50 text-stone-700 hover:bg-emerald-50 hover:text-emerald-950"
@@ -96,7 +98,7 @@ export function PlantSelect({
                 const plant = plants.find((item) => formatPlantName(item) === plantName);
                 if (plant) onSelect(plant);
               }}
-              className="shrink-0 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-950"
+              className="shrink-0 rounded-full border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700"
             >
               {plantName}
             </button>

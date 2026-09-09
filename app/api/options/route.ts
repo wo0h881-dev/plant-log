@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getDataSourceOptions, resolveDataSourceId } from "@/lib/notion";
 
-const FALLBACK_OBSERVATION_TAGS = ["신엽", "하엽", "상태이상", "잎끝 갈변", "응애", "분갈이 필요"];
+const FALLBACK_OBSERVATION_TAGS = ["신엽", "하엽", "상태이상", "잎끝 갈변", "응애"];
+const HIDDEN_OBSERVATION_TAGS = new Set(["분갈이", "분갈이 필요"]);
 const FALLBACK_SOIL_OPTIONS = ["배흙", "수태", "세라미스", "펄라이트"];
 const FALLBACK_POT_OPTIONS = ["슬릿분", "토분", "플분", "투명분", "행잉분", "기타"];
 
@@ -50,7 +51,7 @@ export async function GET() {
 
     return NextResponse.json(
       {
-        observationTags,
+        observationTags: observationTags.filter((tag) => !HIDDEN_OBSERVATION_TAGS.has(tag)),
         soilOptions,
         potOptions,
         source: "notion",

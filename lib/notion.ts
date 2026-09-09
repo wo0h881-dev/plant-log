@@ -63,6 +63,7 @@ type UpdatePlantSettingsPageParams = {
   lightWatt?: number;
   soils?: string[];
   potName?: string;
+  repottedAt?: string;
 };
 
 type CreateSettingChangePageParams = {
@@ -71,7 +72,7 @@ type CreateSettingChangePageParams = {
   plantId: string;
   plantName: string;
   changedAt: string;
-  type: "빛" | "흙" | "화분";
+  type: "빛" | "흙" | "화분" | "분갈이";
   lightName?: string;
   lightWatt?: number;
   soils?: string[];
@@ -303,6 +304,7 @@ export async function updatePlantSettingsPage({
   lightWatt,
   soils,
   potName,
+  repottedAt,
 }: UpdatePlantSettingsPageParams) {
   const properties: Record<string, unknown> = {
     "마지막 세팅 변경일": {
@@ -331,6 +333,12 @@ export async function updatePlantSettingsPage({
   if (potName) {
     properties["현재 화분"] = {
       select: { name: potName },
+    };
+  }
+
+  if (repottedAt) {
+    properties["최근 분갈이날"] = {
+      date: { start: repottedAt },
     };
   }
 
@@ -364,7 +372,7 @@ export async function createSettingChangePage({
         parent: { type: "data_source_id", data_source_id: parentId },
         properties: {
           이름: {
-            title: [{ text: { content: `${plantName} ${type} 변경` } }],
+            title: [{ text: { content: type === "분갈이" ? `${plantName} 분갈이` : `${plantName} ${type} 변경` } }],
           },
           날짜: {
             date: { start: changedAt },

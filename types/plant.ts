@@ -12,6 +12,7 @@ export type Plant = {
   currentSoils?: string[];
   currentPot?: string;
   lastSettingChangedAt?: string;
+  lastRepottedAt?: string;
 };
 
 export type PlantLogPayload = {
