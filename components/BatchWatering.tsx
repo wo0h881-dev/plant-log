@@ -34,6 +34,7 @@ function formatPlantName(plant: Plant) {
 export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dismissedDueIds, setDismissedDueIds] = useState<string[]>([]);
+  const [isDueOpen, setIsDueOpen] = useState(false);
   const [isOtherOpen, setIsOtherOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [wateredDate, setWateredDate] = useState(getTodayValue);
@@ -164,38 +165,44 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
         />
       </label>
 
-      <section className="rounded-lg border border-amber-200 bg-[#fffaf0] p-4">
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div className="flex gap-3">
+      <section className="rounded-lg border border-amber-200 bg-[#fffaf0]">
+        <button
+          type="button"
+          onClick={() => setIsDueOpen((current) => !current)}
+          className="flex min-h-16 w-full items-center justify-between gap-3 p-4 text-left"
+          aria-expanded={isDueOpen}
+        >
+          <span className="flex gap-3">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-amber-100 text-amber-800">
               <Droplets size={19} aria-hidden="true" />
             </span>
-            <div>
-              <h2 className="text-base font-bold text-stone-900">물줄 때 된 식물</h2>
-              <p className="mt-0.5 text-xs text-stone-600">
+            <span>
+              <span className="block text-base font-bold text-stone-900">물줄 때 된 식물</span>
+              <span className="mt-0.5 block text-xs text-stone-600">
                 {duePlants.length ? `${duePlants.length}개의 기록이 필요해요` : "지금은 모두 괜찮아요"}
-              </p>
-            </div>
-          </div>
-          {duePlants.length ? (
-            <button
-              type="button"
-              onClick={toggleAllDuePlants}
-              className="min-h-9 shrink-0 rounded-lg border border-amber-300 bg-white px-3 text-xs font-bold text-amber-900"
-            >
-              {areAllDueSelected ? "전체해제" : "전체선택"}
-            </button>
-          ) : null}
-        </div>
+              </span>
+            </span>
+          </span>
+          <ChevronDown size={20} className={`shrink-0 text-amber-800 transition ${isDueOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+        </button>
 
-        {duePlants.length ? (
-          <div className="max-h-72 space-y-2 overflow-y-auto">{duePlants.map((plant) => renderPlantRow(plant, true))}</div>
-        ) : (
-          <div className="flex items-center gap-2 rounded-lg bg-white px-3 py-3 text-sm text-stone-600">
-            <Check size={17} className="text-emerald-700" aria-hidden="true" />
-            오늘 확인할 물주기 알림이 없습니다.
+        {isDueOpen ? (
+          <div className="border-t border-amber-200 p-3">
+            {duePlants.length ? (
+              <>
+                <button type="button" onClick={toggleAllDuePlants} className="mb-3 min-h-9 w-full rounded-lg border border-amber-300 bg-white px-3 text-xs font-bold text-amber-900">
+                  {areAllDueSelected ? "전체해제" : "전체선택"}
+                </button>
+                <div className="max-h-72 space-y-2 overflow-y-auto">{duePlants.map((plant) => renderPlantRow(plant, true))}</div>
+              </>
+            ) : (
+              <div className="flex items-center gap-2 rounded-lg bg-white px-3 py-3 text-sm text-stone-600">
+                <Check size={17} className="text-emerald-700" aria-hidden="true" />
+                오늘 확인할 물주기 알림이 없습니다.
+              </div>
+            )}
           </div>
-        )}
+        ) : null}
       </section>
 
       <section className="rounded-lg border border-stone-200 bg-white">

@@ -30,3 +30,18 @@ export type PlantObservationSummary = {
   tags: string[];
   url?: string;
 };
+
+export type PlantPhotoSummary = {
+  id: string;
+  name: string;
+  url: string;
+  date?: string;
+};
+
+export type RecentObservedPlant = {
+  plantId?: string;
+  plantName: string;
+  plantCategory: string;
+  observedAt?: string;
+  photoUrl?: string;
+};

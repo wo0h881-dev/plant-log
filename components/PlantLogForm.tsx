@@ -7,10 +7,10 @@ import { PlantPhotoUploader } from "@/components/PlantPhotoUploader";
 import { PlantOverview } from "@/components/PlantOverview";
 import { PlantSelect } from "@/components/PlantSelect";
 import { fallbackPlants } from "@/lib/plants";
-import type { Plant, SaveState } from "@/types/plant";
+import type { Plant, RecentObservedPlant, SaveState } from "@/types/plant";
 
 const RECENT_PLANTS_KEY = "plant-log:recent-plants";
-const DEFAULT_OBSERVATION_TAGS = ["신엽", "하엽", "상태이상", "잎끝 갈변", "응애"];
+const DEFAULT_OBSERVATION_TAGS = ["신엽", "하엽", "상태이상", "잎끝 갈변", "응애", "과습"];
 const HIDDEN_OBSERVATION_TAGS = new Set(["분갈이", "분갈이 필요"]);
 
 type RecordTab = "water" | "observation" | "profile";
@@ -21,6 +21,7 @@ type OptionsResponse = {
   potOptions: string[];
   source: "notion" | "fallback";
 };
+type RecentPlantsResponse = { recentPlants?: RecentObservedPlant[] };
 
 function formatPlantName(plant: Plant) {
   return `${plant.category} - ${plant.name}`;
@@ -60,6 +61,7 @@ export function PlantLogForm() {
     }
   });
   const [observationTags, setObservationTags] = useState<string[]>(DEFAULT_OBSERVATION_TAGS);
+  const [recentObservedPlants, setRecentObservedPlants] = useState<RecentObservedPlant[]>([]);
 
   const [photos, setPhotos] = useState<File[]>([]);
   const [observedDate, setObservedDate] = useState(getTodayValue);
@@ -94,6 +96,13 @@ export function PlantLogForm() {
       .catch(() => {
         setObservationTags(DEFAULT_OBSERVATION_TAGS);
       });
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/plant-details")
+      .then((response) => response.json() as Promise<RecentPlantsResponse>)
+      .then((payload) => setRecentObservedPlants(payload.recentPlants ?? []))
+      .catch(() => setRecentObservedPlants([]));
   }, []);
 
   const selectedPlantLabel = formatPlantName(selectedPlant);
@@ -169,22 +178,22 @@ export function PlantLogForm() {
   ];
 
   return (
-    <main className="min-h-dvh bg-[#fffaf2] text-stone-950">
+    <main className="min-h-dvh bg-[#f1f6eb] text-stone-950">
       <div className="mx-auto min-h-dvh w-full max-w-md px-4 pb-6 pt-5">
-        <header className="mb-4 flex items-center justify-between rounded-lg border border-emerald-100 bg-[#eaf6e7] px-4 py-3">
+        <header className="mb-4 flex items-center justify-between rounded-lg bg-[#456615] px-4 py-3 text-white shadow-lg shadow-[#36510e]/15">
           <div className="flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-full bg-[#fff1b8] text-emerald-800">
+            <span className="grid h-11 w-11 place-items-center rounded-full bg-[#fff1a8] text-[#456615]">
               <Flower2 size={23} aria-hidden="true" />
             </span>
             <div>
-              <p className="text-xs font-bold text-emerald-800">{todayLabel}</p>
+              <p className="text-xs font-bold text-white/70">{todayLabel}</p>
               <h1 className="text-xl font-bold">Plant Log</h1>
             </div>
           </div>
-          <span className="rounded-full bg-white/80 px-3 py-1.5 text-xs font-bold text-stone-600">오늘도 쑥쑥</span>
+          <span className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-[#456615]">오늘도 쑥쑥</span>
         </header>
 
-        <nav className="sticky top-0 z-20 -mx-1 mb-5 bg-[#fffaf2]/95 px-1 py-2 backdrop-blur" aria-label="기록 종류">
+        <nav className="sticky top-0 z-20 -mx-1 mb-5 bg-[#f1f6eb]/95 px-1 py-2 backdrop-blur" aria-label="기록 종류">
           <div className="grid grid-cols-3 gap-1 rounded-lg border border-emerald-100 bg-white p-1 shadow-sm shadow-emerald-900/5">
             {tabs.map(({ id, label, icon: Icon, badge }) => {
               const isActive = activeTab === id;
@@ -193,7 +202,7 @@ export function PlantLogForm() {
                   key={id}
                   type="button"
                   onClick={() => setActiveTab(id)}
-                  className={`relative flex min-h-12 items-center justify-center gap-1.5 rounded-md px-2 text-sm font-bold transition ${isActive ? "bg-emerald-900 text-white" : "text-stone-600"}`}
+                  className={`relative flex min-h-12 items-center justify-center gap-1.5 rounded-md px-2 text-sm font-bold transition ${isActive ? "bg-[#456615] text-white" : "text-stone-600"}`}
                   aria-current={isActive ? "page" : undefined}
                 >
                   <Icon size={17} aria-hidden="true" />
@@ -238,7 +247,7 @@ export function PlantLogForm() {
             </label>
 
             <StatusMessage state={observationSaveState} message={observationMessage} />
-            <div className="sticky bottom-0 -mx-4 bg-gradient-to-t from-[#fffaf2] via-[#fffaf2] to-transparent px-4 pb-2 pt-4">
+            <div className="sticky bottom-0 -mx-4 bg-gradient-to-t from-[#f1f6eb] via-[#f1f6eb] to-transparent px-4 pb-2 pt-4">
               <button type="submit" disabled={!canSaveObservation} className="min-h-14 w-full rounded-lg bg-emerald-900 px-5 text-base font-bold text-white shadow-lg shadow-emerald-950/15 transition active:scale-[0.99] disabled:bg-stone-300 disabled:text-stone-500 disabled:shadow-none">
                 {observationSaveState === "saving" ? "저장 중..." : "관찰일지 저장"}
               </button>
@@ -248,7 +257,7 @@ export function PlantLogForm() {
 
         {activeTab === "profile" ? (
           <div className="space-y-5">
-            <PlantSelect plants={plants} value={selectedPlantLabel} query={query} recentPlants={recentPlants} onQueryChange={setQuery} onSelect={selectPlant} />
+            <PlantSelect plants={plants} value={selectedPlantLabel} query={query} recentPlants={recentPlants} featuredPlants={recentObservedPlants} onQueryChange={setQuery} onSelect={selectPlant} />
             <PlantOverview key={selectedPlant.id} plant={selectedPlant} />
           </div>
         ) : null}
