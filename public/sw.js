@@ -1,5 +1,5 @@
-const CACHE_NAME = "plant-log-v2";
-const APP_SHELL = ["/icon.svg"];
+const CACHE_NAME = "plant-log-v3";
+const APP_SHELL = ["/", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
@@ -22,9 +22,22 @@ self.addEventListener("fetch", (event) => {
 
   const requestUrl = new URL(event.request.url);
 
-  if (requestUrl.origin !== self.location.origin || requestUrl.pathname.startsWith("/_next/")) {
+  if (requestUrl.origin !== self.location.origin) {
     return;
   }
+
+  if (requestUrl.pathname.startsWith("/_next/static/")) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
+        const responseClone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+        return response;
+      })),
+    );
+    return;
+  }
+
+  if (requestUrl.pathname.startsWith("/_next/")) return;
 
   if (event.request.mode === "navigate") {
     event.respondWith(fetch(event.request).catch(() => caches.match("/")));

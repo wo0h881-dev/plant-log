@@ -141,15 +141,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const relationFilter = { property: "식물", relation: { contains: plantId } };
-    const filter = plantName
-      ? { or: [relationFilter, { property: "식물명", title: { equals: plantName } }] }
-      : relationFilter;
-    const payload = await queryObservationPages(token, dataSourceId, {
+    const relationPayload = await queryObservationPages(token, dataSourceId, {
       page_size: 20,
-      filter,
+      filter: { property: "식물", relation: { contains: plantId } },
       sorts: [{ property: "관찰일", direction: "descending" }],
     });
+    const payload = relationPayload.results.length || !plantName
+      ? relationPayload
+      : await queryObservationPages(token, dataSourceId, {
+          page_size: 20,
+          filter: { property: "식물명", title: { equals: plantName } },
+          sorts: [{ property: "관찰일", direction: "descending" }],
+        });
 
     return NextResponse.json(
       {
