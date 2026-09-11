@@ -48,7 +48,7 @@ function StatusMessage({ state, message }: { state: SaveState; message: string }
 
 export function PlantLogForm() {
   const [plants, setPlants] = useState<Plant[]>(fallbackPlants);
-  const [selectedPlant, setSelectedPlant] = useState<Plant>(fallbackPlants[0]);
+  const [selectedPlantId, setSelectedPlantId] = useState("");
   const [activeTab, setActiveTab] = useState<RecordTab>("observation");
   const [query, setQuery] = useState("");
   const [profileQuery, setProfileQuery] = useState("");
@@ -80,7 +80,8 @@ export function PlantLogForm() {
       .then((payload) => {
         const nextPlants = payload.plants.length ? payload.plants : fallbackPlants;
         setPlants(nextPlants);
-        setSelectedPlant((current) => nextPlants.find((plant) => plant.id === current.id) ?? nextPlants[0]);
+        setSelectedPlantId((current) => nextPlants.some((plant) => plant.id === current) ? current : "");
+        setProfilePlantId((current) => nextPlants.some((plant) => plant.id === current) ? current : "");
       })
       .catch(() => setPlants(fallbackPlants));
   }, []);
@@ -108,7 +109,8 @@ export function PlantLogForm() {
       .catch(() => setRecentObservedPlants([]));
   }, []);
 
-  const selectedPlantLabel = formatPlantName(selectedPlant);
+  const selectedPlant = plants.find((plant) => plant.id === selectedPlantId);
+  const selectedPlantLabel = selectedPlant ? formatPlantName(selectedPlant) : "";
   const profilePlant = plants.find((plant) => plant.id === profilePlantId);
   const dueCount = useMemo(
     () => plants.filter((plant) => plant.isWateringDue && !["자구", "사망"].includes(plant.category.trim())).length,
@@ -119,21 +121,21 @@ export function PlantLogForm() {
     [],
   );
   const canSaveObservation = Boolean(
-    selectedPlant.name && (photos.length || selectedTags.length || note.trim()) && observationSaveState !== "saving",
+    selectedPlant && (photos.length || selectedTags.length || note.trim()) && observationSaveState !== "saving",
   );
   function selectPlant(plant: Plant) {
-    setSelectedPlant(plant);
+    setSelectedPlantId(plant.id);
     setQuery(plant.name);
     setObservationMessage("");
   }
 
   function selectProfilePlant(plant: Plant) {
-    setSelectedPlant(plant);
     setProfilePlantId(plant.id);
     setProfileQuery(plant.name);
   }
 
   function storeRecentPlant() {
+    if (!selectedPlant) return;
     const label = formatPlantName(selectedPlant);
     const next = [label, ...recentPlants.filter((item) => item !== label)].slice(0, 5);
     setRecentPlants(next);
@@ -151,7 +153,7 @@ export function PlantLogForm() {
 
   async function saveObservation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canSaveObservation) return;
+    if (!canSaveObservation || !selectedPlant) return;
 
     setObservationSaveState("saving");
     setObservationMessage("");
@@ -233,7 +235,17 @@ export function PlantLogForm() {
         {activeTab === "observation" ? (
           <form onSubmit={saveObservation} className="space-y-5">
             <PlantPhotoUploader files={photos} onChange={setPhotos} onCaptureDateChange={updateCaptureDate} />
-            <PlantSelect plants={plants} value={selectedPlantLabel} query={query} recentPlants={recentPlants} onQueryChange={setQuery} onSelect={selectPlant} />
+            <PlantSelect
+              plants={plants}
+              value={selectedPlantLabel}
+              query={query}
+              recentPlants={recentPlants}
+              onQueryChange={(value) => {
+                setQuery(value);
+                if (value !== selectedPlant?.name) setSelectedPlantId("");
+              }}
+              onSelect={selectPlant}
+            />
 
             <section className="rounded-lg border border-violet-100 bg-[#f8f5ff] p-4">
               <label htmlFor="observed-date" className="mb-2 block text-sm font-semibold text-stone-800">관찰 날짜</label>

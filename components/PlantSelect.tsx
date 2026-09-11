@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Search, X } from "lucide-react";
+import { matchesPlantSearch } from "@/lib/plant-search";
 import type { Plant } from "@/types/plant";
 
 type PlantSelectProps = {
@@ -26,11 +27,9 @@ export function PlantSelect({
   onSelect,
 }: PlantSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLElement>(null);
   const normalizedQuery = query.trim().toLowerCase();
-  const filteredPlants = plants.filter((plant) => {
-    const searchable = `${plant.category} ${plant.name}`.toLowerCase();
-    return searchable.includes(normalizedQuery);
-  });
+  const filteredPlants = plants.filter((plant) => matchesPlantSearch(plant, normalizedQuery));
   const selectedPlant = plants.find((plant) => formatPlantName(plant) === value);
   const selectedCategory = selectedPlant?.category ?? "";
 
@@ -39,13 +38,17 @@ export function PlantSelect({
     setIsOpen(false);
   }
 
+  useEffect(() => {
+    function closeOnOutsidePointer(event: PointerEvent) {
+      if (!containerRef.current?.contains(event.target as Node)) setIsOpen(false);
+    }
+
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, []);
+
   return (
-    <section
-      className="space-y-2"
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setIsOpen(false);
-      }}
-    >
+    <section ref={containerRef} className="space-y-2">
       <div className="flex items-center justify-between">
         <label htmlFor="plant-search" className="text-sm font-bold text-stone-800">식물 선택</label>
         {selectedCategory ? <span className="rounded-full bg-[#edf5df] px-2.5 py-1 text-xs font-bold text-[#52751c]">{selectedCategory}</span> : null}
@@ -60,7 +63,10 @@ export function PlantSelect({
             value={query}
             onFocus={() => setIsOpen(true)}
             onClick={() => setIsOpen(true)}
-            onChange={(event) => onQueryChange(event.target.value)}
+            onChange={(event) => {
+              onQueryChange(event.target.value);
+              setIsOpen(true);
+            }}
             placeholder={selectedPlant ? selectedPlant.name : "식물 이름 검색"}
             className="h-12 w-full rounded-lg border border-[#dce9c8] bg-[#f7faef] pl-10 pr-20 text-base outline-none transition focus:border-[#52751c]"
           />

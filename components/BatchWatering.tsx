@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AlertCircle, Check, ChevronDown, Droplets, Search, X } from "lucide-react";
+import { matchesPlantSearch } from "@/lib/plant-search";
 import type { Plant, SaveState } from "@/types/plant";
 
 type BatchWateringProps = {
@@ -27,10 +28,6 @@ function canShowInWateringList(plant: Plant) {
   return !["자구", "사망"].includes(plant.category.trim());
 }
 
-function formatPlantName(plant: Plant) {
-  return `${plant.category} ${plant.name}`.toLowerCase();
-}
-
 export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dismissedDueIds, setDismissedDueIds] = useState<string[]>([]);
@@ -52,12 +49,8 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
     [dismissedDueIdSet, wateringPlants],
   );
   const otherPlants = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    const dueIds = new Set(duePlants.map((plant) => plant.id));
-    return wateringPlants.filter(
-      (plant) => !dueIds.has(plant.id) && formatPlantName(plant).includes(normalizedQuery),
-    );
-  }, [duePlants, query, wateringPlants]);
+    return wateringPlants.filter((plant) => matchesPlantSearch(plant, query));
+  }, [query, wateringPlants]);
   const dueSelectedCount = duePlants.filter((plant) => selectedIdSet.has(plant.id)).length;
   const areAllDueSelected = duePlants.length > 0 && dueSelectedCount === duePlants.length;
   const successfulResults = results.filter((result) => result.ok);
