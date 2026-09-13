@@ -1,12 +1,14 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, Check, ChevronDown, Droplets, Search, Sprout, X } from "lucide-react";
 import { matchesPlantSearch } from "@/lib/plant-search";
-import type { Plant, SaveState } from "@/types/plant";
+import type { Plant, RecentObservedPlant, SaveState } from "@/types/plant";
 
 type BatchWateringProps = {
   plants: Plant[];
+  recentPlants?: RecentObservedPlant[];
   onWateringSaved?: () => void;
 };
 
@@ -30,7 +32,7 @@ function canShowInWateringList(plant: Plant) {
   return !["자구", "사망"].includes(plant.category.trim());
 }
 
-export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
+export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: BatchWateringProps) {
   const today = getTodayValue();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dismissedDueIds, setDismissedDueIds] = useState<string[]>([]);
@@ -84,6 +86,22 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
   const areAllDueSelected = duePlants.length > 0 && dueSelectedCount === duePlants.length;
   const successfulResults = results.filter((result) => result.ok);
   const failedResults = results.filter((result) => !result.ok);
+  const recentPhotoByPlant = useMemo(() => {
+    const photos = new Map<string, string>();
+    for (const recent of recentPlants) {
+      if (!recent.photoUrl) continue;
+      if (recent.plantId) photos.set(recent.plantId, recent.photoUrl);
+      photos.set(`${recent.plantCategory}:${recent.plantName}`, recent.photoUrl);
+      photos.set(recent.plantName, recent.photoUrl);
+    }
+    return photos;
+  }, [recentPlants]);
+  const getPlantPhoto = useCallback((plant: Pick<Plant, "id" | "category" | "name">) => (
+    recentPhotoByPlant.get(plant.id)
+      ?? recentPhotoByPlant.get(`${plant.category}:${plant.name}`)
+      ?? recentPhotoByPlant.get(plant.name)
+  ), [recentPhotoByPlant]);
+  const dueHeroPhoto = duePlants.map(getPlantPhoto).find(Boolean);
 
   function togglePlant(plantId: string) {
     setSelectedIds((current) =>
@@ -154,6 +172,7 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
 
   function renderPlantRow(plant: Plant, due = false) {
     const isSelected = selectedIdSet.has(plant.id);
+    const photoUrl = getPlantPhoto(plant);
     const daysText = typeof plant.daysSinceWatered === "number"
       ? `${plant.daysSinceWatered}일 전 물줌`
       : "물준 기록 없음";
@@ -167,8 +186,8 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
             : due ? "border-[#f0c9aa] bg-[#fff7ef]" : "border-stone-200 bg-white"
         }`}
       >
-        <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${due ? "bg-[#f9dfca] text-[#9a4f25]" : "bg-[#e8f0df] text-[#315b36]"}`}>
-          <Sprout size={18} aria-hidden="true" />
+        <span className={`relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-lg ${due ? "bg-[#f9dfca] text-[#9a4f25]" : "bg-[#e8f0df] text-[#315b36]"}`}>
+          {photoUrl ? <Image src={photoUrl} alt="" fill sizes="44px" className="object-cover" unoptimized /> : <Sprout size={18} aria-hidden="true" />}
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-bold text-stone-900">{plant.name}</span>
@@ -194,9 +213,11 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
         <button
           type="button"
           onClick={() => setIsDueOpen((current) => !current)}
-          className="relative flex min-h-44 w-full items-end justify-between overflow-hidden p-5 text-left"
+          className="relative flex min-h-64 w-full items-end justify-between overflow-hidden p-5 text-left"
           aria-expanded={isDueOpen}
         >
+          {dueHeroPhoto ? <Image src={dueHeroPhoto} alt="" fill sizes="(max-width: 448px) 100vw, 448px" className="object-cover" unoptimized /> : null}
+          {dueHeroPhoto ? <span className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/5" /> : null}
           <Droplets size={132} strokeWidth={1.2} className="absolute -right-5 -top-5 text-[#a8c66c]/35" aria-hidden="true" />
           <span className="relative">
             <span className="block text-sm font-semibold text-white/70">물줄 때 된 식물</span>
@@ -243,7 +264,9 @@ export function BatchWatering({ plants, onWateringSaved }: BatchWateringProps) {
           <div className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1">
             {todayWateredPlants.map((plant) => (
               <div key={plant.id || plant.name} className="flex w-40 shrink-0 items-center gap-2.5 rounded-lg border border-[#dce5d3] bg-white p-3 shadow-sm shadow-stone-900/5">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#315b36] text-white"><Check size={18} aria-hidden="true" /></span>
+                <span className="relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-[#315b36] text-white">
+                  {getPlantPhoto({ id: plant.id, name: plant.name, category: "" }) ? <Image src={getPlantPhoto({ id: plant.id, name: plant.name, category: "" })!} alt="" fill sizes="40px" className="object-cover" unoptimized /> : <Check size={18} aria-hidden="true" />}
+                </span>
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-bold text-stone-900">{plant.name}</span>
                   <span className="mt-0.5 block text-[11px] text-stone-500">오늘 완료</span>

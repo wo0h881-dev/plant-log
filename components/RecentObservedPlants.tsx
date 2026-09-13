@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Clock3, Sprout } from "lucide-react";
+import { ArrowRight, Clock3, Sprout } from "lucide-react";
 import type { Plant, RecentObservedPlant } from "@/types/plant";
 
 type RecentObservedPlantsProps = {
@@ -35,8 +35,9 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
       </div>
 
       {items.length ? (
-        <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2">
-          {items.map(({ recent, plant }) => (
+        <>
+          <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-3">
+            {items.map(({ recent, plant }) => (
             <button
               key={`${recent.plantId}-${recent.plantName}`}
               type="button"
@@ -56,8 +57,22 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
               <span className="block truncate px-3 pb-1 pt-3 text-base font-black text-stone-900">{recent.plantName}</span>
               <span className="block truncate px-3 pb-3 text-xs font-medium text-stone-500">{recent.plantCategory}</span>
             </button>
-          ))}
-        </div>
+            ))}
+          </div>
+          {items[0].recent.photoUrl ? (
+            <button type="button" onClick={() => onSelect(items[0].plant)} className="relative mt-4 block aspect-[4/3] w-full overflow-hidden rounded-lg bg-[#dfe9ce] text-left shadow-xl shadow-stone-950/10">
+              <Image src={items[0].recent.photoUrl} alt={items[0].recent.plantName} fill sizes="(max-width: 448px) 100vw, 448px" className="object-cover" unoptimized />
+              <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/5 to-transparent" />
+              <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-4 text-white">
+                <span className="min-w-0">
+                  <span className="block text-xs font-bold text-white/70">최근 관찰</span>
+                  <span className="mt-1 block truncate text-xl font-black">{items[0].recent.plantName}</span>
+                </span>
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-stone-950"><ArrowRight size={18} aria-hidden="true" /></span>
+              </span>
+            </button>
+          ) : null}
+        </>
       ) : (
         <div className="rounded-lg border border-dashed border-[#cdddb4] bg-white/70 px-4 py-6 text-center text-sm text-stone-500">
           최근 관찰한 식물이 아직 없어요.

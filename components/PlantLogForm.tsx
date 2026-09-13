@@ -189,9 +189,9 @@ export function PlantLogForm() {
     { id: "profile" as const, label: "내 식물", icon: Sprout },
   ];
   const pageCopy = {
-    water: { eyebrow: "WATERING", title: "물주기", description: "오늘 필요한 물주기를 한눈에 확인해요" },
-    observation: { eyebrow: "NEW LOG", title: "관찰일지", description: "오늘의 변화를 사진으로 남겨요" },
-    profile: { eyebrow: "MY GARDEN", title: "내 식물", description: "사진과 관리 기록을 모아봐요" },
+    water: { title: "물주기", description: "건강한 오늘이, 더 푸른 내일을 만들어요" },
+    observation: { title: "관찰일지", description: "오늘의 변화를 사진으로 남겨요" },
+    profile: { title: "내 식물", description: "사진과 관리 기록을 모아봐요" },
   }[activeTab];
 
   return (
@@ -199,21 +199,19 @@ export function PlantLogForm() {
       <div className="mx-auto min-h-dvh w-full max-w-md px-4 pb-32 pt-[max(1.25rem,env(safe-area-inset-top))]">
         <header className="mb-6 flex items-start justify-between gap-4 px-1">
           <div className="min-w-0">
-            <div className="mb-2 flex items-center gap-2 text-[11px] font-black text-[#5c6f47]">
-              <span>{pageCopy.eyebrow}</span>
-              <span className="h-px w-8 bg-[#9aac83]" />
-              <span className="font-semibold text-stone-400">{todayLabel}</span>
-            </div>
             <h1 className="text-[2rem] font-black leading-none text-[#1d2a18]">{pageCopy.title}</h1>
             <p className="mt-2 text-sm font-medium text-stone-500">{pageCopy.description}</p>
           </div>
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-[#11180f] text-[#cbe27c] shadow-lg shadow-stone-950/10">
-            <Sprout size={23} aria-hidden="true" />
+          <span className="grid shrink-0 justify-items-end gap-2">
+            <span className="text-[11px] font-bold text-stone-400">{todayLabel}</span>
+            <span className="grid h-10 w-10 place-items-center rounded-full bg-[#11180f] text-white">
+              <Sprout size={19} aria-hidden="true" />
+            </span>
           </span>
         </header>
 
         {activeTab === "water" ? (
-          <BatchWatering plants={plants} onWateringSaved={refreshPlants} />
+          <BatchWatering plants={plants} recentPlants={recentObservedPlants} onWateringSaved={refreshPlants} />
         ) : null}
 
         {activeTab === "observation" ? (
@@ -283,7 +281,7 @@ export function PlantLogForm() {
         ) : null}
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md border-t border-[#dedfd7] bg-[#fbfbf8]/95 px-4 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl" aria-label="기록 종류">
+      <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md border-t border-[#e7e7e1] bg-white/95 px-4 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl" aria-label="기록 종류">
         <div className="grid grid-cols-3 gap-2">
           {tabs.map(({ id, label, icon: Icon, badge }) => {
             const isActive = activeTab === id;
@@ -292,12 +290,12 @@ export function PlantLogForm() {
                 key={id}
                 type="button"
                 onClick={() => setActiveTab(id)}
-                className={`relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg text-[11px] font-black transition ${isActive ? "bg-[#315b36] text-white shadow-md shadow-[#315b36]/15" : "text-stone-500"}`}
+                className={`relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg text-[11px] font-black transition ${isActive ? "text-[#315b36]" : "text-stone-400"}`}
                 aria-current={isActive ? "page" : undefined}
               >
                 <Icon size={20} strokeWidth={isActive ? 2.5 : 2} aria-hidden="true" />
                 <span>{label}</span>
-                {badge ? <span className={`absolute right-[18%] top-1.5 grid min-h-5 min-w-5 place-items-center rounded-full px-1 text-[10px] ${isActive ? "bg-[#d8ef80] text-[#26351d]" : "bg-[#f4c96f] text-stone-900"}`}>{badge}</span> : null}
+                {badge ? <span className="absolute right-[18%] top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-[#d8ef80] px-1 text-[10px] text-[#26351d]">{badge}</span> : null}
               </button>
             );
           })}
