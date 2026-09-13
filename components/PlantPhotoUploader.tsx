@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { ChangeEvent, useEffect, useId, useMemo, useState } from "react";
-import { ImagePlus } from "lucide-react";
+import { Camera, ImagePlus } from "lucide-react";
 import { parse } from "exifr";
 import { compressImage } from "@/lib/imageCompression";
 
@@ -70,15 +70,15 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange }: Pla
   }
 
   return (
-    <section className="rounded-lg border border-dashed border-emerald-200 bg-[#edf8ef] p-3">
+    <section className="overflow-hidden rounded-lg border border-[#d9dfd1] bg-[#dfe9ce] shadow-lg shadow-[#315b36]/10">
       <label
         htmlFor={inputId}
-        className="flex min-h-52 cursor-pointer flex-col items-center justify-center rounded-md bg-white/75 px-4 text-center transition active:bg-emerald-50"
+        className="relative flex min-h-72 cursor-pointer flex-col items-center justify-center text-center transition active:opacity-90"
       >
         {previews.length ? (
-          <div className="grid w-full grid-cols-2 gap-2">
+          <div className="grid min-h-72 w-full grid-cols-2 gap-1">
             {previews.slice(0, 4).map((preview, index) => (
-              <div key={preview.url} className="relative h-28 overflow-hidden rounded-md bg-white">
+              <div key={preview.url} className={`relative overflow-hidden bg-white ${previews.length === 1 ? "col-span-2 min-h-72" : "min-h-36"}`}>
                 <Image
                   src={preview.url}
                   alt={preview.name}
@@ -96,16 +96,22 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange }: Pla
             ))}
           </div>
         ) : (
-          <div className="grid h-16 w-16 place-items-center rounded-full border border-amber-100 bg-[#fff1b8] text-emerald-800 shadow-sm">
-            <ImagePlus size={28} aria-hidden="true" />
-          </div>
+          <>
+            <ImagePlus size={78} strokeWidth={1} className="text-[#315b36]/30" aria-hidden="true" />
+            <div className="mt-5">
+              <span className="block text-lg font-black text-[#23321c]">오늘의 식물을 보여주세요</span>
+              <span className="mt-1 block text-sm font-medium text-[#5c6f47]">여러 장을 한 번에 선택할 수 있어요</span>
+            </div>
+          </>
         )}
-        <span className="mt-4 text-base font-semibold text-stone-950">
-          {files.length ? "사진 다시 고르기" : "오늘의 식물을 보여주세요"}
+        <span className="absolute bottom-4 right-4 grid h-12 w-12 place-items-center rounded-lg bg-[#11180f] text-[#d8ef80] shadow-lg shadow-stone-950/20">
+          <Camera size={22} aria-hidden="true" />
         </span>
-        <span className="mt-1 text-sm text-stone-500">
-          {isCompressing ? "사진 압축 중..." : files.length ? `${files.length}장 선택됨` : "여러 장을 한 번에 선택할 수 있어요"}
-        </span>
+        {previews.length ? (
+          <span className="absolute bottom-4 left-4 rounded-full bg-white/90 px-3 py-2 text-xs font-black text-stone-800 backdrop-blur">
+            {isCompressing ? "사진 압축 중..." : `${files.length}장 선택됨`}
+          </span>
+        ) : null}
       </label>
       <input
         id={inputId}
@@ -115,7 +121,7 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange }: Pla
         className="sr-only"
         onChange={handleChange}
       />
-      {error ? <p className="mt-3 text-sm font-medium text-red-600">{error}</p> : null}
+      {error ? <p className="bg-red-50 px-4 py-3 text-sm font-medium text-red-600">{error}</p> : null}
     </section>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Check, Droplets, Flower2, NotebookPen, Sprout } from "lucide-react";
+import { AlertCircle, Check, Droplets, NotebookPen, Sprout } from "lucide-react";
 import { BatchWatering } from "@/components/BatchWatering";
 import { PlantPhotoUploader } from "@/components/PlantPhotoUploader";
 import { PlantOverview } from "@/components/PlantOverview";
@@ -188,45 +188,29 @@ export function PlantLogForm() {
     { id: "observation" as const, label: "관찰일지", icon: NotebookPen },
     { id: "profile" as const, label: "내 식물", icon: Sprout },
   ];
+  const pageCopy = {
+    water: { eyebrow: "WATERING", title: "물주기", description: "오늘 필요한 물주기를 한눈에 확인해요" },
+    observation: { eyebrow: "NEW LOG", title: "관찰일지", description: "오늘의 변화를 사진으로 남겨요" },
+    profile: { eyebrow: "MY GARDEN", title: "내 식물", description: "사진과 관리 기록을 모아봐요" },
+  }[activeTab];
 
   return (
-    <main className="min-h-dvh bg-[#f1f6eb] text-stone-950">
-      <div className="mx-auto min-h-dvh w-full max-w-md px-4 pb-6 pt-5">
-        <header className="mb-4 flex items-center justify-between rounded-lg bg-[#456615] px-4 py-3 text-white shadow-lg shadow-[#36510e]/15">
-          <div className="flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-full bg-[#fff1a8] text-[#456615]">
-              <Flower2 size={23} aria-hidden="true" />
-            </span>
-            <div>
-              <p className="text-xs font-bold text-white/70">{todayLabel}</p>
-              <h1 className="text-xl font-bold">Plant Log</h1>
+    <main className="min-h-dvh bg-[#f7f7f2] text-[#171914]">
+      <div className="mx-auto min-h-dvh w-full max-w-md px-4 pb-32 pt-[max(1.25rem,env(safe-area-inset-top))]">
+        <header className="mb-6 flex items-start justify-between gap-4 px-1">
+          <div className="min-w-0">
+            <div className="mb-2 flex items-center gap-2 text-[11px] font-black text-[#5c6f47]">
+              <span>{pageCopy.eyebrow}</span>
+              <span className="h-px w-8 bg-[#9aac83]" />
+              <span className="font-semibold text-stone-400">{todayLabel}</span>
             </div>
+            <h1 className="text-[2rem] font-black leading-none text-[#1d2a18]">{pageCopy.title}</h1>
+            <p className="mt-2 text-sm font-medium text-stone-500">{pageCopy.description}</p>
           </div>
-          <span className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-[#456615]">오늘도 쑥쑥</span>
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-[#11180f] text-[#cbe27c] shadow-lg shadow-stone-950/10">
+            <Sprout size={23} aria-hidden="true" />
+          </span>
         </header>
-
-        <nav className="sticky top-0 z-20 -mx-1 mb-5 bg-[#f1f6eb]/95 px-1 py-2 backdrop-blur" aria-label="기록 종류">
-          <div className="grid grid-cols-3 gap-1 rounded-lg border border-emerald-100 bg-white p-1 shadow-sm shadow-emerald-900/5">
-            {tabs.map(({ id, label, icon: Icon, badge }) => {
-              const isActive = activeTab === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setActiveTab(id)}
-                  className={`relative flex min-h-12 items-center justify-center gap-1.5 rounded-md px-2 text-sm font-bold transition ${isActive ? "bg-[#456615] text-white" : "text-stone-600"}`}
-                  aria-current={isActive ? "page" : undefined}
-                >
-                  <Icon size={17} aria-hidden="true" />
-                  <span>{label}</span>
-                  {badge ? (
-                    <span className={`min-w-5 rounded-full px-1.5 py-0.5 text-[11px] ${isActive ? "bg-white text-emerald-900" : "bg-amber-100 text-amber-900"}`}>{badge}</span>
-                  ) : null}
-                </button>
-              );
-            })}
-          </div>
-        </nav>
 
         {activeTab === "water" ? (
           <BatchWatering plants={plants} onWateringSaved={refreshPlants} />
@@ -247,30 +231,30 @@ export function PlantLogForm() {
               onSelect={selectPlant}
             />
 
-            <section className="rounded-lg border border-violet-100 bg-[#f8f5ff] p-4">
+            <section className="rounded-lg border border-[#e4e5dd] bg-white p-4 shadow-sm shadow-stone-950/[0.03]">
               <label htmlFor="observed-date" className="mb-2 block text-sm font-semibold text-stone-800">관찰 날짜</label>
-              <input id="observed-date" type="date" value={observedDate} onChange={(event) => { setObservedDate(event.target.value); setDateSource("today"); }} className="h-12 w-full rounded-lg border border-violet-100 bg-white px-3 text-base outline-none focus:border-emerald-700" />
+              <input id="observed-date" type="date" value={observedDate} onChange={(event) => { setObservedDate(event.target.value); setDateSource("today"); }} className="h-12 w-full rounded-lg border border-[#dedfd7] bg-[#f8f8f4] px-3 text-base outline-none focus:border-[#496238]" />
               <p className="mt-2 text-xs text-stone-500">{dateSource === "capture" ? "첫 번째 사진의 촬영일을 불러왔어요." : "기본값은 오늘 날짜예요."}</p>
             </section>
 
-            <section className="rounded-lg border border-rose-100 bg-[#fff5f3] p-4">
+            <section className="rounded-lg border border-[#e4e5dd] bg-white p-4 shadow-sm shadow-stone-950/[0.03]">
               <h2 className="text-sm font-semibold text-stone-800">관찰 태그</h2>
               <div className="mt-3 flex flex-wrap gap-2">
                 {observationTags.map((tag) => {
                   const isSelected = selectedTags.includes(tag);
-                  return <button key={tag} type="button" onClick={() => toggleTag(tag)} className={`min-h-10 rounded-full border px-4 text-sm font-semibold transition ${isSelected ? "border-emerald-900 bg-emerald-900 text-white" : "border-rose-100 bg-white text-stone-700"}`}>{tag}</button>;
+                  return <button key={tag} type="button" onClick={() => toggleTag(tag)} className={`min-h-10 rounded-full border px-4 text-sm font-bold transition ${isSelected ? "border-[#315b36] bg-[#315b36] text-white" : "border-[#dedfd7] bg-[#f8f8f4] text-stone-700"}`}>{tag}</button>;
                 })}
               </div>
             </section>
 
-            <label className="block">
+            <label className="block rounded-lg border border-[#e4e5dd] bg-white p-4 shadow-sm shadow-stone-950/[0.03]">
               <span className="mb-2 block text-sm font-semibold text-stone-800">메모</span>
-              <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="잎이 어떻게 달라졌나요?" rows={5} className="w-full resize-none rounded-lg border border-amber-100 bg-[#fffdf7] p-4 text-base outline-none placeholder:text-stone-400 focus:border-emerald-700" />
+              <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="잎이 어떻게 달라졌나요?" rows={5} className="w-full resize-none rounded-lg border border-[#dedfd7] bg-[#f8f8f4] p-4 text-base outline-none placeholder:text-stone-400 focus:border-[#496238]" />
             </label>
 
             <StatusMessage state={observationSaveState} message={observationMessage} />
-            <div className="sticky bottom-0 -mx-4 bg-gradient-to-t from-[#f1f6eb] via-[#f1f6eb] to-transparent px-4 pb-2 pt-4">
-              <button type="submit" disabled={!canSaveObservation} className="min-h-14 w-full rounded-lg bg-emerald-900 px-5 text-base font-bold text-white shadow-lg shadow-emerald-950/15 transition active:scale-[0.99] disabled:bg-stone-300 disabled:text-stone-500 disabled:shadow-none">
+            <div className="sticky bottom-24 z-20 -mx-2 bg-[#f7f7f2]/90 px-2 py-2 backdrop-blur">
+              <button type="submit" disabled={!canSaveObservation} className="min-h-14 w-full rounded-lg bg-[#11180f] px-5 text-base font-black text-white shadow-xl shadow-stone-950/15 transition active:scale-[0.99] disabled:bg-stone-300 disabled:text-stone-500 disabled:shadow-none">
                 {observationSaveState === "saving" ? "저장 중..." : "관찰일지 저장"}
               </button>
             </div>
@@ -298,6 +282,27 @@ export function PlantLogForm() {
           </div>
         ) : null}
       </div>
+
+      <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md border-t border-[#dedfd7] bg-[#fbfbf8]/95 px-4 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl" aria-label="기록 종류">
+        <div className="grid grid-cols-3 gap-2">
+          {tabs.map(({ id, label, icon: Icon, badge }) => {
+            const isActive = activeTab === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActiveTab(id)}
+                className={`relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg text-[11px] font-black transition ${isActive ? "bg-[#315b36] text-white shadow-md shadow-[#315b36]/15" : "text-stone-500"}`}
+                aria-current={isActive ? "page" : undefined}
+              >
+                <Icon size={20} strokeWidth={isActive ? 2.5 : 2} aria-hidden="true" />
+                <span>{label}</span>
+                {badge ? <span className={`absolute right-[18%] top-1.5 grid min-h-5 min-w-5 place-items-center rounded-full px-1 text-[10px] ${isActive ? "bg-[#d8ef80] text-[#26351d]" : "bg-[#f4c96f] text-stone-900"}`}>{badge}</span> : null}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </main>
   );
 }

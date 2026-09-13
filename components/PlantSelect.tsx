@@ -49,12 +49,12 @@ export function PlantSelect({
 
   return (
     <section ref={containerRef} className="space-y-2">
-      <div className="flex items-center justify-between">
-        <label htmlFor="plant-search" className="text-sm font-bold text-stone-800">식물 선택</label>
-        {selectedCategory ? <span className="rounded-full bg-[#edf5df] px-2.5 py-1 text-xs font-bold text-[#52751c]">{selectedCategory}</span> : null}
+      <div className="flex items-center justify-between px-1">
+        <label htmlFor="plant-search" className="text-sm font-black text-stone-900">식물 선택</label>
+        {selectedCategory ? <span className="rounded-full bg-[#e4ebd7] px-2.5 py-1 text-xs font-bold text-[#496238]">{selectedCategory}</span> : null}
       </div>
 
-      <div className="rounded-lg border border-[#dce9c8] bg-white p-3 shadow-sm shadow-[#456615]/5">
+      <div className="rounded-lg border border-[#e0e1da] bg-white p-3 shadow-sm shadow-stone-950/[0.04]">
         <div className="relative">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6b7d50]" aria-hidden="true" />
           <input
@@ -68,7 +68,7 @@ export function PlantSelect({
               setIsOpen(true);
             }}
             placeholder={selectedPlant ? selectedPlant.name : "식물 이름 검색"}
-            className="h-12 w-full rounded-lg border border-[#dce9c8] bg-[#f7faef] pl-10 pr-20 text-base outline-none transition focus:border-[#52751c]"
+            className="h-12 w-full rounded-lg border border-[#dedfd7] bg-[#f8f8f4] pl-10 pr-20 text-base outline-none transition focus:border-[#496238]"
           />
           {query ? (
             <button type="button" onClick={() => { onQueryChange(""); setIsOpen(true); }} aria-label="검색어 지우기" className="absolute right-10 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center text-stone-500">
@@ -92,7 +92,7 @@ export function PlantSelect({
               {filteredPlants.length ? filteredPlants.map((plant) => {
                 const isSelected = formatPlantName(plant) === value;
                 return (
-                  <button key={plant.id} type="button" onClick={() => choosePlant(plant)} className={`flex min-h-11 w-full items-center justify-between rounded-lg px-3 text-left text-sm transition ${isSelected ? "bg-[#456615] text-white" : "bg-[#f7faef] text-stone-700 hover:bg-[#edf5df]"}`}>
+                  <button key={plant.id} type="button" onClick={() => choosePlant(plant)} className={`flex min-h-12 w-full items-center justify-between rounded-lg px-3 text-left text-sm transition ${isSelected ? "bg-[#315b36] text-white" : "bg-[#f8f8f4] text-stone-700 hover:bg-[#eaf0df]"}`}>
                     <span className="truncate">{plant.name}</span>
                     <span className={`ml-2 shrink-0 text-xs ${isSelected ? "text-white/75" : "text-stone-400"}`}>{isSelected ? "선택됨" : plant.category}</span>
                   </button>

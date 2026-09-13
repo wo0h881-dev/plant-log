@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import { createWateringLogPage, resolveDataSourceId } from "@/lib/notion";
+import {
+  createNotionHeaders,
+  createWateringLogPage,
+  readNotionJson,
+  resolveDataSourceId,
+} from "@/lib/notion";
+
+const NOTION_API_BASE = "https://api.notion.com/v1";
 
 type WateringPlant = {
   id: string;
@@ -14,7 +21,81 @@ type WateringResult = {
   message?: string;
 };
 
+type RichText = { plain_text?: string };
+type WateringLogPage = {
+  properties: Record<string, {
+    title?: RichText[];
+    relation?: Array<{ id?: string }>;
+  }>;
+};
+
+type WateringQueryResponse = {
+  results: WateringLogPage[];
+};
+
 export const runtime = "nodejs";
+
+function getSeoulDateValue() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function readTitle(page: WateringLogPage) {
+  return (page.properties["이름"]?.title ?? [])
+    .map((text) => text.plain_text ?? "")
+    .join("")
+    .replace(/^💧\s*/, "")
+    .trim();
+}
+
+export async function GET(request: Request) {
+  const token = process.env.NOTION_TOKEN;
+  const wateringDatabaseId = process.env.NOTION_WATERING_DATABASE_ID;
+  const configuredWateringDataSourceId = process.env.NOTION_WATERING_DATA_SOURCE_ID;
+  const requestedDate = new URL(request.url).searchParams.get("date") || getSeoulDateValue();
+
+  if (!token || !wateringDatabaseId) {
+    return NextResponse.json({ plants: [], wateredAt: requestedDate }, { headers: { "Cache-Control": "no-store" } });
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) {
+    return NextResponse.json({ message: "올바른 날짜를 선택하세요." }, { status: 400 });
+  }
+
+  try {
+    const dataSourceId = configuredWateringDataSourceId || (await resolveDataSourceId(token, wateringDatabaseId));
+    const payload = await readNotionJson<WateringQueryResponse>(
+      await fetch(`${NOTION_API_BASE}/data_sources/${dataSourceId}/query`, {
+        method: "POST",
+        headers: createNotionHeaders(token),
+        body: JSON.stringify({
+          page_size: 100,
+          filter: { property: "날짜", date: { equals: requestedDate } },
+        }),
+      }),
+    );
+    const uniquePlants = new Map<string, WateringPlant>();
+
+    for (const page of payload.results) {
+      const id = page.properties["식물"]?.relation?.[0]?.id ?? "";
+      const name = readTitle(page);
+      if (!name) continue;
+      uniquePlants.set(id || name, { id, name });
+    }
+
+    return NextResponse.json(
+      { plants: [...uniquePlants.values()], wateredAt: requestedDate },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "오늘 물주기 기록을 불러오지 못했습니다.";
+    return NextResponse.json({ plants: [], wateredAt: requestedDate, message }, { status: 500 });
+  }
+}
 
 async function createWateringLogWithRetry(
   params: Parameters<typeof createWateringLogPage>[0],

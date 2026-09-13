@@ -31,7 +31,7 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
           <h2 className="text-base font-bold text-stone-900">최근 관찰한 식물</h2>
           <p className="mt-0.5 text-xs text-stone-500">카드를 누르면 식물 기록을 볼 수 있어요.</p>
         </div>
-        <Clock3 size={19} className="text-[#52751c]" aria-hidden="true" />
+        <Clock3 size={19} className="text-[#496238]" aria-hidden="true" />
       </div>
 
       {items.length ? (
@@ -41,9 +41,9 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
               key={`${recent.plantId}-${recent.plantName}`}
               type="button"
               onClick={() => onSelect(plant)}
-              className="w-36 shrink-0 snap-start overflow-hidden rounded-lg border border-[#dce9c8] bg-white text-left shadow-sm shadow-[#456615]/10"
+              className="w-44 shrink-0 snap-start overflow-hidden rounded-lg bg-white text-left shadow-md shadow-stone-950/10"
             >
-              <div className="relative aspect-[4/5] bg-[#e5edcf]">
+              <div className="relative aspect-[4/5] bg-[#dfe9ce]">
                 {recent.photoUrl ? (
                   <Image src={recent.photoUrl} alt={recent.plantName} fill sizes="144px" className="object-cover" unoptimized />
                 ) : (
@@ -53,8 +53,8 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
                   {formatDate(recent.observedAt)}
                 </span>
               </div>
-              <span className="block truncate px-3 pb-1 pt-2.5 text-sm font-bold text-stone-900">{recent.plantName}</span>
-              <span className="block truncate px-3 pb-3 text-[11px] text-stone-500">{recent.plantCategory}</span>
+              <span className="block truncate px-3 pb-1 pt-3 text-base font-black text-stone-900">{recent.plantName}</span>
+              <span className="block truncate px-3 pb-3 text-xs font-medium text-stone-500">{recent.plantCategory}</span>
             </button>
           ))}
         </div>
