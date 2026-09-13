@@ -9,6 +9,7 @@ import type { Plant, RecentObservedPlant, SaveState } from "@/types/plant";
 type BatchWateringProps = {
   plants: Plant[];
   recentPlants?: RecentObservedPlant[];
+  onInitialLoad?: () => void;
   onWateringSaved?: () => void;
 };
 
@@ -32,7 +33,7 @@ function canShowInWateringList(plant: Plant) {
   return !["자구", "사망"].includes(plant.category.trim());
 }
 
-export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: BatchWateringProps) {
+export function BatchWatering({ plants, recentPlants = [], onInitialLoad, onWateringSaved }: BatchWateringProps) {
   const today = getTodayValue();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dismissedDueIds, setDismissedDueIds] = useState<string[]>([]);
@@ -63,8 +64,11 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
         setTodayWateredPlants([]);
         setTodayWateringError(true);
       })
-      .finally(() => setIsTodayLoading(false));
-  }, [today]);
+      .finally(() => {
+        setIsTodayLoading(false);
+        onInitialLoad?.();
+      });
+  }, [onInitialLoad, today]);
 
   useEffect(() => {
     refreshTodayWatered();

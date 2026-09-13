@@ -46,6 +46,23 @@ function StatusMessage({ state, message }: { state: SaveState; message: string }
   );
 }
 
+function AppLoadingScreen() {
+  return (
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-[#eef1e9]" role="status" aria-live="polite">
+      <div className="flex min-h-dvh w-full max-w-md flex-col items-center justify-center bg-white px-8">
+        <span className="grid h-16 w-16 place-items-center rounded-full bg-[#315b36] text-white shadow-lg shadow-[#315b36]/20">
+          <Sprout size={28} className="animate-pulse" aria-hidden="true" />
+        </span>
+        <p className="mt-5 text-2xl font-black text-[#1d2a18]">Plant Log</p>
+        <p className="mt-1.5 text-sm font-medium text-stone-500">식물 기록을 준비하고 있어요</p>
+        <span className="mt-5 h-1 w-20 overflow-hidden rounded-full bg-[#e6eadf]">
+          <span className="block h-full w-1/2 animate-pulse rounded-full bg-[#8ca263]" />
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function PlantLogForm() {
   const [plants, setPlants] = useState<Plant[]>(fallbackPlants);
   const [selectedPlantId, setSelectedPlantId] = useState("");
@@ -65,6 +82,11 @@ export function PlantLogForm() {
   });
   const [observationTags, setObservationTags] = useState<string[]>(DEFAULT_OBSERVATION_TAGS);
   const [recentObservedPlants, setRecentObservedPlants] = useState<RecentObservedPlant[]>([]);
+  const [hasLoadedPlants, setHasLoadedPlants] = useState(false);
+  const [hasLoadedRecentPlants, setHasLoadedRecentPlants] = useState(false);
+  const [hasLoadedTodayWatering, setHasLoadedTodayWatering] = useState(false);
+  const [hasPreloadedImages, setHasPreloadedImages] = useState(false);
+  const [hasBootTimedOut, setHasBootTimedOut] = useState(false);
 
   const [photos, setPhotos] = useState<File[]>([]);
   const [observedDate, setObservedDate] = useState(getTodayValue);
@@ -83,7 +105,8 @@ export function PlantLogForm() {
         setSelectedPlantId((current) => nextPlants.some((plant) => plant.id === current) ? current : "");
         setProfilePlantId((current) => nextPlants.some((plant) => plant.id === current) ? current : "");
       })
-      .catch(() => setPlants(fallbackPlants));
+      .catch(() => setPlants(fallbackPlants))
+      .finally(() => setHasLoadedPlants(true));
   }, []);
 
   useEffect(() => {
@@ -106,8 +129,50 @@ export function PlantLogForm() {
     fetch("/api/plant-details")
       .then((response) => response.json() as Promise<RecentPlantsResponse>)
       .then((payload) => setRecentObservedPlants(payload.recentPlants ?? []))
-      .catch(() => setRecentObservedPlants([]));
+      .catch(() => setRecentObservedPlants([]))
+      .finally(() => setHasLoadedRecentPlants(true));
   }, []);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setHasBootTimedOut(true), 4_000);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedPlants || !hasLoadedRecentPlants) return;
+
+    let cancelled = false;
+    const recentPhotoById = new Map(
+      recentObservedPlants
+        .filter((plant) => plant.plantId && plant.photoUrl)
+        .map((plant) => [plant.plantId!, plant.photoUrl!]),
+    );
+    const duePlants = plants.filter((plant) => plant.isWateringDue && !["자구", "사망"].includes(plant.category.trim()));
+    const urls = [...new Set([
+      ...duePlants.map((plant) => recentPhotoById.get(plant.id) ?? plant.coverPhotoUrl),
+      ...recentObservedPlants.map((plant) => plant.photoUrl),
+      ...plants.map((plant) => plant.coverPhotoUrl),
+    ].filter((url): url is string => Boolean(url)))].slice(0, 6);
+
+    const preload = (url: string) => new Promise<void>((resolve) => {
+      const image = new window.Image();
+      image.onload = () => resolve();
+      image.onerror = () => resolve();
+      image.src = url;
+    });
+    const delay = (milliseconds: number) => new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
+    const imageLoad = Promise.race([Promise.allSettled(urls.map(preload)), delay(1_200)]);
+
+    Promise.all([imageLoad, delay(350)]).then(() => {
+      if (!cancelled) setHasPreloadedImages(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasLoadedPlants, hasLoadedRecentPlants, plants, recentObservedPlants]);
+
+  const handleInitialWateringLoad = useCallback(() => setHasLoadedTodayWatering(true), []);
 
   const selectedPlant = plants.find((plant) => plant.id === selectedPlantId);
   const selectedPlantLabel = selectedPlant ? formatPlantName(selectedPlant) : "";
@@ -211,7 +276,12 @@ export function PlantLogForm() {
         </header>
 
         {activeTab === "water" ? (
-          <BatchWatering plants={plants} recentPlants={recentObservedPlants} onWateringSaved={refreshPlants} />
+          <BatchWatering
+            plants={plants}
+            recentPlants={recentObservedPlants}
+            onInitialLoad={handleInitialWateringLoad}
+            onWateringSaved={refreshPlants}
+          />
         ) : null}
 
         {activeTab === "observation" ? (
@@ -301,6 +371,7 @@ export function PlantLogForm() {
           })}
         </div>
       </nav>
+      {!(hasPreloadedImages && hasLoadedTodayWatering) && !hasBootTimedOut ? <AppLoadingScreen /> : null}
     </main>
   );
 }
