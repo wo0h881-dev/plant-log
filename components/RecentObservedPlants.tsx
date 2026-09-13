@@ -18,6 +18,7 @@ function formatDate(dateValue?: string) {
 
 export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentObservedPlantsProps) {
   const [isFavorite, setIsFavorite] = useState(false);
+  const [showAllPlants, setShowAllPlants] = useState(false);
   const items = recentPlants.flatMap((recent) => {
     const plant = plants.find((item) => item.id === recent.plantId)
       ?? plants.find((item) => item.name === recent.plantName && (!recent.plantCategory || item.category === recent.plantCategory));
@@ -25,15 +26,36 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
   });
   const featured = items[0];
   const featuredPhotoUrl = featured?.recent.photoUrl ?? featured?.plant.coverPhotoUrl;
+  const recentPhotoByPlantId = new Map(items.map(({ recent, plant }) => [plant.id, recent.photoUrl]));
+  const allPlants = [...plants].sort((a, b) => `${a.category} ${a.name}`.localeCompare(`${b.category} ${b.name}`, "ko"));
 
   return (
     <section className="space-y-5">
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-[17px] font-black text-[#151515]">최근 관찰한 식물</h2>
-          <span className="text-xs font-semibold text-[#909090]">전체보기 <span aria-hidden="true">›</span></span>
+          <h2 className="text-[17px] font-black text-[#151515]">{showAllPlants ? "모든 식물" : "최근 관찰한 식물"}</h2>
+          <button type="button" onClick={() => setShowAllPlants((current) => !current)} className="min-h-9 rounded-full px-2 text-xs font-semibold text-[#6F746C] transition active:bg-[#E8EAE5]">
+            {showAllPlants ? "최근보기" : "전체보기"} <span aria-hidden="true">{showAllPlants ? "‹" : "›"}</span>
+          </button>
         </div>
-        {items.length ? (
+        {showAllPlants ? (
+          <div className="grid grid-cols-2 gap-3">
+            {allPlants.map((plant) => {
+              const photoUrl = recentPhotoByPlantId.get(plant.id) ?? plant.coverPhotoUrl;
+              return (
+                <button key={plant.id} type="button" onClick={() => onSelect(plant)} className="overflow-hidden rounded-[22px] bg-white text-left transition active:scale-[0.98]">
+                  <span className="relative grid aspect-[4/3] w-full place-items-center overflow-hidden bg-[#DCE7D5] text-[#284F2A]">
+                    {photoUrl ? <Image src={photoUrl} alt={plant.name} fill sizes="(max-width: 390px) 44vw, 170px" className="object-cover" unoptimized /> : <Sprout size={30} aria-hidden="true" />}
+                  </span>
+                  <span className="block px-3 py-2.5">
+                    <span className="block truncate text-[13px] font-extrabold text-[#151515]">{plant.name}</span>
+                    <span className="mt-0.5 block truncate text-[10px] text-[#909090]">{plant.category}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ) : items.length ? (
           <div className="-mx-5 flex gap-3 overflow-x-auto px-5 pb-1">
             {items.map(({ recent, plant }) => {
               const photoUrl = recent.photoUrl ?? plant.coverPhotoUrl;
@@ -51,7 +73,7 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
         ) : <div className="rounded-3xl bg-white px-4 py-6 text-center text-sm text-[#909090]">최근 관찰한 식물이 아직 없어요.</div>}
       </div>
 
-      {featured ? (
+      {!showAllPlants && featured ? (
         <div className="relative min-h-[245px] overflow-hidden rounded-[30px] bg-[#DCE7D5]">
           {featuredPhotoUrl ? <Image src={featuredPhotoUrl} alt={featured.plant.name} fill priority sizes="(max-width: 390px) 100vw, 390px" className="object-cover object-center" unoptimized /> : <span className="absolute inset-0 grid place-items-center text-[#284F2A]"><Sprout size={72} strokeWidth={1} aria-hidden="true" /></span>}
           <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/5 to-transparent" />
@@ -69,7 +91,7 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
         </div>
       ) : null}
 
-      {items.length ? (
+      {!showAllPlants && items.length ? (
         <div>
           <div className="mb-3 flex items-center justify-between"><h2 className="text-[17px] font-black text-[#151515]">최근 사진</h2><span className="text-xs font-semibold text-[#909090]">{Math.min(items.length, 4)}개</span></div>
           <div className="grid grid-cols-4 gap-2.5">

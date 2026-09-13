@@ -40,19 +40,6 @@ function StatusMessage({ state, message }: { state: SaveState; message: string }
   return <div className={`flex items-start gap-2 rounded-2xl px-4 py-3 text-sm font-semibold ${isError ? "bg-red-50 text-red-700" : "bg-[#E7EFE3] text-[#284F2A]"}`}>{isError ? <AlertCircle size={17} className="mt-0.5 shrink-0" aria-hidden="true" /> : <Check size={17} className="mt-0.5 shrink-0" aria-hidden="true" />}<span>{message}</span></div>;
 }
 
-function AppLoadingScreen() {
-  return (
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-[#F7F8F5]" role="status" aria-live="polite">
-      <div className="flex min-h-dvh w-full max-w-[390px] flex-col items-center justify-center px-8">
-        <span className="grid h-16 w-16 place-items-center rounded-full bg-[#284F2A] text-white"><Sprout size={28} className="animate-pulse" aria-hidden="true" /></span>
-        <p className="mt-5 text-2xl font-black text-[#151515]">Plant Log</p>
-        <p className="mt-1.5 text-sm font-medium text-[#909090]">식물 기록을 준비하고 있어요</p>
-        <span className="mt-5 h-1 w-20 overflow-hidden rounded-full bg-[#E3E7E0]"><span className="block h-full w-1/2 animate-pulse rounded-full bg-[#284F2A]" /></span>
-      </div>
-    </div>
-  );
-}
-
 export function PlantLogForm() {
   const [plants, setPlants] = useState<Plant[]>(fallbackPlants);
   const [selectedPlantId, setSelectedPlantId] = useState("");
@@ -68,11 +55,6 @@ export function PlantLogForm() {
     try { return JSON.parse(stored) as string[]; } catch { return []; }
   });
   const [recentObservedPlants, setRecentObservedPlants] = useState<RecentObservedPlant[]>([]);
-  const [hasLoadedPlants, setHasLoadedPlants] = useState(false);
-  const [hasLoadedRecentPlants, setHasLoadedRecentPlants] = useState(false);
-  const [hasLoadedTodayWatering, setHasLoadedTodayWatering] = useState(false);
-  const [hasPreloadedImages, setHasPreloadedImages] = useState(false);
-  const [hasBootTimedOut, setHasBootTimedOut] = useState(false);
   const [photos, setPhotos] = useState<File[]>([]);
   const [observedDate, setObservedDate] = useState(getTodayValue);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -89,38 +71,18 @@ export function PlantLogForm() {
         setSelectedPlantId((current) => nextPlants.some((plant) => plant.id === current) ? current : "");
         setProfilePlantId((current) => nextPlants.some((plant) => plant.id === current) ? current : "");
       })
-      .catch(() => setPlants(fallbackPlants))
-      .finally(() => setHasLoadedPlants(true));
+      .catch(() => setPlants(fallbackPlants));
   }, []);
 
   const refreshRecentPlants = useCallback(() => {
     fetch("/api/plant-details")
       .then((response) => response.json() as Promise<RecentPlantsResponse>)
       .then((payload) => setRecentObservedPlants(payload.recentPlants ?? []))
-      .catch(() => setRecentObservedPlants([]))
-      .finally(() => setHasLoadedRecentPlants(true));
+      .catch(() => setRecentObservedPlants([]));
   }, []);
 
   useEffect(() => { refreshPlants(); }, [refreshPlants]);
   useEffect(() => { refreshRecentPlants(); }, [refreshRecentPlants]);
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => setHasBootTimedOut(true), 4_000);
-    return () => window.clearTimeout(timeoutId);
-  }, []);
-
-  useEffect(() => {
-    if (!hasLoadedPlants || !hasLoadedRecentPlants) return;
-    let cancelled = false;
-    const recentPhotoById = new Map(recentObservedPlants.filter((plant) => plant.plantId && plant.photoUrl).map((plant) => [plant.plantId!, plant.photoUrl!]));
-    const duePlants = plants.filter((plant) => plant.isWateringDue && !["자구", "사망"].includes(plant.category.trim()));
-    const urls = [...new Set([...duePlants.map((plant) => recentPhotoById.get(plant.id) ?? plant.coverPhotoUrl), ...recentObservedPlants.map((plant) => plant.photoUrl), ...plants.map((plant) => plant.coverPhotoUrl)].filter((url): url is string => Boolean(url)))].slice(0, 6);
-    const preload = (url: string) => new Promise<void>((resolve) => { const image = new window.Image(); image.onload = () => resolve(); image.onerror = () => resolve(); image.src = url; });
-    const delay = (milliseconds: number) => new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
-    Promise.all([Promise.race([Promise.allSettled(urls.map(preload)), delay(1_200)]), delay(350)]).then(() => { if (!cancelled) setHasPreloadedImages(true); });
-    return () => { cancelled = true; };
-  }, [hasLoadedPlants, hasLoadedRecentPlants, plants, recentObservedPlants]);
-
-  const handleInitialWateringLoad = useCallback(() => setHasLoadedTodayWatering(true), []);
   const selectedPlant = plants.find((plant) => plant.id === selectedPlantId);
   const selectedPlantLabel = selectedPlant ? formatPlantName(selectedPlant) : "";
   const profilePlant = plants.find((plant) => plant.id === profilePlantId);
@@ -182,8 +144,8 @@ export function PlantLogForm() {
 
   const tabs = [
     { id: "water" as const, label: "물주기", icon: Leaf, badge: dueCount },
-    { id: "profile" as const, label: "내 식물", icon: Sprout },
     { id: "observation" as const, label: "관찰일지", icon: NotebookPen },
+    { id: "profile" as const, label: "내 식물", icon: Sprout },
   ];
 
   return (
@@ -195,7 +157,7 @@ export function PlantLogForm() {
               <div><h1 className="text-[32px] font-black leading-tight">물주기</h1><p className="mt-1 text-[13px] font-medium text-[#777B74]">건강한 오늘이, 더 푸른 내일을 만들어요.</p></div>
               <span className="grid h-10 w-10 place-items-center text-[#151515]"><Bell size={23} strokeWidth={1.7} aria-hidden="true" /></span>
             </header>
-            <BatchWatering plants={plants} recentPlants={recentObservedPlants} onInitialLoad={handleInitialWateringLoad} onWateringSaved={refreshPlants} />
+            <BatchWatering plants={plants} recentPlants={recentObservedPlants} onWateringSaved={refreshPlants} />
           </>
         ) : null}
 
@@ -251,7 +213,6 @@ export function PlantLogForm() {
           <button type="button" disabled className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[10px] font-bold text-[#A1A39E]"><MoreHorizontal size={19} strokeWidth={1.7} aria-hidden="true" /><span>더보기</span></button>
         </div>
       </nav>
-      {!(hasPreloadedImages && hasLoadedTodayWatering) && !hasBootTimedOut ? <AppLoadingScreen /> : null}
     </main>
   );
 }
