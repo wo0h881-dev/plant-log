@@ -93,7 +93,6 @@ function parseRecentPlants(pages: ObservationPage[]) {
       photoUrl: firstPhoto ? readPhotoUrl(firstPhoto) : undefined,
     });
     seen.add(key);
-    if (recentPlants.length === 8) break;
   }
 
   return recentPlants;
@@ -132,7 +131,7 @@ export async function GET(request: NextRequest) {
 
     if (!plantId) {
       const payload = await queryObservationPages(token, dataSourceId, {
-        page_size: 30,
+        page_size: 100,
         sorts: [{ property: "관찰일", direction: "descending" }],
       });
       return NextResponse.json(

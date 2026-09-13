@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { AlertCircle, ArrowLeft, Bell, Bug, Check, Droplets, Flower2, Leaf, MoreHorizontal, MoreVertical, NotebookPen, Plus, Sprout } from "lucide-react";
 import { BatchWatering } from "@/components/BatchWatering";
+import { ManagementCalendar } from "@/components/ManagementCalendar";
 import { PlantPhotoUploader } from "@/components/PlantPhotoUploader";
 import { PlantOverview } from "@/components/PlantOverview";
 import { PlantSelect } from "@/components/PlantSelect";
@@ -20,7 +21,7 @@ const OBSERVATION_TAGS = [
   { name: "기타", icon: MoreHorizontal },
 ] as const;
 
-type RecordTab = "water" | "observation" | "profile";
+type RecordTab = "water" | "observation" | "profile" | "more";
 type PlantsResponse = { plants: Plant[]; source: "notion" | "fallback" };
 type RecentPlantsResponse = { recentPlants?: RecentObservedPlant[] };
 
@@ -100,6 +101,11 @@ export function PlantLogForm() {
     setProfileQuery(plant.name);
   }
 
+  function openPlantFromCalendar(plant: Plant) {
+    selectProfilePlant(plant);
+    setActiveTab("profile");
+  }
+
   function storeRecentPlant() {
     if (!selectedPlant) return;
     const label = formatPlantName(selectedPlant);
@@ -146,6 +152,7 @@ export function PlantLogForm() {
     { id: "water" as const, label: "물주기", icon: Leaf, badge: dueCount },
     { id: "observation" as const, label: "관찰일지", icon: NotebookPen },
     { id: "profile" as const, label: "내 식물", icon: Sprout },
+    { id: "more" as const, label: "더보기", icon: MoreHorizontal },
   ];
 
   return (
@@ -202,6 +209,8 @@ export function PlantLogForm() {
             </div>
           </>
         ) : null}
+
+        {activeTab === "more" ? <ManagementCalendar plants={plants} onSelectPlant={openPlantFromCalendar} /> : null}
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-[390px] border-t border-[#ECEDE9] bg-white px-6 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5" aria-label="주요 화면">
@@ -210,7 +219,6 @@ export function PlantLogForm() {
             const isActive = activeTab === id;
             return <button key={id} type="button" onClick={() => setActiveTab(id)} className={`relative flex min-h-12 flex-col items-center justify-center gap-0.5 text-[10px] font-bold transition ${isActive ? "text-[#284F2A]" : "text-[#A1A39E]"}`} aria-current={isActive ? "page" : undefined}><Icon size={19} strokeWidth={isActive ? 2.5 : 1.7} aria-hidden="true" /><span>{label}</span>{badge ? <span className="absolute right-1 top-0 grid min-h-4 min-w-4 place-items-center rounded-full bg-[#284F2A] px-1 text-[9px] text-white">{badge}</span> : null}</button>;
           })}
-          <button type="button" disabled className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[10px] font-bold text-[#A1A39E]"><MoreHorizontal size={19} strokeWidth={1.7} aria-hidden="true" /><span>더보기</span></button>
         </div>
       </nav>
     </main>

@@ -48,3 +48,13 @@ export type RecentObservedPlant = {
   observedAt?: string;
   photoUrl?: string;
 };
+
+export type PlantCalendarEvent = {
+  id: string;
+  type: "watering" | "observation" | "repotting";
+  date: string;
+  plantId?: string;
+  plantName: string;
+  note?: string;
+  tags?: string[];
+};

@@ -26,22 +26,21 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
   });
   const featured = items[0];
   const featuredPhotoUrl = featured?.recent.photoUrl ?? featured?.plant.coverPhotoUrl;
-  const recentPhotoByPlantId = new Map(items.map(({ recent, plant }) => [plant.id, recent.photoUrl]));
-  const allPlants = [...plants].sort((a, b) => `${a.category} ${a.name}`.localeCompare(`${b.category} ${b.name}`, "ko"));
+  const previewItems = items.slice(0, 8);
 
   return (
     <section className="space-y-5">
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-[17px] font-black text-[#151515]">{showAllPlants ? "모든 식물" : "최근 관찰한 식물"}</h2>
+          <h2 className="text-[17px] font-black text-[#151515]">최근 관찰한 식물</h2>
           <button type="button" onClick={() => setShowAllPlants((current) => !current)} className="min-h-9 rounded-full px-2 text-xs font-semibold text-[#6F746C] transition active:bg-[#E8EAE5]">
             {showAllPlants ? "최근보기" : "전체보기"} <span aria-hidden="true">{showAllPlants ? "‹" : "›"}</span>
           </button>
         </div>
         {showAllPlants ? (
           <div className="grid grid-cols-2 gap-3">
-            {allPlants.map((plant) => {
-              const photoUrl = recentPhotoByPlantId.get(plant.id) ?? plant.coverPhotoUrl;
+            {items.map(({ recent, plant }) => {
+              const photoUrl = recent.photoUrl ?? plant.coverPhotoUrl;
               return (
                 <button key={plant.id} type="button" onClick={() => onSelect(plant)} className="overflow-hidden rounded-[22px] bg-white text-left transition active:scale-[0.98]">
                   <span className="relative grid aspect-[4/3] w-full place-items-center overflow-hidden bg-[#DCE7D5] text-[#284F2A]">
@@ -49,7 +48,7 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
                   </span>
                   <span className="block px-3 py-2.5">
                     <span className="block truncate text-[13px] font-extrabold text-[#151515]">{plant.name}</span>
-                    <span className="mt-0.5 block truncate text-[10px] text-[#909090]">{plant.category}</span>
+                    <span className="mt-0.5 block truncate text-[10px] text-[#909090]">{formatDate(recent.observedAt)}</span>
                   </span>
                 </button>
               );
@@ -57,7 +56,7 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
           </div>
         ) : items.length ? (
           <div className="-mx-5 flex gap-3 overflow-x-auto px-5 pb-1">
-            {items.map(({ recent, plant }) => {
+            {previewItems.map(({ recent, plant }) => {
               const photoUrl = recent.photoUrl ?? plant.coverPhotoUrl;
               return (
                 <button key={plant.id} type="button" onClick={() => onSelect(plant)} className="w-[78px] shrink-0 text-left">
