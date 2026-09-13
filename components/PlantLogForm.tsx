@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Check, Leaf, NotebookPen, Sprout } from "lucide-react";
+import { AlertCircle, ArrowLeft, Bell, Bug, Check, Droplets, Flower2, Leaf, MoreHorizontal, MoreVertical, NotebookPen, Plus, Sprout } from "lucide-react";
 import { BatchWatering } from "@/components/BatchWatering";
 import { PlantPhotoUploader } from "@/components/PlantPhotoUploader";
 import { PlantOverview } from "@/components/PlantOverview";
@@ -11,17 +11,17 @@ import { fallbackPlants } from "@/lib/plants";
 import type { Plant, RecentObservedPlant, SaveState } from "@/types/plant";
 
 const RECENT_PLANTS_KEY = "plant-log:recent-plants";
-const DEFAULT_OBSERVATION_TAGS = ["신엽", "하엽", "상태이상", "잎끝 갈변", "응애", "과습"];
-const HIDDEN_OBSERVATION_TAGS = new Set(["분갈이", "분갈이 필요"]);
+const OBSERVATION_TAGS = [
+  { name: "신엽", icon: Leaf },
+  { name: "하엽", icon: Leaf },
+  { name: "과습", icon: Droplets },
+  { name: "병해충", icon: Bug },
+  { name: "꽃", icon: Flower2 },
+  { name: "기타", icon: MoreHorizontal },
+] as const;
 
 type RecordTab = "water" | "observation" | "profile";
 type PlantsResponse = { plants: Plant[]; source: "notion" | "fallback" };
-type OptionsResponse = {
-  observationTags: string[];
-  soilOptions: string[];
-  potOptions: string[];
-  source: "notion" | "fallback";
-};
 type RecentPlantsResponse = { recentPlants?: RecentObservedPlant[] };
 
 function formatPlantName(plant: Plant) {
@@ -37,27 +37,17 @@ function getTodayValue() {
 function StatusMessage({ state, message }: { state: SaveState; message: string }) {
   if (!message) return null;
   const isError = state === "error";
-
-  return (
-    <div className={`flex items-start gap-2 rounded-lg px-4 py-3 text-sm font-semibold ${isError ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-800"}`}>
-      {isError ? <AlertCircle size={17} className="mt-0.5 shrink-0" aria-hidden="true" /> : <Check size={17} className="mt-0.5 shrink-0" aria-hidden="true" />}
-      <span>{message}</span>
-    </div>
-  );
+  return <div className={`flex items-start gap-2 rounded-2xl px-4 py-3 text-sm font-semibold ${isError ? "bg-red-50 text-red-700" : "bg-[#E7EFE3] text-[#284F2A]"}`}>{isError ? <AlertCircle size={17} className="mt-0.5 shrink-0" aria-hidden="true" /> : <Check size={17} className="mt-0.5 shrink-0" aria-hidden="true" />}<span>{message}</span></div>;
 }
 
 function AppLoadingScreen() {
   return (
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-[#eef1e9]" role="status" aria-live="polite">
-      <div className="flex min-h-dvh w-full max-w-md flex-col items-center justify-center bg-white px-8">
-        <span className="grid h-16 w-16 place-items-center rounded-full bg-[#315b36] text-white shadow-lg shadow-[#315b36]/20">
-          <Sprout size={28} className="animate-pulse" aria-hidden="true" />
-        </span>
-        <p className="mt-5 text-2xl font-black text-[#1d2a18]">Plant Log</p>
-        <p className="mt-1.5 text-sm font-medium text-stone-500">식물 기록을 준비하고 있어요</p>
-        <span className="mt-5 h-1 w-20 overflow-hidden rounded-full bg-[#e6eadf]">
-          <span className="block h-full w-1/2 animate-pulse rounded-full bg-[#8ca263]" />
-        </span>
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-[#F7F8F5]" role="status" aria-live="polite">
+      <div className="flex min-h-dvh w-full max-w-[390px] flex-col items-center justify-center px-8">
+        <span className="grid h-16 w-16 place-items-center rounded-full bg-[#284F2A] text-white"><Sprout size={28} className="animate-pulse" aria-hidden="true" /></span>
+        <p className="mt-5 text-2xl font-black text-[#151515]">Plant Log</p>
+        <p className="mt-1.5 text-sm font-medium text-[#909090]">식물 기록을 준비하고 있어요</p>
+        <span className="mt-5 h-1 w-20 overflow-hidden rounded-full bg-[#E3E7E0]"><span className="block h-full w-1/2 animate-pulse rounded-full bg-[#284F2A]" /></span>
       </div>
     </div>
   );
@@ -70,27 +60,21 @@ export function PlantLogForm() {
   const [query, setQuery] = useState("");
   const [profileQuery, setProfileQuery] = useState("");
   const [profilePlantId, setProfilePlantId] = useState("");
+  const [profileOpenRequest, setProfileOpenRequest] = useState(0);
   const [recentPlants, setRecentPlants] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
     const stored = window.localStorage.getItem(RECENT_PLANTS_KEY);
     if (!stored) return [];
-    try {
-      return JSON.parse(stored) as string[];
-    } catch {
-      return [];
-    }
+    try { return JSON.parse(stored) as string[]; } catch { return []; }
   });
-  const [observationTags, setObservationTags] = useState<string[]>(DEFAULT_OBSERVATION_TAGS);
   const [recentObservedPlants, setRecentObservedPlants] = useState<RecentObservedPlant[]>([]);
   const [hasLoadedPlants, setHasLoadedPlants] = useState(false);
   const [hasLoadedRecentPlants, setHasLoadedRecentPlants] = useState(false);
   const [hasLoadedTodayWatering, setHasLoadedTodayWatering] = useState(false);
   const [hasPreloadedImages, setHasPreloadedImages] = useState(false);
   const [hasBootTimedOut, setHasBootTimedOut] = useState(false);
-
   const [photos, setPhotos] = useState<File[]>([]);
   const [observedDate, setObservedDate] = useState(getTodayValue);
-  const [dateSource, setDateSource] = useState<"capture" | "today">("today");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [note, setNote] = useState("");
   const [observationSaveState, setObservationSaveState] = useState<SaveState>("idle");
@@ -109,23 +93,7 @@ export function PlantLogForm() {
       .finally(() => setHasLoadedPlants(true));
   }, []);
 
-  useEffect(() => {
-    refreshPlants();
-  }, [refreshPlants]);
-
-  useEffect(() => {
-    fetch("/api/options")
-      .then((response) => response.json() as Promise<OptionsResponse>)
-      .then((payload) => {
-        const visibleTags = payload.observationTags.filter((tag) => !HIDDEN_OBSERVATION_TAGS.has(tag));
-        setObservationTags(visibleTags.length ? visibleTags : DEFAULT_OBSERVATION_TAGS);
-      })
-      .catch(() => {
-        setObservationTags(DEFAULT_OBSERVATION_TAGS);
-      });
-  }, []);
-
-  useEffect(() => {
+  const refreshRecentPlants = useCallback(() => {
     fetch("/api/plant-details")
       .then((response) => response.json() as Promise<RecentPlantsResponse>)
       .then((payload) => setRecentObservedPlants(payload.recentPlants ?? []))
@@ -133,6 +101,8 @@ export function PlantLogForm() {
       .finally(() => setHasLoadedRecentPlants(true));
   }, []);
 
+  useEffect(() => { refreshPlants(); }, [refreshPlants]);
+  useEffect(() => { refreshRecentPlants(); }, [refreshRecentPlants]);
   useEffect(() => {
     const timeoutId = window.setTimeout(() => setHasBootTimedOut(true), 4_000);
     return () => window.clearTimeout(timeoutId);
@@ -140,54 +110,23 @@ export function PlantLogForm() {
 
   useEffect(() => {
     if (!hasLoadedPlants || !hasLoadedRecentPlants) return;
-
     let cancelled = false;
-    const recentPhotoById = new Map(
-      recentObservedPlants
-        .filter((plant) => plant.plantId && plant.photoUrl)
-        .map((plant) => [plant.plantId!, plant.photoUrl!]),
-    );
+    const recentPhotoById = new Map(recentObservedPlants.filter((plant) => plant.plantId && plant.photoUrl).map((plant) => [plant.plantId!, plant.photoUrl!]));
     const duePlants = plants.filter((plant) => plant.isWateringDue && !["자구", "사망"].includes(plant.category.trim()));
-    const urls = [...new Set([
-      ...duePlants.map((plant) => recentPhotoById.get(plant.id) ?? plant.coverPhotoUrl),
-      ...recentObservedPlants.map((plant) => plant.photoUrl),
-      ...plants.map((plant) => plant.coverPhotoUrl),
-    ].filter((url): url is string => Boolean(url)))].slice(0, 6);
-
-    const preload = (url: string) => new Promise<void>((resolve) => {
-      const image = new window.Image();
-      image.onload = () => resolve();
-      image.onerror = () => resolve();
-      image.src = url;
-    });
+    const urls = [...new Set([...duePlants.map((plant) => recentPhotoById.get(plant.id) ?? plant.coverPhotoUrl), ...recentObservedPlants.map((plant) => plant.photoUrl), ...plants.map((plant) => plant.coverPhotoUrl)].filter((url): url is string => Boolean(url)))].slice(0, 6);
+    const preload = (url: string) => new Promise<void>((resolve) => { const image = new window.Image(); image.onload = () => resolve(); image.onerror = () => resolve(); image.src = url; });
     const delay = (milliseconds: number) => new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
-    const imageLoad = Promise.race([Promise.allSettled(urls.map(preload)), delay(1_200)]);
-
-    Promise.all([imageLoad, delay(350)]).then(() => {
-      if (!cancelled) setHasPreloadedImages(true);
-    });
-
-    return () => {
-      cancelled = true;
-    };
+    Promise.all([Promise.race([Promise.allSettled(urls.map(preload)), delay(1_200)]), delay(350)]).then(() => { if (!cancelled) setHasPreloadedImages(true); });
+    return () => { cancelled = true; };
   }, [hasLoadedPlants, hasLoadedRecentPlants, plants, recentObservedPlants]);
 
   const handleInitialWateringLoad = useCallback(() => setHasLoadedTodayWatering(true), []);
-
   const selectedPlant = plants.find((plant) => plant.id === selectedPlantId);
   const selectedPlantLabel = selectedPlant ? formatPlantName(selectedPlant) : "";
   const profilePlant = plants.find((plant) => plant.id === profilePlantId);
-  const dueCount = useMemo(
-    () => plants.filter((plant) => plant.isWateringDue && !["자구", "사망"].includes(plant.category.trim())).length,
-    [plants],
-  );
-  const todayLabel = useMemo(
-    () => new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", weekday: "short" }).format(new Date()),
-    [],
-  );
-  const canSaveObservation = Boolean(
-    selectedPlant && (photos.length || selectedTags.length || note.trim()) && observationSaveState !== "saving",
-  );
+  const dueCount = useMemo(() => plants.filter((plant) => plant.isWateringDue && !["자구", "사망"].includes(plant.category.trim())).length, [plants]);
+  const canSaveObservation = Boolean(selectedPlant && (photos.length || selectedTags.length || note.trim()) && observationSaveState !== "saving");
+
   function selectPlant(plant: Plant) {
     setSelectedPlantId(plant.id);
     setQuery(plant.name);
@@ -211,15 +150,9 @@ export function PlantLogForm() {
     setSelectedTags((current) => current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag]);
   }
 
-  function updateCaptureDate(captureDate: string | null) {
-    setObservedDate(captureDate ?? getTodayValue());
-    setDateSource(captureDate ? "capture" : "today");
-  }
-
   async function saveObservation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSaveObservation || !selectedPlant) return;
-
     setObservationSaveState("saving");
     setObservationMessage("");
     const formData = new FormData();
@@ -230,18 +163,17 @@ export function PlantLogForm() {
     formData.append("note", note.trim());
     formData.append("createdAt", observedDate);
     formData.append("observationTags", JSON.stringify(selectedTags));
-
     try {
       const response = await fetch("/api/plant-logs", { method: "POST", body: formData });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message ?? "관찰일지 저장에 실패했습니다.");
-
       storeRecentPlant();
       setPhotos([]);
       setSelectedTags([]);
       setNote("");
       setObservationSaveState("success");
       setObservationMessage("관찰일지를 Notion에 저장했습니다.");
+      refreshRecentPlants();
     } catch (error) {
       setObservationSaveState("error");
       setObservationMessage(error instanceof Error ? error.message : "관찰일지 저장에 실패했습니다.");
@@ -250,125 +182,73 @@ export function PlantLogForm() {
 
   const tabs = [
     { id: "water" as const, label: "물주기", icon: Leaf, badge: dueCount },
-    { id: "observation" as const, label: "관찰일지", icon: NotebookPen },
     { id: "profile" as const, label: "내 식물", icon: Sprout },
+    { id: "observation" as const, label: "관찰일지", icon: NotebookPen },
   ];
-  const pageCopy = {
-    water: { title: "물주기", description: "건강한 오늘이, 더 푸른 내일을 만들어요" },
-    observation: { title: "관찰일지", description: "오늘의 변화를 사진으로 남겨요" },
-    profile: { title: "내 식물", description: "사진과 관리 기록을 모아봐요" },
-  }[activeTab];
 
   return (
-    <main className="min-h-dvh bg-[#eef1e9] text-[#171914]">
-      <div className="mx-auto min-h-dvh w-full max-w-md bg-white px-5 pb-28 pt-[max(1rem,env(safe-area-inset-top))] shadow-sm shadow-stone-950/5">
-        <header className="mb-5 flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="text-[1.75rem] font-black leading-none text-[#1d2a18]">{pageCopy.title}</h1>
-            <p className="mt-1.5 text-[13px] font-medium text-stone-500">{pageCopy.description}</p>
-          </div>
-          <span className="grid shrink-0 justify-items-end gap-2">
-            <span className="text-[11px] font-bold text-stone-400">{todayLabel}</span>
-            <span className="grid h-10 w-10 place-items-center rounded-full bg-[#11180f] text-white">
-              <Sprout size={19} aria-hidden="true" />
-            </span>
-          </span>
-        </header>
-
+    <main className="min-h-dvh bg-[#F7F8F5] text-[#151515]">
+      <div className="mx-auto min-h-dvh w-full max-w-[390px] px-5 pb-24 pt-[max(1.1rem,env(safe-area-inset-top))]">
         {activeTab === "water" ? (
-          <BatchWatering
-            plants={plants}
-            recentPlants={recentObservedPlants}
-            onInitialLoad={handleInitialWateringLoad}
-            onWateringSaved={refreshPlants}
-          />
+          <>
+            <header className="mb-5 flex items-center justify-between gap-4">
+              <div><h1 className="text-[32px] font-black leading-tight">물주기</h1><p className="mt-1 text-[13px] font-medium text-[#777B74]">건강한 오늘이, 더 푸른 내일을 만들어요.</p></div>
+              <span className="grid h-10 w-10 place-items-center text-[#151515]"><Bell size={23} strokeWidth={1.7} aria-hidden="true" /></span>
+            </header>
+            <BatchWatering plants={plants} recentPlants={recentObservedPlants} onInitialLoad={handleInitialWateringLoad} onWateringSaved={refreshPlants} />
+          </>
         ) : null}
 
         {activeTab === "observation" ? (
-          <form onSubmit={saveObservation} className="space-y-4">
-            <PlantPhotoUploader files={photos} onChange={setPhotos} onCaptureDateChange={updateCaptureDate} />
-            <PlantSelect
-              plants={plants}
-              value={selectedPlantLabel}
-              query={query}
-              recentPlants={recentPlants}
-              onQueryChange={(value) => {
-                setQuery(value);
-                if (value !== selectedPlant?.name) setSelectedPlantId("");
-              }}
-              onSelect={selectPlant}
-            />
-
-            <section className="rounded-2xl bg-[#f5f6f2] p-4">
-              <label htmlFor="observed-date" className="mb-2 block text-sm font-semibold text-stone-800">관찰 날짜</label>
-              <input id="observed-date" type="date" value={observedDate} onChange={(event) => { setObservedDate(event.target.value); setDateSource("today"); }} className="h-11 w-full rounded-xl border border-[#dedfd7] bg-white px-3 text-sm outline-none focus:border-[#496238]" />
-              <p className="mt-2 text-xs text-stone-500">{dateSource === "capture" ? "첫 번째 사진의 촬영일을 불러왔어요." : "기본값은 오늘 날짜예요."}</p>
-            </section>
-
-            <section className="rounded-2xl bg-[#f5f6f2] p-4">
-              <h2 className="text-sm font-semibold text-stone-800">관찰 태그</h2>
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                {observationTags.map((tag) => {
-                  const isSelected = selectedTags.includes(tag);
-                  return <button key={tag} type="button" onClick={() => toggleTag(tag)} className={`min-h-11 rounded-xl border px-2 text-[13px] font-bold transition ${isSelected ? "border-[#315b36] bg-[#315b36] text-white" : "border-[#e0e1da] bg-white text-stone-700"}`}>{tag}</button>;
-                })}
-              </div>
-            </section>
-
-            <label className="block rounded-2xl bg-[#f5f6f2] p-4">
-              <span className="mb-2 block text-sm font-semibold text-stone-800">메모</span>
-              <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="잎이 어떻게 달라졌나요?" rows={4} className="w-full resize-none rounded-xl border border-[#dedfd7] bg-white p-3 text-sm outline-none placeholder:text-stone-400 focus:border-[#496238]" />
-            </label>
-
-            <StatusMessage state={observationSaveState} message={observationMessage} />
-            <div className="sticky bottom-20 z-20 -mx-1 bg-white/90 px-1 py-2 backdrop-blur">
-              <button type="submit" disabled={!canSaveObservation} className="min-h-12 w-full rounded-2xl bg-[#315b36] px-5 text-sm font-black text-white shadow-lg shadow-[#315b36]/15 transition active:scale-[0.99] disabled:bg-stone-300 disabled:text-stone-500 disabled:shadow-none">
-                {observationSaveState === "saving" ? "저장 중..." : "관찰일지 저장"}
-              </button>
-            </div>
-          </form>
+          <>
+            <header className="relative mb-4 flex h-10 items-center justify-between">
+              <button type="button" onClick={() => setActiveTab("water")} aria-label="물주기로 돌아가기" className="-ml-2 grid h-10 w-10 place-items-center"><ArrowLeft size={23} aria-hidden="true" /></button>
+              <h1 className="absolute inset-x-12 text-center text-xl font-black">관찰일지</h1>
+              <span className="-mr-2 grid h-10 w-10 place-items-center"><MoreVertical size={21} aria-hidden="true" /></span>
+            </header>
+            <form onSubmit={saveObservation} className="space-y-3">
+              <PlantPhotoUploader files={photos} onChange={setPhotos} onCaptureDateChange={(date) => setObservedDate(date ?? getTodayValue())} />
+              <section className="space-y-5 rounded-[30px] bg-white p-4">
+                <PlantSelect plants={plants} value={selectedPlantLabel} query={query} recentPlants={recentPlants} onQueryChange={(value) => { setQuery(value); if (value !== selectedPlant?.name) setSelectedPlantId(""); }} onSelect={selectPlant} variant="row" />
+                <label className="flex items-center justify-between gap-4"><span className="text-[15px] font-extrabold">관찰 날짜</span><input type="date" value={observedDate} onChange={(event) => setObservedDate(event.target.value)} className="h-9 min-w-32 rounded-xl border-0 bg-[#F0F1EE] px-2 text-xs font-bold outline-none focus:ring-1 focus:ring-[#284F2A]/30" /></label>
+                <section>
+                  <div className="mb-3 flex items-center justify-between"><h2 className="text-[15px] font-extrabold">관찰태그</h2><span className="text-[11px] text-[#909090]">여러 개를 선택할 수 있어요.</span></div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {OBSERVATION_TAGS.map(({ name, icon: Icon }) => {
+                      const isSelected = selectedTags.includes(name);
+                      return <button key={name} type="button" onClick={() => toggleTag(name)} className={`flex min-h-12 items-center justify-center gap-1.5 rounded-2xl text-xs font-bold transition ${isSelected ? "bg-[#284F2A] text-white" : "bg-[#F0F1EE] text-[#333633]"}`}><Icon size={16} strokeWidth={1.8} aria-hidden="true" />{name}</button>;
+                    })}
+                  </div>
+                </section>
+                <label className="block">
+                  <span className="mb-2 block text-[15px] font-extrabold">메모</span>
+                  <span className="relative block"><textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={300} placeholder="오늘의 변화를 기록해보세요." rows={4} className="w-full resize-none rounded-2xl border-0 bg-[#F0F1EE] p-3 pb-7 text-sm leading-6 outline-none placeholder:text-[#A3A5A0] focus:ring-1 focus:ring-[#284F2A]/30" /><span className="pointer-events-none absolute bottom-2.5 right-3 text-[10px] text-[#909090]">{note.length}/300</span></span>
+                </label>
+                <StatusMessage state={observationSaveState} message={observationMessage} />
+                <button type="submit" disabled={!canSaveObservation} className="min-h-14 w-full rounded-2xl bg-[#284F2A] px-5 text-sm font-black text-white transition active:scale-[0.99] disabled:bg-[#C9CBC6] disabled:text-[#777B74]">{observationSaveState === "saving" ? "저장 중..." : "관찰일지 저장"}</button>
+              </section>
+            </form>
+          </>
         ) : null}
 
         {activeTab === "profile" ? (
-          <div className="space-y-5">
-            <PlantSelect
-              plants={plants}
-              value={profilePlant ? formatPlantName(profilePlant) : ""}
-              query={profileQuery}
-              recentPlants={[]}
-              onQueryChange={(value) => {
-                setProfileQuery(value);
-                if (!value) setProfilePlantId("");
-              }}
-              onSelect={selectProfilePlant}
-            />
-            {profilePlant ? (
-              <PlantOverview key={profilePlant.id} plant={profilePlant} />
-            ) : (
-              <RecentObservedPlants plants={plants} recentPlants={recentObservedPlants} onSelect={selectProfilePlant} />
-            )}
-          </div>
+          <>
+            <header className="mb-4 flex items-center justify-between"><h1 className="text-[32px] font-black leading-tight">내 식물</h1><button type="button" onClick={() => setProfileOpenRequest((current) => current + 1)} aria-label="식물 찾기" className="grid h-10 w-10 place-items-center rounded-full bg-[#151515] text-white"><Plus size={21} aria-hidden="true" /></button></header>
+            <div className="space-y-5">
+              <PlantSelect plants={plants} value={profilePlant ? formatPlantName(profilePlant) : ""} query={profileQuery} recentPlants={[]} onQueryChange={(value) => { setProfileQuery(value); if (!value || value !== profilePlant?.name) setProfilePlantId(""); }} onSelect={selectProfilePlant} variant="search" openRequest={profileOpenRequest} />
+              {profilePlant ? <PlantOverview key={profilePlant.id} plant={profilePlant} /> : <RecentObservedPlants plants={plants} recentPlants={recentObservedPlants} onSelect={selectProfilePlant} />}
+            </div>
+          </>
         ) : null}
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md border-t border-[#eeeeea] bg-white/95 px-8 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur-xl" aria-label="기록 종류">
-        <div className="grid grid-cols-3 gap-6">
+      <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-[390px] border-t border-[#ECEDE9] bg-white px-6 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5" aria-label="주요 화면">
+        <div className="grid grid-cols-4 gap-3">
           {tabs.map(({ id, label, icon: Icon, badge }) => {
             const isActive = activeTab === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setActiveTab(id)}
-                className={`relative flex min-h-12 flex-col items-center justify-center gap-0.5 text-[10px] font-bold transition ${isActive ? "text-[#315b36]" : "text-stone-400"}`}
-                aria-current={isActive ? "page" : undefined}
-              >
-                <Icon size={18} strokeWidth={isActive ? 2.5 : 1.8} aria-hidden="true" />
-                <span>{label}</span>
-                {badge ? <span className="absolute right-[12%] top-0 grid min-h-4 min-w-4 place-items-center rounded-full bg-[#d8ef80] px-1 text-[9px] text-[#26351d]">{badge}</span> : null}
-              </button>
-            );
+            return <button key={id} type="button" onClick={() => setActiveTab(id)} className={`relative flex min-h-12 flex-col items-center justify-center gap-0.5 text-[10px] font-bold transition ${isActive ? "text-[#284F2A]" : "text-[#A1A39E]"}`} aria-current={isActive ? "page" : undefined}><Icon size={19} strokeWidth={isActive ? 2.5 : 1.7} aria-hidden="true" /><span>{label}</span>{badge ? <span className="absolute right-1 top-0 grid min-h-4 min-w-4 place-items-center rounded-full bg-[#284F2A] px-1 text-[9px] text-white">{badge}</span> : null}</button>;
           })}
+          <button type="button" disabled className="flex min-h-12 flex-col items-center justify-center gap-0.5 text-[10px] font-bold text-[#A1A39E]"><MoreHorizontal size={19} strokeWidth={1.7} aria-hidden="true" /><span>더보기</span></button>
         </div>
       </nav>
       {!(hasPreloadedImages && hasLoadedTodayWatering) && !hasBootTimedOut ? <AppLoadingScreen /> : null}

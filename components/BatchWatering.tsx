@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Check, ChevronDown, Droplets, Sprout, X } from "lucide-react";
+import { AlertCircle, ArrowRight, CalendarDays, Check, ChevronDown, Sprout, X } from "lucide-react";
 import { matchesPlantSearch } from "@/lib/plant-search";
 import type { Plant, RecentObservedPlant, SaveState } from "@/types/plant";
 
@@ -38,7 +38,7 @@ export function BatchWatering({ plants, recentPlants = [], onInitialLoad, onWate
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dismissedDueIds, setDismissedDueIds] = useState<string[]>([]);
   const [isDueOpen, setIsDueOpen] = useState(false);
-  const [isOtherOpen, setIsOtherOpen] = useState(false);
+  const [isOtherOpen, setIsOtherOpen] = useState(true);
   const [query, setQuery] = useState("");
   const [wateredDate, setWateredDate] = useState(today);
   const [todayWateredPlants, setTodayWateredPlants] = useState<WateredPlant[]>([]);
@@ -195,185 +195,83 @@ export function BatchWatering({ plants, recentPlants = [], onInitialLoad, onWate
     return (
       <label
         key={plant.id}
-        className={`flex min-h-14 items-center justify-between gap-3 rounded-2xl border px-3 py-2 transition ${
+        className={`flex min-h-[68px] items-center justify-between gap-3 rounded-[22px] bg-white px-3 py-2.5 transition ${
           isSelected
-            ? "border-[#315b36] bg-[#edf5e8]"
-            : due ? "border-[#f0c9aa] bg-[#fff7ef]" : "border-stone-200 bg-white"
+            ? "ring-2 ring-[#284F2A]"
+            : due ? "ring-1 ring-[#E5DFC4]" : ""
         }`}
       >
-        <span className={`relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl ${due ? "bg-[#f9dfca] text-[#9a4f25]" : "bg-[#e8f0df] text-[#315b36]"}`}>
-          {photoUrl ? <Image src={photoUrl} alt="" fill sizes="40px" className="object-cover" unoptimized onError={() => markPhotoFailed(photoUrl)} /> : <Sprout size={18} aria-hidden="true" />}
+        <span className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-[#E7EDE3] text-[#284F2A]">
+          {photoUrl ? <Image src={photoUrl} alt="" fill sizes="48px" className="object-cover" unoptimized onError={() => markPhotoFailed(photoUrl)} /> : <Sprout size={18} aria-hidden="true" />}
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-bold text-stone-900">{plant.name}</span>
-          <span className="block truncate text-xs text-stone-500">
+          <span className="mt-1 block truncate text-[11px] text-[#909090]">
             {due && typeof plant.wateringCycleDays === "number"
               ? `주기 ${plant.wateringCycleDays}일 · ${daysText}`
-              : plant.category}
+              : daysText}
           </span>
         </span>
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={() => togglePlant(plant.id)}
-          className="h-6 w-6 shrink-0 accent-[#315b36]"
-        />
+        <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border transition ${isSelected ? "border-[#5C9A3C] bg-[#5C9A3C] text-white" : "border-[#B7BAB4] bg-white text-transparent"}`}>
+          <Check size={16} strokeWidth={3} aria-hidden="true" />
+        </span>
+        <input type="checkbox" checked={isSelected} onChange={() => togglePlant(plant.id)} className="sr-only" />
       </label>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <section className="overflow-hidden rounded-3xl bg-[#315b36] text-white shadow-lg shadow-[#244529]/15">
-        <button
-          type="button"
-          onClick={() => setIsDueOpen((current) => !current)}
-          className="relative flex min-h-52 w-full items-end justify-between overflow-hidden p-5 text-left"
-          aria-expanded={isDueOpen}
-        >
-          {dueHeroPhoto ? <Image src={dueHeroPhoto} alt="" fill sizes="(max-width: 448px) 100vw, 448px" className="object-cover" unoptimized onError={() => markPhotoFailed(dueHeroPhoto)} /> : null}
-          {dueHeroPhoto ? <span className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/5" /> : null}
-          <Droplets size={132} strokeWidth={1.2} className="absolute -right-5 -top-5 text-[#a8c66c]/35" aria-hidden="true" />
-          <span className="relative">
-            <span className="block text-sm font-semibold text-white/70">물줄 때 된 식물</span>
-            <span className="mt-1.5 block text-4xl font-black leading-none">{duePlants.length}<span className="ml-1 text-base font-bold">개</span></span>
-            <span className="mt-3 block text-xs font-medium text-white/70">눌러서 목록 확인하기</span>
+    <div className="space-y-5">
+      <section className="overflow-hidden rounded-[30px] bg-[#284F2A] text-white">
+        <button type="button" onClick={() => setIsDueOpen((current) => !current)} className="relative flex min-h-[255px] w-full items-end justify-between overflow-hidden p-5 text-left" aria-expanded={isDueOpen}>
+          {dueHeroPhoto ? <Image src={dueHeroPhoto} alt="" fill priority sizes="(max-width: 390px) 100vw, 390px" className="object-cover object-center" unoptimized onError={() => markPhotoFailed(dueHeroPhoto)} /> : <span className="absolute inset-0 grid place-items-center bg-[#DCE7D5] text-[#284F2A]"><Sprout size={74} strokeWidth={1} aria-hidden="true" /></span>}
+          <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+          <span className="relative pb-0.5">
+            <span className="block text-lg font-extrabold">물줄 때 된 식물</span>
+            <span className="mt-1 block text-[46px] font-black leading-none">{duePlants.length}<span className="ml-1 text-lg">개</span></span>
           </span>
-          <span className="relative grid h-10 w-10 place-items-center rounded-full bg-white text-[#315b36]">
-            <ChevronDown size={21} className={`transition ${isDueOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+          <span className="relative grid h-11 w-11 place-items-center rounded-full bg-[#151515] text-white">
+            {isDueOpen ? <ChevronDown size={21} className="rotate-180" aria-hidden="true" /> : <ArrowRight size={20} aria-hidden="true" />}
           </span>
         </button>
-
         {isDueOpen ? (
-          <div className="border-t border-white/15 bg-[#f9faf5] p-3 text-stone-900">
-            {duePlants.length ? (
-              <>
-                <button type="button" onClick={toggleAllDuePlants} className="mb-3 min-h-10 w-full rounded-xl border border-[#cbd9be] bg-white px-3 text-sm font-bold text-[#315b36]">
-                  {areAllDueSelected ? "전체해제" : "전체선택"}
-                </button>
-                <div className="max-h-80 space-y-2 overflow-y-auto">{duePlants.map((plant) => renderPlantRow(plant, true))}</div>
-              </>
-            ) : (
-              <div className="flex items-center gap-2 rounded-lg bg-white px-3 py-4 text-sm text-stone-600">
-                <Check size={18} className="text-[#315b36]" aria-hidden="true" />
-                오늘 확인할 물주기 알림이 없습니다.
-              </div>
-            )}
+          <div className="bg-[#F2F4EF] p-3 text-[#151515]">
+            {duePlants.length ? <><button type="button" onClick={toggleAllDuePlants} className="mb-2.5 min-h-10 w-full rounded-2xl bg-white text-sm font-extrabold text-[#284F2A]">{areAllDueSelected ? "전체해제" : "전체선택"}</button><div className="max-h-80 space-y-2 overflow-y-auto">{duePlants.map((plant) => renderPlantRow(plant, true))}</div></> : <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-4 text-sm text-[#777B74]"><Check size={18} className="text-[#284F2A]" aria-hidden="true" />오늘 확인할 물주기 알림이 없습니다.</div>}
+          </div>
+        ) : null}
+      </section>
+
+      <label className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3">
+        <span className="flex items-center gap-2 text-sm font-bold text-[#151515]"><CalendarDays size={17} className="text-[#284F2A]" aria-hidden="true" />물 준 날짜</span>
+        <input type="date" value={wateredDate} onChange={(event) => setWateredDate(event.target.value)} className="h-8 min-w-32 rounded-xl border-0 bg-[#F0F1EE] px-2 text-xs font-bold outline-none focus:ring-1 focus:ring-[#284F2A]/30" />
+      </label>
+
+      <section>
+        <button type="button" onClick={() => setIsOtherOpen((current) => !current)} className="mb-3 flex w-full items-center justify-between text-left" aria-expanded={isOtherOpen}>
+          <span className="text-lg font-black text-[#151515]">다른 식물 물주기</span>
+          <span className="flex items-center gap-1.5 text-sm font-semibold text-[#909090]">{wateringPlants.length}개 <ChevronDown size={17} className={`transition ${isOtherOpen ? "rotate-180" : ""}`} aria-hidden="true" /></span>
+        </button>
+        {isOtherOpen ? (
+          <div>
+            <div className="relative mb-3">
+              <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름 또는 초성으로 검색" className="h-10 w-full rounded-full border-0 bg-[#EDEEEA] px-4 pr-10 text-sm outline-none placeholder:text-[#909090] focus:ring-1 focus:ring-[#284F2A]/30" />
+              {query ? <button type="button" onClick={() => setQuery("")} aria-label="검색어 지우기" className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center text-[#777B74]"><X size={16} aria-hidden="true" /></button> : null}
+            </div>
+            <div className="max-h-[25rem] space-y-2 overflow-y-auto">{otherPlants.length ? otherPlants.map((plant) => renderPlantRow(plant)) : <p className="py-5 text-center text-sm text-[#909090]">검색 결과가 없습니다.</p>}</div>
           </div>
         ) : null}
       </section>
 
       <section>
-        <div className="mb-3 flex items-end justify-between">
-          <div>
-            <h2 className="text-base font-black text-stone-950">오늘 물 준 식물</h2>
-            <p className="mt-0.5 text-xs text-stone-500">오늘의 물주기 기록을 모아봤어요.</p>
-          </div>
-          <span className="text-sm font-black text-[#315b36]">{todayWateredPlants.length}개</span>
-        </div>
-        {isTodayLoading ? (
-          <div className="h-16 animate-pulse rounded-2xl bg-[#f5f6f2]" />
-        ) : todayWateringError ? (
-          <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-4 text-center text-sm text-red-700">오늘 기록을 불러오지 못했어요. 잠시 후 새로고침해 주세요.</div>
-        ) : todayWateredPlants.length ? (
-          <div className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1">
-            {todayWateredPlants.map((plant) => {
-              const photoUrl = getPlantPhoto({ id: plant.id, name: plant.name, category: "" });
-              return (
-                <div key={plant.id || plant.name} className="flex w-36 shrink-0 items-center gap-2.5 rounded-2xl bg-[#f5f6f2] p-2.5">
-                  <span className="relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-[#315b36] text-white">
-                    {photoUrl ? <Image src={photoUrl} alt="" fill sizes="40px" className="object-cover" unoptimized onError={() => markPhotoFailed(photoUrl)} /> : <Check size={18} aria-hidden="true" />}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-bold text-stone-900">{plant.name}</span>
-                    <span className="mt-0.5 block text-[11px] text-stone-500">오늘 완료</span>
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="rounded-2xl bg-[#f5f6f2] px-4 py-4 text-center text-sm text-stone-500">아직 오늘 물 준 식물이 없어요.</div>
-        )}
+        <div className="mb-2 flex items-center justify-between"><h2 className="text-[15px] font-extrabold text-[#151515]">오늘 물 준 식물</h2><span className="text-xs font-bold text-[#284F2A]">{todayWateredPlants.length}개</span></div>
+        {isTodayLoading ? <div className="h-14 animate-pulse rounded-2xl bg-white" /> : todayWateringError ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-center text-xs text-red-700">오늘 기록을 불러오지 못했어요.</div> : todayWateredPlants.length ? (
+          <div className="flex gap-2 overflow-x-auto pb-1">{todayWateredPlants.map((plant) => { const photoUrl = getPlantPhoto({ id: plant.id, name: plant.name, category: "" }); return <div key={plant.id || plant.name} className="flex w-32 shrink-0 items-center gap-2 rounded-2xl bg-white p-2"><span className="relative grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-xl bg-[#E7EDE3] text-[#284F2A]">{photoUrl ? <Image src={photoUrl} alt="" fill sizes="36px" className="object-cover" unoptimized onError={() => markPhotoFailed(photoUrl)} /> : <Check size={16} aria-hidden="true" />}</span><span className="min-w-0"><span className="block truncate text-xs font-bold">{plant.name}</span><span className="text-[10px] text-[#909090]">오늘 완료</span></span></div>; })}</div>
+        ) : <div className="rounded-2xl bg-white px-4 py-3 text-center text-xs text-[#909090]">아직 오늘 물 준 식물이 없어요.</div>}
       </section>
 
-      <label className="flex items-center justify-between gap-4 rounded-2xl bg-[#f5f6f2] px-4 py-3">
-        <span>
-          <span className="block text-sm font-bold text-stone-900">물 준 날짜</span>
-          <span className="mt-0.5 block text-xs text-stone-500">다른 날의 기록도 남길 수 있어요.</span>
-        </span>
-        <input
-          type="date"
-          value={wateredDate}
-          onChange={(event) => setWateredDate(event.target.value)}
-          className="h-9 min-w-32 rounded-xl border border-stone-200 bg-white px-2 text-sm font-bold outline-none focus:border-[#315b36]"
-        />
-      </label>
+      {message ? <div className={`rounded-2xl px-4 py-3 text-sm ${saveState === "error" ? "bg-red-50 text-red-700" : "bg-[#E7EFE3] text-[#284F2A]"}`}><div className="flex items-start gap-2">{saveState === "error" ? <AlertCircle size={17} className="mt-0.5 shrink-0" aria-hidden="true" /> : <Check size={17} className="mt-0.5 shrink-0" aria-hidden="true" />}<div><p className="font-semibold">{message}</p>{successfulResults.length ? <p className="mt-1">성공: {successfulResults.map((result) => result.plantName).join(", ")}</p> : null}{failedResults.length ? <p className="mt-1">실패: {failedResults.map((result) => result.plantName).join(", ")}</p> : null}</div></div></div> : null}
 
-      <section className="rounded-2xl bg-[#f5f6f2]">
-        <button
-          type="button"
-          onClick={() => setIsOtherOpen((current) => !current)}
-          className="flex min-h-14 w-full items-center justify-between px-4 text-left"
-          aria-expanded={isOtherOpen}
-        >
-          <span>
-            <span className="block text-sm font-black text-stone-900">다른 식물 물주기</span>
-            <span className="mt-0.5 block text-xs text-stone-500">전체 식물에서 직접 선택하기</span>
-          </span>
-          <ChevronDown size={20} className={`text-stone-500 transition ${isOtherOpen ? "rotate-180" : ""}`} aria-hidden="true" />
-        </button>
-
-        {isOtherOpen ? (
-          <div className="border-t border-stone-100 p-3">
-            <div className="relative mb-3">
-              <input
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="이름 또는 초성으로 검색"
-                className="h-11 w-full rounded-2xl border-0 bg-white px-4 pr-10 text-sm outline-none focus:ring-1 focus:ring-[#315b36]"
-              />
-              {query ? (
-                <button type="button" onClick={() => setQuery("")} aria-label="검색어 지우기" className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center text-stone-500">
-                  <X size={17} aria-hidden="true" />
-                </button>
-              ) : null}
-            </div>
-            <div className="max-h-80 space-y-2 overflow-y-auto">
-              {otherPlants.length ? otherPlants.map((plant) => renderPlantRow(plant)) : (
-                <p className="py-5 text-center text-sm text-stone-500">검색 결과가 없습니다.</p>
-              )}
-            </div>
-          </div>
-        ) : null}
-      </section>
-
-      {message ? (
-        <div className={`rounded-lg px-4 py-3 text-sm ${saveState === "error" ? "bg-red-50 text-red-700" : "bg-[#e8f0df] text-[#315b36]"}`}>
-          <div className="flex items-start gap-2">
-            {saveState === "error" ? <AlertCircle size={17} className="mt-0.5 shrink-0" aria-hidden="true" /> : <Check size={17} className="mt-0.5 shrink-0" aria-hidden="true" />}
-            <div>
-              <p className="font-semibold">{message}</p>
-              {successfulResults.length ? <p className="mt-1">성공: {successfulResults.map((result) => result.plantName).join(", ")}</p> : null}
-              {failedResults.length ? <p className="mt-1">실패: {failedResults.map((result) => result.plantName).join(", ")}</p> : null}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {selectedIds.length ? (
-        <div className="sticky bottom-20 z-20 -mx-1 bg-white/90 px-1 py-2 backdrop-blur">
-          <button
-            type="button"
-            onClick={saveWateringLogs}
-            disabled={saveState === "saving"}
-            className="min-h-12 w-full rounded-2xl bg-[#315b36] px-5 text-sm font-black text-white shadow-lg shadow-[#244529]/15 transition active:scale-[0.99] disabled:bg-stone-300"
-          >
-            {saveState === "saving" ? "저장 중..." : failedResults.length ? `실패한 ${selectedIds.length}개 다시 저장` : `${selectedIds.length}개 물주기 저장`}
-          </button>
-        </div>
-      ) : null}
+      {selectedIds.length ? <div className="sticky bottom-[72px] z-20 py-2"><button type="button" onClick={saveWateringLogs} disabled={saveState === "saving"} className="min-h-12 w-full rounded-2xl bg-[#284F2A] px-5 text-sm font-black text-white transition active:scale-[0.99] disabled:bg-[#C9CBC6]">{saveState === "saving" ? "저장 중..." : failedResults.length ? `실패한 ${selectedIds.length}개 다시 저장` : `${selectedIds.length}개 물주기 저장`}</button></div> : null}
     </div>
   );
 }

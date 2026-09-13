@@ -198,12 +198,19 @@ export function parseNotionPlantPage(page: NotionPlantPage): Plant | null {
   const coverPhotoUrl = page.cover?.type === "external"
     ? page.cover.external?.url
     : page.cover?.file?.url;
+  const scientificName = readTextProperty(page.properties["학명"]) || undefined;
+  const description =
+    readTextProperty(page.properties["설명"]) ||
+    readTextProperty(page.properties["소개"]) ||
+    undefined;
 
   return {
     id: page.id,
     category,
     name,
     coverPhotoUrl,
+    scientificName,
+    description,
     wateringCycleDays,
     lastWateredAt,
     daysSinceWatered,

@@ -3,6 +3,8 @@ export type Plant = {
   category: string;
   name: string;
   coverPhotoUrl?: string;
+  scientificName?: string;
+  description?: string;
   wateringCycleDays?: number;
   lastWateredAt?: string;
   daysSinceWatered?: number;

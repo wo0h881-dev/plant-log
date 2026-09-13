@@ -70,15 +70,15 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange }: Pla
   }
 
   return (
-    <section className="overflow-hidden rounded-3xl bg-[#dfe9ce] shadow-md shadow-[#315b36]/10">
+    <section className="overflow-hidden rounded-[30px] bg-[#DCE7D5]">
       <label
         htmlFor={inputId}
-        className="relative flex min-h-60 cursor-pointer flex-col items-center justify-center text-center transition active:opacity-90"
+        className="relative flex min-h-[258px] cursor-pointer flex-col items-center justify-center text-center transition active:opacity-90"
       >
         {previews.length ? (
-          <div className="grid min-h-60 w-full grid-cols-2 gap-1">
+          <div className="grid min-h-[258px] w-full grid-cols-2 gap-1">
             {previews.slice(0, 4).map((preview, index) => (
-              <div key={preview.url} className={`relative overflow-hidden bg-white ${previews.length === 1 ? "col-span-2 min-h-60" : "min-h-30"}`}>
+              <div key={preview.url} className={`relative overflow-hidden bg-white ${previews.length === 1 ? "col-span-2 min-h-[258px]" : "min-h-32"}`}>
                 <Image
                   src={preview.url}
                   alt={preview.name}
@@ -97,14 +97,14 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange }: Pla
           </div>
         ) : (
           <>
-            <ImagePlus size={64} strokeWidth={1} className="text-[#315b36]/30" aria-hidden="true" />
+            <ImagePlus size={58} strokeWidth={1} className="text-[#284F2A]/25" aria-hidden="true" />
             <div className="mt-4">
-              <span className="block text-lg font-black text-[#23321c]">오늘의 식물을 보여주세요</span>
-              <span className="mt-1 block text-sm font-medium text-[#5c6f47]">여러 장을 한 번에 선택할 수 있어요</span>
+              <span className="block text-lg font-black text-[#284F2A]">오늘의 식물을 보여주세요</span>
+              <span className="mt-1 block text-sm font-medium text-[#687565]">여러 장을 한 번에 선택할 수 있어요</span>
             </div>
           </>
         )}
-        <span className="absolute bottom-4 right-4 grid h-10 w-10 place-items-center rounded-full bg-[#315b36] text-white shadow-lg shadow-stone-950/15">
+        <span className="absolute bottom-4 right-4 grid h-11 w-11 place-items-center rounded-full bg-[#151515] text-white shadow-lg shadow-black/20">
           <Camera size={19} aria-hidden="true" />
         </span>
         {previews.length ? (
