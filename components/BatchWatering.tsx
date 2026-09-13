@@ -43,6 +43,7 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
   const [todayWateredPlants, setTodayWateredPlants] = useState<WateredPlant[]>([]);
   const [isTodayLoading, setIsTodayLoading] = useState(true);
   const [todayWateringError, setTodayWateringError] = useState(false);
+  const [failedPhotoUrls, setFailedPhotoUrls] = useState<string[]>([]);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [message, setMessage] = useState("");
   const [results, setResults] = useState<WateringResult[]>([]);
@@ -96,13 +97,22 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
     }
     return photos;
   }, [recentPlants]);
-  const getPlantPhoto = useCallback((plant: Pick<Plant, "id" | "category" | "name">) => (
-    recentPhotoByPlant.get(plant.id)
-      ?? recentPhotoByPlant.get(`${plant.category}:${plant.name}`)
-      ?? recentPhotoByPlant.get(plant.name)
-      ?? plants.find((item) => item.id === plant.id || item.name === plant.name)?.coverPhotoUrl
-  ), [plants, recentPhotoByPlant]);
+  const failedPhotoUrlSet = useMemo(() => new Set(failedPhotoUrls), [failedPhotoUrls]);
+  const getPlantPhoto = useCallback((plant: Pick<Plant, "id" | "category" | "name">) => {
+    const matchingPlant = plants.find((item) => item.id === plant.id || item.name === plant.name);
+    const candidates = [
+      recentPhotoByPlant.get(plant.id),
+      recentPhotoByPlant.get(`${plant.category}:${plant.name}`),
+      recentPhotoByPlant.get(plant.name),
+      matchingPlant?.coverPhotoUrl,
+    ];
+    return candidates.find((url) => url && !failedPhotoUrlSet.has(url));
+  }, [failedPhotoUrlSet, plants, recentPhotoByPlant]);
   const dueHeroPhoto = duePlants.map(getPlantPhoto).find(Boolean);
+
+  function markPhotoFailed(url: string) {
+    setFailedPhotoUrls((current) => current.includes(url) ? current : [...current, url]);
+  }
 
   function togglePlant(plantId: string) {
     setSelectedIds((current) =>
@@ -188,7 +198,7 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
         }`}
       >
         <span className={`relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl ${due ? "bg-[#f9dfca] text-[#9a4f25]" : "bg-[#e8f0df] text-[#315b36]"}`}>
-          {photoUrl ? <Image src={photoUrl} alt="" fill sizes="44px" className="object-cover" unoptimized /> : <Sprout size={18} aria-hidden="true" />}
+          {photoUrl ? <Image src={photoUrl} alt="" fill sizes="40px" className="object-cover" unoptimized onError={() => markPhotoFailed(photoUrl)} /> : <Sprout size={18} aria-hidden="true" />}
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-bold text-stone-900">{plant.name}</span>
@@ -217,7 +227,7 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
           className="relative flex min-h-52 w-full items-end justify-between overflow-hidden p-5 text-left"
           aria-expanded={isDueOpen}
         >
-          {dueHeroPhoto ? <Image src={dueHeroPhoto} alt="" fill sizes="(max-width: 448px) 100vw, 448px" className="object-cover" unoptimized /> : null}
+          {dueHeroPhoto ? <Image src={dueHeroPhoto} alt="" fill sizes="(max-width: 448px) 100vw, 448px" className="object-cover" unoptimized onError={() => markPhotoFailed(dueHeroPhoto)} /> : null}
           {dueHeroPhoto ? <span className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/5" /> : null}
           <Droplets size={132} strokeWidth={1.2} className="absolute -right-5 -top-5 text-[#a8c66c]/35" aria-hidden="true" />
           <span className="relative">
@@ -263,17 +273,20 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
           <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-4 text-center text-sm text-red-700">오늘 기록을 불러오지 못했어요. 잠시 후 새로고침해 주세요.</div>
         ) : todayWateredPlants.length ? (
           <div className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1">
-            {todayWateredPlants.map((plant) => (
-              <div key={plant.id || plant.name} className="flex w-36 shrink-0 items-center gap-2.5 rounded-2xl bg-[#f5f6f2] p-2.5">
-                <span className="relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-[#315b36] text-white">
-                  {getPlantPhoto({ id: plant.id, name: plant.name, category: "" }) ? <Image src={getPlantPhoto({ id: plant.id, name: plant.name, category: "" })!} alt="" fill sizes="40px" className="object-cover" unoptimized /> : <Check size={18} aria-hidden="true" />}
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-bold text-stone-900">{plant.name}</span>
-                  <span className="mt-0.5 block text-[11px] text-stone-500">오늘 완료</span>
-                </span>
-              </div>
-            ))}
+            {todayWateredPlants.map((plant) => {
+              const photoUrl = getPlantPhoto({ id: plant.id, name: plant.name, category: "" });
+              return (
+                <div key={plant.id || plant.name} className="flex w-36 shrink-0 items-center gap-2.5 rounded-2xl bg-[#f5f6f2] p-2.5">
+                  <span className="relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-[#315b36] text-white">
+                    {photoUrl ? <Image src={photoUrl} alt="" fill sizes="40px" className="object-cover" unoptimized onError={() => markPhotoFailed(photoUrl)} /> : <Check size={18} aria-hidden="true" />}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-bold text-stone-900">{plant.name}</span>
+                    <span className="mt-0.5 block text-[11px] text-stone-500">오늘 완료</span>
+                  </span>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="rounded-2xl bg-[#f5f6f2] px-4 py-4 text-center text-sm text-stone-500">아직 오늘 물 준 식물이 없어요.</div>
