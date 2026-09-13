@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Check, Droplets, NotebookPen, Sprout } from "lucide-react";
+import { AlertCircle, Check, Leaf, NotebookPen, Sprout } from "lucide-react";
 import { BatchWatering } from "@/components/BatchWatering";
 import { PlantPhotoUploader } from "@/components/PlantPhotoUploader";
 import { PlantOverview } from "@/components/PlantOverview";
@@ -49,7 +49,7 @@ function StatusMessage({ state, message }: { state: SaveState; message: string }
 export function PlantLogForm() {
   const [plants, setPlants] = useState<Plant[]>(fallbackPlants);
   const [selectedPlantId, setSelectedPlantId] = useState("");
-  const [activeTab, setActiveTab] = useState<RecordTab>("observation");
+  const [activeTab, setActiveTab] = useState<RecordTab>("water");
   const [query, setQuery] = useState("");
   const [profileQuery, setProfileQuery] = useState("");
   const [profilePlantId, setProfilePlantId] = useState("");
@@ -184,7 +184,7 @@ export function PlantLogForm() {
   }
 
   const tabs = [
-    { id: "water" as const, label: "물주기", icon: Droplets, badge: dueCount },
+    { id: "water" as const, label: "물주기", icon: Leaf, badge: dueCount },
     { id: "observation" as const, label: "관찰일지", icon: NotebookPen },
     { id: "profile" as const, label: "내 식물", icon: Sprout },
   ];
@@ -195,12 +195,12 @@ export function PlantLogForm() {
   }[activeTab];
 
   return (
-    <main className="min-h-dvh bg-[#f7f7f2] text-[#171914]">
-      <div className="mx-auto min-h-dvh w-full max-w-md px-4 pb-32 pt-[max(1.25rem,env(safe-area-inset-top))]">
-        <header className="mb-6 flex items-start justify-between gap-4 px-1">
+    <main className="min-h-dvh bg-[#eef1e9] text-[#171914]">
+      <div className="mx-auto min-h-dvh w-full max-w-md bg-white px-5 pb-28 pt-[max(1rem,env(safe-area-inset-top))] shadow-sm shadow-stone-950/5">
+        <header className="mb-5 flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-[2rem] font-black leading-none text-[#1d2a18]">{pageCopy.title}</h1>
-            <p className="mt-2 text-sm font-medium text-stone-500">{pageCopy.description}</p>
+            <h1 className="text-[1.75rem] font-black leading-none text-[#1d2a18]">{pageCopy.title}</h1>
+            <p className="mt-1.5 text-[13px] font-medium text-stone-500">{pageCopy.description}</p>
           </div>
           <span className="grid shrink-0 justify-items-end gap-2">
             <span className="text-[11px] font-bold text-stone-400">{todayLabel}</span>
@@ -215,7 +215,7 @@ export function PlantLogForm() {
         ) : null}
 
         {activeTab === "observation" ? (
-          <form onSubmit={saveObservation} className="space-y-5">
+          <form onSubmit={saveObservation} className="space-y-4">
             <PlantPhotoUploader files={photos} onChange={setPhotos} onCaptureDateChange={updateCaptureDate} />
             <PlantSelect
               plants={plants}
@@ -229,30 +229,30 @@ export function PlantLogForm() {
               onSelect={selectPlant}
             />
 
-            <section className="rounded-lg border border-[#e4e5dd] bg-white p-4 shadow-sm shadow-stone-950/[0.03]">
+            <section className="rounded-2xl bg-[#f5f6f2] p-4">
               <label htmlFor="observed-date" className="mb-2 block text-sm font-semibold text-stone-800">관찰 날짜</label>
-              <input id="observed-date" type="date" value={observedDate} onChange={(event) => { setObservedDate(event.target.value); setDateSource("today"); }} className="h-12 w-full rounded-lg border border-[#dedfd7] bg-[#f8f8f4] px-3 text-base outline-none focus:border-[#496238]" />
+              <input id="observed-date" type="date" value={observedDate} onChange={(event) => { setObservedDate(event.target.value); setDateSource("today"); }} className="h-11 w-full rounded-xl border border-[#dedfd7] bg-white px-3 text-sm outline-none focus:border-[#496238]" />
               <p className="mt-2 text-xs text-stone-500">{dateSource === "capture" ? "첫 번째 사진의 촬영일을 불러왔어요." : "기본값은 오늘 날짜예요."}</p>
             </section>
 
-            <section className="rounded-lg border border-[#e4e5dd] bg-white p-4 shadow-sm shadow-stone-950/[0.03]">
+            <section className="rounded-2xl bg-[#f5f6f2] p-4">
               <h2 className="text-sm font-semibold text-stone-800">관찰 태그</h2>
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-3 grid grid-cols-3 gap-2">
                 {observationTags.map((tag) => {
                   const isSelected = selectedTags.includes(tag);
-                  return <button key={tag} type="button" onClick={() => toggleTag(tag)} className={`min-h-10 rounded-full border px-4 text-sm font-bold transition ${isSelected ? "border-[#315b36] bg-[#315b36] text-white" : "border-[#dedfd7] bg-[#f8f8f4] text-stone-700"}`}>{tag}</button>;
+                  return <button key={tag} type="button" onClick={() => toggleTag(tag)} className={`min-h-11 rounded-xl border px-2 text-[13px] font-bold transition ${isSelected ? "border-[#315b36] bg-[#315b36] text-white" : "border-[#e0e1da] bg-white text-stone-700"}`}>{tag}</button>;
                 })}
               </div>
             </section>
 
-            <label className="block rounded-lg border border-[#e4e5dd] bg-white p-4 shadow-sm shadow-stone-950/[0.03]">
+            <label className="block rounded-2xl bg-[#f5f6f2] p-4">
               <span className="mb-2 block text-sm font-semibold text-stone-800">메모</span>
-              <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="잎이 어떻게 달라졌나요?" rows={5} className="w-full resize-none rounded-lg border border-[#dedfd7] bg-[#f8f8f4] p-4 text-base outline-none placeholder:text-stone-400 focus:border-[#496238]" />
+              <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="잎이 어떻게 달라졌나요?" rows={4} className="w-full resize-none rounded-xl border border-[#dedfd7] bg-white p-3 text-sm outline-none placeholder:text-stone-400 focus:border-[#496238]" />
             </label>
 
             <StatusMessage state={observationSaveState} message={observationMessage} />
-            <div className="sticky bottom-24 z-20 -mx-2 bg-[#f7f7f2]/90 px-2 py-2 backdrop-blur">
-              <button type="submit" disabled={!canSaveObservation} className="min-h-14 w-full rounded-lg bg-[#11180f] px-5 text-base font-black text-white shadow-xl shadow-stone-950/15 transition active:scale-[0.99] disabled:bg-stone-300 disabled:text-stone-500 disabled:shadow-none">
+            <div className="sticky bottom-20 z-20 -mx-1 bg-white/90 px-1 py-2 backdrop-blur">
+              <button type="submit" disabled={!canSaveObservation} className="min-h-12 w-full rounded-2xl bg-[#315b36] px-5 text-sm font-black text-white shadow-lg shadow-[#315b36]/15 transition active:scale-[0.99] disabled:bg-stone-300 disabled:text-stone-500 disabled:shadow-none">
                 {observationSaveState === "saving" ? "저장 중..." : "관찰일지 저장"}
               </button>
             </div>
@@ -281,8 +281,8 @@ export function PlantLogForm() {
         ) : null}
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md border-t border-[#e7e7e1] bg-white/95 px-4 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl" aria-label="기록 종류">
-        <div className="grid grid-cols-3 gap-2">
+      <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md border-t border-[#eeeeea] bg-white/95 px-8 pb-[max(0.4rem,env(safe-area-inset-bottom))] pt-1 backdrop-blur-xl" aria-label="기록 종류">
+        <div className="grid grid-cols-3 gap-6">
           {tabs.map(({ id, label, icon: Icon, badge }) => {
             const isActive = activeTab === id;
             return (
@@ -290,12 +290,12 @@ export function PlantLogForm() {
                 key={id}
                 type="button"
                 onClick={() => setActiveTab(id)}
-                className={`relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg text-[11px] font-black transition ${isActive ? "text-[#315b36]" : "text-stone-400"}`}
+                className={`relative flex min-h-12 flex-col items-center justify-center gap-0.5 text-[10px] font-bold transition ${isActive ? "text-[#315b36]" : "text-stone-400"}`}
                 aria-current={isActive ? "page" : undefined}
               >
-                <Icon size={20} strokeWidth={isActive ? 2.5 : 2} aria-hidden="true" />
+                <Icon size={18} strokeWidth={isActive ? 2.5 : 1.8} aria-hidden="true" />
                 <span>{label}</span>
-                {badge ? <span className="absolute right-[18%] top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-[#d8ef80] px-1 text-[10px] text-[#26351d]">{badge}</span> : null}
+                {badge ? <span className="absolute right-[12%] top-0 grid min-h-4 min-w-4 place-items-center rounded-full bg-[#d8ef80] px-1 text-[9px] text-[#26351d]">{badge}</span> : null}
               </button>
             );
           })}

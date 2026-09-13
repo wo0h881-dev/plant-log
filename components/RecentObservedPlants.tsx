@@ -23,6 +23,7 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
       ?? plants.find((item) => item.name === recent.plantName && (!recent.plantCategory || item.category === recent.plantCategory));
     return plant ? [{ recent, plant }] : [];
   });
+  const featuredPhotoUrl = items[0]?.recent.photoUrl ?? items[0]?.plant.coverPhotoUrl;
 
   return (
     <section>
@@ -42,11 +43,11 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
               key={`${recent.plantId}-${recent.plantName}`}
               type="button"
               onClick={() => onSelect(plant)}
-              className="w-44 shrink-0 snap-start overflow-hidden rounded-lg bg-white text-left shadow-md shadow-stone-950/10"
+              className="w-36 shrink-0 snap-start overflow-hidden rounded-2xl bg-white text-left shadow-sm shadow-stone-950/10"
             >
               <div className="relative aspect-[4/5] bg-[#dfe9ce]">
-                {recent.photoUrl ? (
-                  <Image src={recent.photoUrl} alt={recent.plantName} fill sizes="144px" className="object-cover" unoptimized />
+                {recent.photoUrl || plant.coverPhotoUrl ? (
+                  <Image src={recent.photoUrl ?? plant.coverPhotoUrl!} alt={recent.plantName} fill sizes="144px" className="object-cover" unoptimized />
                 ) : (
                   <span className="grid h-full place-items-center text-[#52751c]"><Sprout size={30} aria-hidden="true" /></span>
                 )}
@@ -59,9 +60,9 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
             </button>
             ))}
           </div>
-          {items[0].recent.photoUrl ? (
-            <button type="button" onClick={() => onSelect(items[0].plant)} className="relative mt-4 block aspect-[4/3] w-full overflow-hidden rounded-lg bg-[#dfe9ce] text-left shadow-xl shadow-stone-950/10">
-              <Image src={items[0].recent.photoUrl} alt={items[0].recent.plantName} fill sizes="(max-width: 448px) 100vw, 448px" className="object-cover" unoptimized />
+          {featuredPhotoUrl ? (
+            <button type="button" onClick={() => onSelect(items[0].plant)} className="relative mt-3 block aspect-[4/3] w-full overflow-hidden rounded-3xl bg-[#dfe9ce] text-left shadow-lg shadow-stone-950/10">
+              <Image src={featuredPhotoUrl} alt={items[0].recent.plantName} fill sizes="(max-width: 448px) 100vw, 448px" className="object-cover" unoptimized />
               <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/5 to-transparent" />
               <span className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-4 text-white">
                 <span className="min-w-0">

@@ -1,4 +1,4 @@
-const CACHE_NAME = "plant-log-v3";
+const CACHE_NAME = "plant-log-v4";
 const APP_SHELL = ["/", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -28,11 +28,13 @@ self.addEventListener("fetch", (event) => {
 
   if (requestUrl.pathname.startsWith("/_next/static/")) {
     event.respondWith(
-      caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
-        const responseClone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
-        return response;
-      })),
+      fetch(event.request)
+        .then((response) => {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+          return response;
+        })
+        .catch(() => caches.match(event.request)),
     );
     return;
   }

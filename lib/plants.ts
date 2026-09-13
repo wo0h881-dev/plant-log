@@ -41,6 +41,11 @@ type NotionProperty = {
 
 type NotionPlantPage = {
   id: string;
+  cover?: {
+    type: "external" | "file";
+    external?: { url?: string };
+    file?: { url?: string };
+  } | null;
   properties: Record<string, NotionProperty>;
 };
 
@@ -190,11 +195,15 @@ export function parseNotionPlantPage(page: NotionPlantPage): Plant | null {
   const currentPot = readTextProperty(page.properties["현재 화분"]) || undefined;
   const lastSettingChangedAt = readDateProperty(page.properties["마지막 세팅 변경일"]);
   const lastRepottedAt = readDateProperty(page.properties["최근 분갈이날"]);
+  const coverPhotoUrl = page.cover?.type === "external"
+    ? page.cover.external?.url
+    : page.cover?.file?.url;
 
   return {
     id: page.id,
     category,
     name,
+    coverPhotoUrl,
     wateringCycleDays,
     lastWateredAt,
     daysSinceWatered,

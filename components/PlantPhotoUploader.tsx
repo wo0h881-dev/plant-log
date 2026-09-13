@@ -70,15 +70,15 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange }: Pla
   }
 
   return (
-    <section className="overflow-hidden rounded-lg border border-[#d9dfd1] bg-[#dfe9ce] shadow-lg shadow-[#315b36]/10">
+    <section className="overflow-hidden rounded-3xl bg-[#dfe9ce] shadow-md shadow-[#315b36]/10">
       <label
         htmlFor={inputId}
-        className="relative flex min-h-72 cursor-pointer flex-col items-center justify-center text-center transition active:opacity-90"
+        className="relative flex min-h-60 cursor-pointer flex-col items-center justify-center text-center transition active:opacity-90"
       >
         {previews.length ? (
-          <div className="grid min-h-72 w-full grid-cols-2 gap-1">
+          <div className="grid min-h-60 w-full grid-cols-2 gap-1">
             {previews.slice(0, 4).map((preview, index) => (
-              <div key={preview.url} className={`relative overflow-hidden bg-white ${previews.length === 1 ? "col-span-2 min-h-72" : "min-h-36"}`}>
+              <div key={preview.url} className={`relative overflow-hidden bg-white ${previews.length === 1 ? "col-span-2 min-h-60" : "min-h-30"}`}>
                 <Image
                   src={preview.url}
                   alt={preview.name}
@@ -97,15 +97,15 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange }: Pla
           </div>
         ) : (
           <>
-            <ImagePlus size={78} strokeWidth={1} className="text-[#315b36]/30" aria-hidden="true" />
-            <div className="mt-5">
+            <ImagePlus size={64} strokeWidth={1} className="text-[#315b36]/30" aria-hidden="true" />
+            <div className="mt-4">
               <span className="block text-lg font-black text-[#23321c]">오늘의 식물을 보여주세요</span>
               <span className="mt-1 block text-sm font-medium text-[#5c6f47]">여러 장을 한 번에 선택할 수 있어요</span>
             </div>
           </>
         )}
-        <span className="absolute bottom-4 right-4 grid h-12 w-12 place-items-center rounded-lg bg-[#11180f] text-[#d8ef80] shadow-lg shadow-stone-950/20">
-          <Camera size={22} aria-hidden="true" />
+        <span className="absolute bottom-4 right-4 grid h-10 w-10 place-items-center rounded-full bg-[#315b36] text-white shadow-lg shadow-stone-950/15">
+          <Camera size={19} aria-hidden="true" />
         </span>
         {previews.length ? (
           <span className="absolute bottom-4 left-4 rounded-full bg-white/90 px-3 py-2 text-xs font-black text-stone-800 backdrop-blur">

@@ -57,7 +57,7 @@ export function PlantOverview({ plant }: { plant: Plant }) {
 
   return (
     <div className="space-y-4">
-      <section className="overflow-hidden rounded-lg bg-[#315b36] text-white shadow-xl shadow-[#244529]/15">
+      <section className="overflow-hidden rounded-3xl bg-[#315b36] text-white shadow-lg shadow-[#244529]/15">
         <div className="relative aspect-[4/5] max-h-[30rem] bg-[#dfe9ce]">
           {photos.length ? (
             <div className="flex h-full snap-x snap-mandatory overflow-x-auto overscroll-x-contain">
@@ -69,6 +69,8 @@ export function PlantOverview({ plant }: { plant: Plant }) {
                 </div>
               ))}
             </div>
+          ) : plant.coverPhotoUrl ? (
+            <Image src={plant.coverPhotoUrl} alt={`${plant.name} 커버 사진`} fill sizes="(max-width: 448px) 100vw, 448px" className="object-cover" unoptimized />
           ) : (
             <div className="grid h-full place-items-center text-center text-[#456615]">
               <div>
@@ -88,7 +90,7 @@ export function PlantOverview({ plant }: { plant: Plant }) {
         </div>
       </section>
 
-      <section className="grid grid-cols-3 divide-x divide-stone-100 rounded-lg border border-[#e0e1da] bg-white px-1 py-3 shadow-sm shadow-stone-950/[0.03]">
+      <section className="grid grid-cols-3 divide-x divide-stone-100 rounded-2xl bg-[#f5f6f2] px-1 py-3">
         <div className="min-w-0 px-2 text-center">
           <Droplets size={16} className="mx-auto text-sky-600" aria-hidden="true" />
           <p className="mt-1 text-[11px] font-semibold text-stone-500">최근 물</p>
@@ -107,7 +109,7 @@ export function PlantOverview({ plant }: { plant: Plant }) {
         </div>
       </section>
 
-      <section className="rounded-lg border border-[#e0e1da] bg-white p-4 shadow-sm shadow-stone-950/[0.03]">
+      <section className="rounded-2xl bg-[#f5f6f2] p-4">
         <div className="flex items-center gap-2">
           <History size={18} className="text-[#52751c]" aria-hidden="true" />
           <h2 className="text-sm font-bold text-stone-900">최근 관찰</h2>

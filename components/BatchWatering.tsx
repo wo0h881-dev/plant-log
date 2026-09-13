@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Check, ChevronDown, Droplets, Search, Sprout, X } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, Droplets, Sprout, X } from "lucide-react";
 import { matchesPlantSearch } from "@/lib/plant-search";
 import type { Plant, RecentObservedPlant, SaveState } from "@/types/plant";
 
@@ -100,7 +100,8 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
     recentPhotoByPlant.get(plant.id)
       ?? recentPhotoByPlant.get(`${plant.category}:${plant.name}`)
       ?? recentPhotoByPlant.get(plant.name)
-  ), [recentPhotoByPlant]);
+      ?? plants.find((item) => item.id === plant.id || item.name === plant.name)?.coverPhotoUrl
+  ), [plants, recentPhotoByPlant]);
   const dueHeroPhoto = duePlants.map(getPlantPhoto).find(Boolean);
 
   function togglePlant(plantId: string) {
@@ -180,13 +181,13 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
     return (
       <label
         key={plant.id}
-        className={`flex min-h-16 items-center justify-between gap-3 rounded-lg border px-3 py-2.5 transition ${
+        className={`flex min-h-14 items-center justify-between gap-3 rounded-2xl border px-3 py-2 transition ${
           isSelected
             ? "border-[#315b36] bg-[#edf5e8]"
             : due ? "border-[#f0c9aa] bg-[#fff7ef]" : "border-stone-200 bg-white"
         }`}
       >
-        <span className={`relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-lg ${due ? "bg-[#f9dfca] text-[#9a4f25]" : "bg-[#e8f0df] text-[#315b36]"}`}>
+        <span className={`relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl ${due ? "bg-[#f9dfca] text-[#9a4f25]" : "bg-[#e8f0df] text-[#315b36]"}`}>
           {photoUrl ? <Image src={photoUrl} alt="" fill sizes="44px" className="object-cover" unoptimized /> : <Sprout size={18} aria-hidden="true" />}
         </span>
         <span className="min-w-0 flex-1">
@@ -208,12 +209,12 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
   }
 
   return (
-    <div className="space-y-5">
-      <section className="overflow-hidden rounded-lg bg-[#315b36] text-white shadow-xl shadow-[#244529]/15">
+    <div className="space-y-4">
+      <section className="overflow-hidden rounded-3xl bg-[#315b36] text-white shadow-lg shadow-[#244529]/15">
         <button
           type="button"
           onClick={() => setIsDueOpen((current) => !current)}
-          className="relative flex min-h-64 w-full items-end justify-between overflow-hidden p-5 text-left"
+          className="relative flex min-h-52 w-full items-end justify-between overflow-hidden p-5 text-left"
           aria-expanded={isDueOpen}
         >
           {dueHeroPhoto ? <Image src={dueHeroPhoto} alt="" fill sizes="(max-width: 448px) 100vw, 448px" className="object-cover" unoptimized /> : null}
@@ -221,10 +222,10 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
           <Droplets size={132} strokeWidth={1.2} className="absolute -right-5 -top-5 text-[#a8c66c]/35" aria-hidden="true" />
           <span className="relative">
             <span className="block text-sm font-semibold text-white/70">물줄 때 된 식물</span>
-            <span className="mt-2 block text-5xl font-black leading-none">{duePlants.length}<span className="ml-1 text-lg font-bold">개</span></span>
+            <span className="mt-1.5 block text-4xl font-black leading-none">{duePlants.length}<span className="ml-1 text-base font-bold">개</span></span>
             <span className="mt-3 block text-xs font-medium text-white/70">눌러서 목록 확인하기</span>
           </span>
-          <span className="relative grid h-11 w-11 place-items-center rounded-full bg-white text-[#315b36]">
+          <span className="relative grid h-10 w-10 place-items-center rounded-full bg-white text-[#315b36]">
             <ChevronDown size={21} className={`transition ${isDueOpen ? "rotate-180" : ""}`} aria-hidden="true" />
           </span>
         </button>
@@ -233,7 +234,7 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
           <div className="border-t border-white/15 bg-[#f9faf5] p-3 text-stone-900">
             {duePlants.length ? (
               <>
-                <button type="button" onClick={toggleAllDuePlants} className="mb-3 min-h-10 w-full rounded-lg border border-[#cbd9be] bg-white px-3 text-sm font-bold text-[#315b36]">
+                <button type="button" onClick={toggleAllDuePlants} className="mb-3 min-h-10 w-full rounded-xl border border-[#cbd9be] bg-white px-3 text-sm font-bold text-[#315b36]">
                   {areAllDueSelected ? "전체해제" : "전체선택"}
                 </button>
                 <div className="max-h-80 space-y-2 overflow-y-auto">{duePlants.map((plant) => renderPlantRow(plant, true))}</div>
@@ -257,13 +258,13 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
           <span className="text-sm font-black text-[#315b36]">{todayWateredPlants.length}개</span>
         </div>
         {isTodayLoading ? (
-          <div className="h-20 animate-pulse rounded-lg bg-white" />
+          <div className="h-16 animate-pulse rounded-2xl bg-[#f5f6f2]" />
         ) : todayWateringError ? (
           <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-4 text-center text-sm text-red-700">오늘 기록을 불러오지 못했어요. 잠시 후 새로고침해 주세요.</div>
         ) : todayWateredPlants.length ? (
           <div className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-1">
             {todayWateredPlants.map((plant) => (
-              <div key={plant.id || plant.name} className="flex w-40 shrink-0 items-center gap-2.5 rounded-lg border border-[#dce5d3] bg-white p-3 shadow-sm shadow-stone-900/5">
+              <div key={plant.id || plant.name} className="flex w-36 shrink-0 items-center gap-2.5 rounded-2xl bg-[#f5f6f2] p-2.5">
                 <span className="relative grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-[#315b36] text-white">
                   {getPlantPhoto({ id: plant.id, name: plant.name, category: "" }) ? <Image src={getPlantPhoto({ id: plant.id, name: plant.name, category: "" })!} alt="" fill sizes="40px" className="object-cover" unoptimized /> : <Check size={18} aria-hidden="true" />}
                 </span>
@@ -275,11 +276,11 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
             ))}
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed border-[#ccd8c2] bg-white/70 px-4 py-5 text-center text-sm text-stone-500">아직 오늘 물 준 식물이 없어요.</div>
+          <div className="rounded-2xl bg-[#f5f6f2] px-4 py-4 text-center text-sm text-stone-500">아직 오늘 물 준 식물이 없어요.</div>
         )}
       </section>
 
-      <label className="flex items-center justify-between gap-4 rounded-lg border border-stone-200 bg-white px-4 py-3">
+      <label className="flex items-center justify-between gap-4 rounded-2xl bg-[#f5f6f2] px-4 py-3">
         <span>
           <span className="block text-sm font-bold text-stone-900">물 준 날짜</span>
           <span className="mt-0.5 block text-xs text-stone-500">다른 날의 기록도 남길 수 있어요.</span>
@@ -288,15 +289,15 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
           type="date"
           value={wateredDate}
           onChange={(event) => setWateredDate(event.target.value)}
-          className="h-10 min-w-36 rounded-lg border border-stone-200 bg-[#f7f7f2] px-2 text-sm font-bold outline-none focus:border-[#315b36]"
+          className="h-9 min-w-32 rounded-xl border border-stone-200 bg-white px-2 text-sm font-bold outline-none focus:border-[#315b36]"
         />
       </label>
 
-      <section className="rounded-lg border border-stone-200 bg-white">
+      <section className="rounded-2xl bg-[#f5f6f2]">
         <button
           type="button"
           onClick={() => setIsOtherOpen((current) => !current)}
-          className="flex min-h-16 w-full items-center justify-between px-4 text-left"
+          className="flex min-h-14 w-full items-center justify-between px-4 text-left"
           aria-expanded={isOtherOpen}
         >
           <span>
@@ -309,13 +310,12 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
         {isOtherOpen ? (
           <div className="border-t border-stone-100 p-3">
             <div className="relative mb-3">
-              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" aria-hidden="true" />
               <input
                 type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="이름 또는 초성으로 검색"
-                className="h-12 w-full rounded-lg border border-stone-200 bg-[#f7f7f2] pl-10 pr-10 text-base outline-none focus:border-[#315b36]"
+                className="h-11 w-full rounded-2xl border-0 bg-white px-4 pr-10 text-sm outline-none focus:ring-1 focus:ring-[#315b36]"
               />
               {query ? (
                 <button type="button" onClick={() => setQuery("")} aria-label="검색어 지우기" className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center text-stone-500">
@@ -346,12 +346,12 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
       ) : null}
 
       {selectedIds.length ? (
-        <div className="sticky bottom-24 z-20 -mx-2 bg-[#f7f7f2]/90 px-2 py-2 backdrop-blur">
+        <div className="sticky bottom-20 z-20 -mx-1 bg-white/90 px-1 py-2 backdrop-blur">
           <button
             type="button"
             onClick={saveWateringLogs}
             disabled={saveState === "saving"}
-            className="min-h-14 w-full rounded-lg bg-[#315b36] px-5 text-base font-black text-white shadow-xl shadow-[#244529]/20 transition active:scale-[0.99] disabled:bg-stone-300"
+            className="min-h-12 w-full rounded-2xl bg-[#315b36] px-5 text-sm font-black text-white shadow-lg shadow-[#244529]/15 transition active:scale-[0.99] disabled:bg-stone-300"
           >
             {saveState === "saving" ? "저장 중..." : failedResults.length ? `실패한 ${selectedIds.length}개 다시 저장` : `${selectedIds.length}개 물주기 저장`}
           </button>

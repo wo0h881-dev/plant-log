@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Search, X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import { matchesPlantSearch } from "@/lib/plant-search";
 import type { Plant } from "@/types/plant";
 
@@ -54,9 +54,8 @@ export function PlantSelect({
         {selectedCategory ? <span className="rounded-full bg-[#e4ebd7] px-2.5 py-1 text-xs font-bold text-[#496238]">{selectedCategory}</span> : null}
       </div>
 
-      <div className="rounded-lg border border-[#e0e1da] bg-white p-3 shadow-sm shadow-stone-950/[0.04]">
+      <div>
         <div className="relative">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6b7d50]" aria-hidden="true" />
           <input
             id="plant-search"
             type="search"
@@ -68,10 +67,10 @@ export function PlantSelect({
               setIsOpen(true);
             }}
             placeholder={selectedPlant ? selectedPlant.name : "식물 이름 검색"}
-            className="h-12 w-full rounded-lg border border-[#dedfd7] bg-[#f8f8f4] pl-10 pr-20 text-base outline-none transition focus:border-[#496238]"
+            className="h-11 w-full rounded-2xl border-0 bg-[#f0f1ed] px-4 pr-20 text-sm font-semibold outline-none transition placeholder:font-medium focus:bg-[#e9ede5]"
           />
           {query ? (
-            <button type="button" onClick={() => { onQueryChange(""); setIsOpen(true); }} aria-label="검색어 지우기" className="absolute right-10 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center text-stone-500">
+            <button type="button" onClick={() => { onQueryChange(""); setIsOpen(true); }} aria-label="검색어 지우기" className="absolute right-9 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center text-stone-500">
               <X size={17} aria-hidden="true" />
             </button>
           ) : null}
@@ -79,7 +78,7 @@ export function PlantSelect({
         </div>
 
         {isOpen ? (
-          <div className="mt-3 border-t border-[#edf2e5] pt-3">
+          <div className="mt-2 rounded-2xl border border-[#e4e5df] bg-white p-2 shadow-lg shadow-stone-950/[0.06]">
             {!normalizedQuery && recentPlants.length ? (
               <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
                 {recentPlants.map((plantName) => {
@@ -92,7 +91,7 @@ export function PlantSelect({
               {filteredPlants.length ? filteredPlants.map((plant) => {
                 const isSelected = formatPlantName(plant) === value;
                 return (
-                  <button key={plant.id} type="button" onClick={() => choosePlant(plant)} className={`flex min-h-12 w-full items-center justify-between rounded-lg px-3 text-left text-sm transition ${isSelected ? "bg-[#315b36] text-white" : "bg-[#f8f8f4] text-stone-700 hover:bg-[#eaf0df]"}`}>
+                  <button key={plant.id} type="button" onClick={() => choosePlant(plant)} className={`flex min-h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm transition ${isSelected ? "bg-[#315b36] text-white" : "bg-[#f7f8f5] text-stone-700 hover:bg-[#eaf0df]"}`}>
                     <span className="truncate">{plant.name}</span>
                     <span className={`ml-2 shrink-0 text-xs ${isSelected ? "text-white/75" : "text-stone-400"}`}>{isSelected ? "선택됨" : plant.category}</span>
                   </button>

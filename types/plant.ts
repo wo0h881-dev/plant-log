@@ -2,6 +2,7 @@ export type Plant = {
   id: string;
   category: string;
   name: string;
+  coverPhotoUrl?: string;
   wateringCycleDays?: number;
   lastWateredAt?: string;
   daysSinceWatered?: number;
