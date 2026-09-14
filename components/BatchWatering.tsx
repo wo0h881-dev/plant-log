@@ -191,9 +191,13 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
       : "물준 기록 없음";
 
     return (
-      <label
+      <button
         key={plant.id}
-        className={`flex min-h-[68px] items-center justify-between gap-3 rounded-[22px] bg-white px-3 py-2.5 transition ${
+        type="button"
+        role="checkbox"
+        aria-checked={isSelected}
+        onClick={() => togglePlant(plant.id)}
+        className={`flex min-h-[68px] w-full items-center justify-between gap-3 rounded-[22px] bg-white px-3 py-2.5 text-left transition ${
           isSelected
             ? "ring-2 ring-[#284F2A]"
             : due ? "ring-1 ring-[#E5DFC4]" : ""
@@ -213,8 +217,7 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
         <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border transition ${isSelected ? "border-[#5C9A3C] bg-[#5C9A3C] text-white" : "border-[#B7BAB4] bg-white text-transparent"}`}>
           <Check size={16} strokeWidth={3} aria-hidden="true" />
         </span>
-        <input type="checkbox" checked={isSelected} onChange={() => togglePlant(plant.id)} className="sr-only" />
-      </label>
+      </button>
     );
   }
 
