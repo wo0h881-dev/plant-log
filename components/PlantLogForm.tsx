@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, ArrowLeft, Bell, Bug, Check, Droplets, Flower2, Leaf, MoreHorizontal, MoreVertical, NotebookPen, Plus, Sprout, Tag } from "lucide-react";
+import { AlertCircle, ArrowLeft, Bell, Bug, Check, Droplets, Flower2, Leaf, MoreHorizontal, MoreVertical, NotebookPen, Plus, RefreshCcw, Sprout, Tag } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { BatchWatering } from "@/components/BatchWatering";
 import { ManagementCalendar } from "@/components/ManagementCalendar";
@@ -13,20 +13,21 @@ import { fallbackPlants } from "@/lib/plants";
 import type { Plant, RecentObservedPlant, SaveState } from "@/types/plant";
 
 const RECENT_PLANTS_KEY = "plant-log:recent-plants";
-const DEFAULT_OBSERVATION_TAGS = ["신엽", "하엽", "과습", "병해충", "꽃", "기타"];
+const DEFAULT_OBSERVATION_TAGS = ["신엽", "하엽", "과습", "병해충", "꽃", "분갈이", "기타"];
 const OBSERVATION_TAG_ICONS: Record<string, LucideIcon> = {
   신엽: Leaf,
   하엽: Leaf,
   과습: Droplets,
   병해충: Bug,
   꽃: Flower2,
+  분갈이: RefreshCcw,
   기타: MoreHorizontal,
 };
 
 type RecordTab = "water" | "observation" | "profile" | "more";
 type PlantsResponse = { plants: Plant[]; source: "notion" | "fallback" };
 type RecentPlantsResponse = { recentPlants?: RecentObservedPlant[] };
-type OptionsResponse = { observationTags?: string[] };
+type OptionsResponse = { observationTags?: string[]; soilOptions?: string[] };
 
 function formatPlantName(plant: Plant) {
   return `${plant.category} - ${plant.name}`;
@@ -62,9 +63,12 @@ export function PlantLogForm() {
   });
   const [recentObservedPlants, setRecentObservedPlants] = useState<RecentObservedPlant[]>([]);
   const [observationTags, setObservationTags] = useState<string[]>(DEFAULT_OBSERVATION_TAGS);
+  const [soilOptions, setSoilOptions] = useState<string[]>(["배흙", "수태", "세라미스", "펄라이트"]);
   const [photos, setPhotos] = useState<File[]>([]);
   const [observedDate, setObservedDate] = useState(getTodayValue);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [repotSoils, setRepotSoils] = useState<string[]>([]);
+  const [repotReason, setRepotReason] = useState("");
   const [note, setNote] = useState("");
   const [observationSaveState, setObservationSaveState] = useState<SaveState>("idle");
   const [observationMessage, setObservationMessage] = useState("");
@@ -96,6 +100,8 @@ export function PlantLogForm() {
       .then((payload) => {
         const nextTags = payload.observationTags?.map((tagName) => tagName.trim()).filter(Boolean) ?? [];
         if (nextTags.length) setObservationTags([...new Set(nextTags)]);
+        const nextSoils = payload.soilOptions?.map((soilName) => soilName.trim()).filter(Boolean) ?? [];
+        if (nextSoils.length) setSoilOptions([...new Set(nextSoils)]);
       })
       .catch(() => undefined);
   }, []);
@@ -107,9 +113,19 @@ export function PlantLogForm() {
   const selectedPlantLabel = selectedPlant ? formatPlantName(selectedPlant) : "";
   const profilePlant = plants.find((plant) => plant.id === profilePlantId);
   const dueCount = useMemo(() => plants.filter((plant) => plant.isWateringDue && !["자구", "사망"].includes(plant.category.trim())).length, [plants]);
-  const canSaveObservation = Boolean(selectedPlant && (photos.length || selectedTags.length || note.trim()) && observationSaveState !== "saving");
+  const isRepotting = selectedTags.includes("분갈이");
+  const canSaveObservation = Boolean(
+    selectedPlant &&
+    (photos.length || selectedTags.length || note.trim()) &&
+    (!isRepotting || repotSoils.length) &&
+    observationSaveState !== "saving",
+  );
 
   function selectPlant(plant: Plant) {
+    if (plant.id !== selectedPlantId) {
+      setRepotSoils([]);
+      setRepotReason("");
+    }
     setSelectedPlantId(plant.id);
     setQuery(plant.name);
     setObservationMessage("");
@@ -134,7 +150,15 @@ export function PlantLogForm() {
   }
 
   function toggleTag(tag: string) {
+    if (tag === "분갈이" && selectedTags.includes(tag)) {
+      setRepotSoils([]);
+      setRepotReason("");
+    }
     setSelectedTags((current) => current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag]);
+  }
+
+  function toggleRepotSoil(soil: string) {
+    setRepotSoils((current) => current.includes(soil) ? current.filter((item) => item !== soil) : [...current, soil]);
   }
 
   async function saveObservation(event: FormEvent<HTMLFormElement>) {
@@ -150,6 +174,11 @@ export function PlantLogForm() {
     formData.append("note", note.trim());
     formData.append("createdAt", observedDate);
     formData.append("observationTags", JSON.stringify(selectedTags));
+    if (isRepotting) {
+      formData.append("repotSoils", JSON.stringify(repotSoils));
+      formData.append("repotPreviousSoils", JSON.stringify(selectedPlant.currentSoils ?? []));
+      formData.append("repotReason", repotReason.trim());
+    }
     try {
       const response = await fetch("/api/plant-logs", { method: "POST", body: formData });
       const payload = await response.json();
@@ -157,10 +186,17 @@ export function PlantLogForm() {
       storeRecentPlant();
       setPhotos([]);
       setSelectedTags([]);
+      setRepotSoils([]);
+      setRepotReason("");
       setNote("");
       setObservationSaveState("success");
-      setObservationMessage("관찰일지를 Notion에 저장했습니다.");
+      setObservationMessage(
+        isRepotting
+          ? "관찰일지와 분갈이 기록을 Notion에 저장했습니다."
+          : "관찰일지를 Notion에 저장했습니다.",
+      );
       refreshRecentPlants();
+      refreshPlants();
     } catch (error) {
       setObservationSaveState("error");
       setObservationMessage(error instanceof Error ? error.message : "관찰일지 저장에 실패했습니다.");
@@ -215,6 +251,35 @@ export function PlantLogForm() {
                     })}
                   </div>
                 </section>
+                {isRepotting ? (
+                  <section className="space-y-4 rounded-3xl bg-[#F2F4EF] p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <h2 className="flex items-center gap-2 text-[15px] font-extrabold"><RefreshCcw size={17} aria-hidden="true" />분갈이 기록</h2>
+                      <span className="text-[11px] font-semibold text-[#777B74]">{observedDate}</span>
+                    </div>
+                    <div>
+                      <p className="mb-2 text-xs font-bold text-[#777B74]">기존 흙</p>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedPlant?.currentSoils?.length
+                          ? selectedPlant.currentSoils.map((soil) => <span key={soil} className="rounded-full bg-white px-3 py-2 text-xs font-bold text-[#555A53]">{soil}</span>)
+                          : <span className="rounded-full bg-white px-3 py-2 text-xs font-bold text-[#909090]">미기록</span>}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="mb-2 text-xs font-bold text-[#777B74]">분갈이 후 흙</p>
+                      <div className="flex flex-wrap gap-2">
+                        {soilOptions.map((soil) => {
+                          const isSelected = repotSoils.includes(soil);
+                          return <button key={soil} type="button" onClick={() => toggleRepotSoil(soil)} aria-pressed={isSelected} className={`rounded-full px-3 py-2 text-xs font-bold transition ${isSelected ? "bg-[#284F2A] text-white" : "bg-white text-[#555A53]"}`}>{soil}</button>;
+                        })}
+                      </div>
+                    </div>
+                    <label className="block">
+                      <span className="mb-2 block text-xs font-bold text-[#777B74]">분갈이 이유</span>
+                      <input value={repotReason} onChange={(event) => setRepotReason(event.target.value)} maxLength={100} placeholder="예: 뿌리무름" className="h-11 w-full rounded-2xl border-0 bg-white px-3 text-sm outline-none placeholder:text-[#A3A5A0] focus:ring-1 focus:ring-[#284F2A]/30" />
+                    </label>
+                  </section>
+                ) : null}
                 <label className="block">
                   <span className="mb-2 block text-[15px] font-extrabold">메모</span>
                   <span className="relative block"><textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={300} placeholder="오늘의 변화를 기록해보세요." rows={4} className="w-full resize-none rounded-2xl border-0 bg-[#F0F1EE] p-3 pb-7 text-sm leading-6 outline-none placeholder:text-[#A3A5A0] focus:ring-1 focus:ring-[#284F2A]/30" /><span className="pointer-events-none absolute bottom-2.5 right-3 text-[10px] text-[#909090]">{note.length}/300</span></span>

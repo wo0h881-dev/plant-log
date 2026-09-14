@@ -39,8 +39,13 @@ export async function POST(request: Request) {
     const settingLightWattValue = String(formData.get("settingLightWatt") ?? "").trim();
     const settingSoilsValue = String(formData.get("settingSoils") ?? "").trim();
     const settingPotName = String(formData.get("settingPotName") ?? "").trim();
+    const repotSoilsValue = String(formData.get("repotSoils") ?? "").trim();
+    const repotPreviousSoilsValue = String(formData.get("repotPreviousSoils") ?? "").trim();
+    const repotReason = String(formData.get("repotReason") ?? "").trim();
     const settingLightWatt = settingLightWattValue ? Number(settingLightWattValue) : undefined;
     let settingSoils: unknown = [];
+    let repotSoils: unknown = [];
+    let repotPreviousSoils: unknown = [];
     let observationTags: unknown = [];
 
     try {
@@ -53,6 +58,13 @@ export async function POST(request: Request) {
       observationTags = observationTagsValue ? JSON.parse(observationTagsValue) : [];
     } catch {
       return NextResponse.json({ message: "관찰태그 선택값이 올바르지 않습니다." }, { status: 400 });
+    }
+
+    try {
+      repotSoils = repotSoilsValue ? JSON.parse(repotSoilsValue) : [];
+      repotPreviousSoils = repotPreviousSoilsValue ? JSON.parse(repotPreviousSoilsValue) : [];
+    } catch {
+      return NextResponse.json({ message: "분갈이 흙 선택값이 올바르지 않습니다." }, { status: 400 });
     }
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(createdAt) || Number.isNaN(Date.parse(`${createdAt}T00:00:00Z`))) {
@@ -83,14 +95,40 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "관찰태그 선택값이 올바르지 않습니다." }, { status: 400 });
     }
 
+    if (
+      !Array.isArray(repotSoils) ||
+      repotSoils.some((soil) => typeof soil !== "string") ||
+      !Array.isArray(repotPreviousSoils) ||
+      repotPreviousSoils.some((soil) => typeof soil !== "string")
+    ) {
+      return NextResponse.json({ message: "분갈이 흙 선택값이 올바르지 않습니다." }, { status: 400 });
+    }
+
     const selectedSoils = settingSoils.map((soil) => soil.trim()).filter(Boolean);
     const selectedObservationTags = observationTags.map((tag) => tag.trim()).filter(Boolean);
+    const selectedRepotSoils = repotSoils.map((soil) => soil.trim()).filter(Boolean);
+    const selectedPreviousSoils = repotPreviousSoils.map((soil) => soil.trim()).filter(Boolean);
+    const hasRepottingContent = selectedObservationTags.includes("분갈이");
+    if (hasRepottingContent && !selectedRepotSoils.length) {
+      return NextResponse.json({ message: "분갈이 후 사용한 흙을 하나 이상 선택하세요." }, { status: 400 });
+    }
+
+    if (repotReason.length > 100) {
+      return NextResponse.json({ message: "분갈이 이유는 100자 이내로 입력하세요." }, { status: 400 });
+    }
+
+    const previousSoilLabel = selectedPreviousSoils.length ? selectedPreviousSoils.join(" + ") : "기존 흙 미기록";
+    const nextSoilLabel = selectedRepotSoils.join(" + ");
+    const repotSummary = hasRepottingContent
+      ? `분갈이: ${previousSoilLabel} → ${nextSoilLabel}${repotReason ? `\n이유: ${repotReason}` : ""}`
+      : "";
+    const observationNote = [note, repotSummary].filter(Boolean).join("\n\n");
     const hasObservationContent =
-      photos.length > 0 || Boolean(note) || Boolean(wateredAt) || selectedObservationTags.length > 0;
+      photos.length > 0 || Boolean(observationNote) || Boolean(wateredAt) || selectedObservationTags.length > 0;
     const hasLightSettings = Boolean(settingLightName) || typeof settingLightWatt === "number";
     const hasSoilSettings = selectedSoils.length > 0;
     const hasPotSettings = Boolean(settingPotName);
-    const hasSettingsContent = hasLightSettings || hasSoilSettings || hasPotSettings;
+    const hasSettingsContent = hasLightSettings || hasSoilSettings || hasPotSettings || hasRepottingContent;
 
     if (!hasObservationContent && !hasSettingsContent) {
       return NextResponse.json({ message: "사진, 메모, 물 줌 기록, 세팅 변경 중 하나는 입력하세요." }, { status: 400 });
@@ -132,7 +170,7 @@ export async function POST(request: Request) {
           plantId,
           plantName,
           plantCategory,
-          note,
+          note: observationNote,
           createdAt,
           wateredAt: wateredAt || undefined,
           tags: selectedObservationTags,
@@ -168,8 +206,9 @@ export async function POST(request: Request) {
         changedAt: createdAt,
         lightName: settingLightName || undefined,
         lightWatt: settingLightWatt,
-        soils: selectedSoils.length ? selectedSoils : undefined,
+        soils: hasRepottingContent ? selectedRepotSoils : selectedSoils.length ? selectedSoils : undefined,
         potName: settingPotName || undefined,
+        repottedAt: hasRepottingContent ? createdAt : undefined,
       });
 
       if (hasLightSettings) {
@@ -197,6 +236,21 @@ export async function POST(request: Request) {
             changedAt: createdAt,
             type: "흙",
             soils: selectedSoils,
+          }),
+        );
+      }
+
+      if (hasRepottingContent) {
+        settingPages.push(
+          await createSettingChangePage({
+            token,
+            parentId: settingsParentId,
+            plantId,
+            plantName,
+            changedAt: createdAt,
+            type: "분갈이",
+            soils: selectedRepotSoils,
+            note: `${previousSoilLabel} → ${nextSoilLabel}${repotReason ? `\n이유: ${repotReason}` : ""}`,
           }),
         );
       }
