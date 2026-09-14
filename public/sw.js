@@ -1,4 +1,5 @@
-const CACHE_NAME = "plant-log-v13";
+const CACHE_NAME = "plant-log-v14";
+const HERO_CACHE_NAME = "plant-log-watering-hero-v1";
 const APP_SHELL = ["/", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -10,7 +11,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))),
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME && key !== HERO_CACHE_NAME).map((key) => caches.delete(key)))),
   );
   self.clients.claim();
 });
@@ -23,6 +24,11 @@ self.addEventListener("fetch", (event) => {
   const requestUrl = new URL(event.request.url);
 
   if (requestUrl.origin !== self.location.origin) {
+    if (event.request.destination === "image") {
+      event.respondWith(
+        caches.open(HERO_CACHE_NAME).then(async (cache) => (await cache.match(event.request)) || fetch(event.request)),
+      );
+    }
     return;
   }
 

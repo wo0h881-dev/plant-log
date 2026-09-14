@@ -46,6 +46,8 @@ function StatusMessage({ state, message }: { state: SaveState; message: string }
 
 export function PlantLogForm() {
   const [plants, setPlants] = useState<Plant[]>(fallbackPlants);
+  const [isPlantsLoading, setIsPlantsLoading] = useState(true);
+  const [isRecentPlantsLoading, setIsRecentPlantsLoading] = useState(true);
   const [selectedPlantId, setSelectedPlantId] = useState("");
   const [activeTab, setActiveTab] = useState<RecordTab>("water");
   const [query, setQuery] = useState("");
@@ -76,14 +78,16 @@ export function PlantLogForm() {
         setSelectedPlantId((current) => nextPlants.some((plant) => plant.id === current) ? current : "");
         setProfilePlantId((current) => nextPlants.some((plant) => plant.id === current) ? current : "");
       })
-      .catch(() => setPlants(fallbackPlants));
+      .catch(() => setPlants(fallbackPlants))
+      .finally(() => setIsPlantsLoading(false));
   }, []);
 
   const refreshRecentPlants = useCallback(() => {
     fetch("/api/plant-details")
       .then((response) => response.json() as Promise<RecentPlantsResponse>)
       .then((payload) => setRecentObservedPlants(payload.recentPlants ?? []))
-      .catch(() => setRecentObservedPlants([]));
+      .catch(() => setRecentObservedPlants([]))
+      .finally(() => setIsRecentPlantsLoading(false));
   }, []);
 
   const refreshOptions = useCallback(() => {
@@ -179,7 +183,13 @@ export function PlantLogForm() {
               <div><h1 className="text-[32px] font-black leading-tight">물주기</h1><p className="mt-1 text-[13px] font-medium text-[#777B74]">건강한 오늘이, 더 푸른 내일을 만들어요.</p></div>
               <span className="grid h-10 w-10 place-items-center text-[#151515]"><Bell size={23} strokeWidth={1.7} aria-hidden="true" /></span>
             </header>
-            <BatchWatering plants={plants} recentPlants={recentObservedPlants} onWateringSaved={refreshPlants} />
+            <BatchWatering
+              plants={plants}
+              recentPlants={recentObservedPlants}
+              isLoading={isPlantsLoading}
+              isPhotoLoading={isPlantsLoading || isRecentPlantsLoading}
+              onWateringSaved={refreshPlants}
+            />
           </>
         ) : null}
 

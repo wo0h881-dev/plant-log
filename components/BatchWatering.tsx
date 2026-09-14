@@ -1,14 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { AlertCircle, ArrowRight, CalendarDays, Check, ChevronDown, Sprout, X } from "lucide-react";
 import { matchesPlantSearch } from "@/lib/plant-search";
+import { cacheWateringHeroPhoto, clearCachedWateringHeroPhoto, readCachedWateringHeroPhoto } from "@/lib/watering-hero-cache";
 import type { Plant, RecentObservedPlant, SaveState } from "@/types/plant";
 
 type BatchWateringProps = {
   plants: Plant[];
   recentPlants?: RecentObservedPlant[];
+  isLoading?: boolean;
+  isPhotoLoading?: boolean;
   onWateringSaved?: () => void;
 };
 
@@ -32,7 +35,16 @@ function canShowInWateringList(plant: Plant) {
   return !["자구", "사망"].includes(plant.category.trim());
 }
 
-export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: BatchWateringProps) {
+const subscribeToCachedHeroPhoto = () => () => undefined;
+const getServerCachedHeroPhoto = () => undefined;
+
+export function BatchWatering({
+  plants,
+  recentPlants = [],
+  isLoading = false,
+  isPhotoLoading = false,
+  onWateringSaved,
+}: BatchWateringProps) {
   const today = getTodayValue();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dismissedDueIds, setDismissedDueIds] = useState<string[]>([]);
@@ -44,6 +56,7 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
   const [isTodayLoading, setIsTodayLoading] = useState(true);
   const [todayWateringError, setTodayWateringError] = useState(false);
   const [failedPhotoUrls, setFailedPhotoUrls] = useState<string[]>([]);
+  const [loadedHeroPhoto, setLoadedHeroPhoto] = useState<string>();
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [message, setMessage] = useState("");
   const [results, setResults] = useState<WateringResult[]>([]);
@@ -108,10 +121,44 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
     ];
     return candidates.find((url) => url && !failedPhotoUrlSet.has(url));
   }, [failedPhotoUrlSet, plants, recentPhotoByPlant]);
-  const dueHeroPhoto = duePlants.map(getPlantPhoto).find(Boolean);
+  const dueHeroPhoto = isPhotoLoading ? undefined : duePlants.map(getPlantPhoto).find(Boolean);
+  const cachedHeroPhoto = useSyncExternalStore(
+    subscribeToCachedHeroPhoto,
+    readCachedWateringHeroPhoto,
+    getServerCachedHeroPhoto,
+  );
+  const displayedHeroPhoto = loadedHeroPhoto
+    ?? (cachedHeroPhoto && !failedPhotoUrlSet.has(cachedHeroPhoto) ? cachedHeroPhoto : undefined);
 
-  function markPhotoFailed(url: string) {
+  const markPhotoFailed = useCallback((url: string) => {
     setFailedPhotoUrls((current) => current.includes(url) ? current : [...current, url]);
+  }, []);
+
+  useEffect(() => {
+    if (!dueHeroPhoto || dueHeroPhoto === displayedHeroPhoto) return;
+
+    let cancelled = false;
+    const preload = new window.Image();
+    preload.onload = () => {
+      if (cancelled) return;
+      setLoadedHeroPhoto(dueHeroPhoto);
+      void cacheWateringHeroPhoto(dueHeroPhoto).catch(() => undefined);
+    };
+    preload.onerror = () => {
+      if (!cancelled) markPhotoFailed(dueHeroPhoto);
+    };
+    preload.src = dueHeroPhoto;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [displayedHeroPhoto, dueHeroPhoto, markPhotoFailed]);
+
+  function handleDisplayedHeroPhotoError() {
+    if (!displayedHeroPhoto) return;
+    markPhotoFailed(displayedHeroPhoto);
+    setLoadedHeroPhoto(undefined);
+    void clearCachedWateringHeroPhoto().catch(() => undefined);
   }
 
   function togglePlant(plantId: string) {
@@ -220,12 +267,12 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
   return (
     <div className="space-y-5">
       <section className="overflow-hidden rounded-[30px] bg-[#284F2A] text-white">
-        <button type="button" onClick={() => setIsDueOpen((current) => !current)} className={`relative flex w-full items-end justify-between overflow-hidden text-left transition-[height,padding] duration-300 ease-out ${isDueOpen ? "h-[145px] p-4" : "h-[255px] p-5"}`} aria-expanded={isDueOpen}>
-          {dueHeroPhoto ? <Image src={dueHeroPhoto} alt="" fill priority sizes="(max-width: 390px) 100vw, 390px" className="object-cover object-center" unoptimized onError={() => markPhotoFailed(dueHeroPhoto)} /> : <span className="absolute inset-0 grid place-items-center bg-[#DCE7D5] text-[#284F2A]"><Sprout size={74} strokeWidth={1} aria-hidden="true" /></span>}
+        <button type="button" onClick={() => setIsDueOpen((current) => !current)} disabled={isLoading} className={`relative flex w-full items-end justify-between overflow-hidden text-left transition-[height,padding] duration-300 ease-out ${isDueOpen ? "h-[145px] p-4" : "h-[255px] p-5"}`} aria-expanded={isDueOpen}>
+          {displayedHeroPhoto ? <Image src={displayedHeroPhoto} alt="" fill priority sizes="(max-width: 390px) 100vw, 390px" className="object-cover object-center" unoptimized onError={handleDisplayedHeroPhotoError} /> : <span className="absolute inset-0 grid place-items-center bg-[#DCE7D5] text-[#284F2A]">{isLoading ? null : <Sprout size={74} strokeWidth={1} aria-hidden="true" />}</span>}
           <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
           <span className="relative pb-0.5">
             <span className={`block font-extrabold transition-[font-size] duration-300 ${isDueOpen ? "text-base" : "text-lg"}`}>물줄 때 된 식물</span>
-            <span className={`mt-1 block font-black leading-none transition-[font-size] duration-300 ${isDueOpen ? "text-[34px]" : "text-[46px]"}`}>{duePlants.length}<span className="ml-1 text-base">개</span></span>
+            {isLoading ? <span className="mt-2 block text-sm font-bold leading-5" aria-live="polite">물줄 식물을<br />확인하고 있어요</span> : duePlants.length ? <span className={`mt-1 block font-black leading-none transition-[font-size] duration-300 ${isDueOpen ? "text-[34px]" : "text-[46px]"}`}>{duePlants.length}<span className="ml-1 text-base">개</span></span> : <span className="mt-2 block text-sm font-bold leading-5" aria-live="polite">오늘은 물줄 식물이<br />없어요</span>}
           </span>
           <span className={`relative grid shrink-0 place-items-center rounded-full bg-[#151515] text-white transition-[width,height] duration-300 ${isDueOpen ? "h-10 w-10" : "h-11 w-11"}`}>
             {isDueOpen ? <ChevronDown size={21} className="rotate-180" aria-hidden="true" /> : <ArrowRight size={20} aria-hidden="true" />}
