@@ -220,14 +220,14 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
   return (
     <div className="space-y-5">
       <section className="overflow-hidden rounded-[30px] bg-[#284F2A] text-white">
-        <button type="button" onClick={() => setIsDueOpen((current) => !current)} className="relative flex min-h-[255px] w-full items-end justify-between overflow-hidden p-5 text-left" aria-expanded={isDueOpen}>
+        <button type="button" onClick={() => setIsDueOpen((current) => !current)} className={`relative flex w-full items-end justify-between overflow-hidden text-left transition-[height,padding] duration-300 ease-out ${isDueOpen ? "h-[145px] p-4" : "h-[255px] p-5"}`} aria-expanded={isDueOpen}>
           {dueHeroPhoto ? <Image src={dueHeroPhoto} alt="" fill priority sizes="(max-width: 390px) 100vw, 390px" className="object-cover object-center" unoptimized onError={() => markPhotoFailed(dueHeroPhoto)} /> : <span className="absolute inset-0 grid place-items-center bg-[#DCE7D5] text-[#284F2A]"><Sprout size={74} strokeWidth={1} aria-hidden="true" /></span>}
           <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
           <span className="relative pb-0.5">
-            <span className="block text-lg font-extrabold">물줄 때 된 식물</span>
-            <span className="mt-1 block text-[46px] font-black leading-none">{duePlants.length}<span className="ml-1 text-lg">개</span></span>
+            <span className={`block font-extrabold transition-[font-size] duration-300 ${isDueOpen ? "text-base" : "text-lg"}`}>물줄 때 된 식물</span>
+            <span className={`mt-1 block font-black leading-none transition-[font-size] duration-300 ${isDueOpen ? "text-[34px]" : "text-[46px]"}`}>{duePlants.length}<span className="ml-1 text-base">개</span></span>
           </span>
-          <span className="relative grid h-11 w-11 place-items-center rounded-full bg-[#151515] text-white">
+          <span className={`relative grid shrink-0 place-items-center rounded-full bg-[#151515] text-white transition-[width,height] duration-300 ${isDueOpen ? "h-10 w-10" : "h-11 w-11"}`}>
             {isDueOpen ? <ChevronDown size={21} className="rotate-180" aria-hidden="true" /> : <ArrowRight size={20} aria-hidden="true" />}
           </span>
         </button>
