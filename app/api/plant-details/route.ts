@@ -35,7 +35,11 @@ type ObservationPage = {
   url?: string;
   properties: Record<string, NotionProperty>;
 };
-type ObservationQueryResponse = { results: ObservationPage[] };
+type ObservationQueryResponse = {
+  results: ObservationPage[];
+  has_more?: boolean;
+  next_cursor?: string | null;
+};
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -108,12 +112,30 @@ async function queryObservationPages(token: string, dataSourceId: string, body: 
   );
 }
 
+async function queryAllObservationPages(token: string, dataSourceId: string) {
+  const pages: ObservationPage[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const payload = await queryObservationPages(token, dataSourceId, {
+      page_size: 100,
+      ...(cursor ? { start_cursor: cursor } : {}),
+      sorts: [{ property: "관찰일", direction: "descending" }],
+    });
+    pages.push(...payload.results);
+    cursor = payload.has_more && payload.next_cursor ? payload.next_cursor : undefined;
+  } while (cursor);
+
+  return pages;
+}
+
 export async function GET(request: NextRequest) {
   const token = process.env.NOTION_TOKEN;
   const observationDatabaseId = process.env.NOTION_DATABASE_ID;
   const configuredDataSourceId = process.env.NOTION_DATA_SOURCE_ID;
   const plantId = request.nextUrl.searchParams.get("plantId")?.trim() ?? "";
   const plantName = request.nextUrl.searchParams.get("plantName")?.trim() ?? "";
+  const includeAllRecentPlants = request.nextUrl.searchParams.get("all") === "true";
 
   if (!token || !observationDatabaseId) {
     return NextResponse.json(
@@ -130,12 +152,14 @@ export async function GET(request: NextRequest) {
     const dataSourceId = configuredDataSourceId || (await resolveDataSourceId(token, observationDatabaseId));
 
     if (!plantId) {
-      const payload = await queryObservationPages(token, dataSourceId, {
-        page_size: 100,
-        sorts: [{ property: "관찰일", direction: "descending" }],
-      });
+      const pages = includeAllRecentPlants
+        ? await queryAllObservationPages(token, dataSourceId)
+        : (await queryObservationPages(token, dataSourceId, {
+            page_size: 100,
+            sorts: [{ property: "관찰일", direction: "descending" }],
+          })).results;
       return NextResponse.json(
-        { recentPlants: parseRecentPlants(payload.results) },
+        { recentPlants: parseRecentPlants(pages) },
         { headers: { "Cache-Control": "no-store" } },
       );
     }

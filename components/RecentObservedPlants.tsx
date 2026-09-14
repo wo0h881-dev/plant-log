@@ -19,7 +19,10 @@ function formatDate(dateValue?: string) {
 export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentObservedPlantsProps) {
   const [isFavorite, setIsFavorite] = useState(false);
   const [showAllPlants, setShowAllPlants] = useState(false);
-  const items = recentPlants.flatMap((recent) => {
+  const [allRecentPlants, setAllRecentPlants] = useState<RecentObservedPlant[] | null>(null);
+  const [isLoadingAllPlants, setIsLoadingAllPlants] = useState(false);
+  const displayedRecentPlants = showAllPlants && allRecentPlants ? allRecentPlants : recentPlants;
+  const items = displayedRecentPlants.flatMap((recent) => {
     const plant = plants.find((item) => item.id === recent.plantId)
       ?? plants.find((item) => item.name === recent.plantName && (!recent.plantCategory || item.category === recent.plantCategory));
     return plant ? [{ recent, plant }] : [];
@@ -28,16 +31,41 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
   const featuredPhotoUrl = featured?.recent.photoUrl ?? featured?.plant.coverPhotoUrl;
   const previewItems = items.slice(0, 8);
 
+  function toggleAllPlants() {
+    if (showAllPlants) {
+      setShowAllPlants(false);
+      return;
+    }
+
+    setShowAllPlants(true);
+    if (allRecentPlants || isLoadingAllPlants) return;
+
+    setIsLoadingAllPlants(true);
+    fetch("/api/plant-details?all=true")
+      .then(async (response) => {
+        const payload = (await response.json()) as { recentPlants?: RecentObservedPlant[] };
+        if (!response.ok) throw new Error("최근 관찰 식물을 불러오지 못했습니다.");
+        return payload;
+      })
+      .then((payload) => setAllRecentPlants(payload.recentPlants ?? recentPlants))
+      .catch(() => setAllRecentPlants(recentPlants))
+      .finally(() => setIsLoadingAllPlants(false));
+  }
+
   return (
     <section className="space-y-5">
       <div>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-[17px] font-black text-[#151515]">최근 관찰한 식물</h2>
-          <button type="button" onClick={() => setShowAllPlants((current) => !current)} className="min-h-9 rounded-full px-2 text-xs font-semibold text-[#6F746C] transition active:bg-[#E8EAE5]">
+          <button type="button" onClick={toggleAllPlants} className="min-h-9 rounded-full px-2 text-xs font-semibold text-[#6F746C] transition active:bg-[#E8EAE5]">
             {showAllPlants ? "최근보기" : "전체보기"} <span aria-hidden="true">{showAllPlants ? "‹" : "›"}</span>
           </button>
         </div>
-        {showAllPlants ? (
+        {showAllPlants && isLoadingAllPlants ? (
+          <div className="grid grid-cols-2 gap-3" aria-label="최근 관찰 식물 불러오는 중">
+            {Array.from({ length: 4 }, (_, index) => <span key={index} className="aspect-[4/3] animate-pulse rounded-[22px] bg-[#E7EAE4]" />)}
+          </div>
+        ) : showAllPlants ? (
           <div className="grid grid-cols-2 gap-3">
             {items.map(({ recent, plant }) => {
               const photoUrl = recent.photoUrl ?? plant.coverPhotoUrl;

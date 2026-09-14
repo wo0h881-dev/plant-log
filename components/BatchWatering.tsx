@@ -157,7 +157,9 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
 
       setResults(nextResults);
       setSelectedIds(failedIds);
-      setDismissedDueIds((current) => [...new Set([...current, ...succeededIds])]);
+      if (wateredDate === today) {
+        setDismissedDueIds((current) => [...new Set([...current, ...succeededIds])]);
+      }
       setSaveState(failureCount ? "error" : "success");
       setMessage(
         failureCount

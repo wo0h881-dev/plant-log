@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, ArrowLeft, Bell, Bug, Check, Droplets, Flower2, Leaf, MoreHorizontal, MoreVertical, NotebookPen, Plus, Sprout } from "lucide-react";
+import { AlertCircle, ArrowLeft, Bell, Bug, Check, Droplets, Flower2, Leaf, MoreHorizontal, MoreVertical, NotebookPen, Plus, Sprout, Tag } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { BatchWatering } from "@/components/BatchWatering";
 import { ManagementCalendar } from "@/components/ManagementCalendar";
 import { PlantPhotoUploader } from "@/components/PlantPhotoUploader";
@@ -12,18 +13,20 @@ import { fallbackPlants } from "@/lib/plants";
 import type { Plant, RecentObservedPlant, SaveState } from "@/types/plant";
 
 const RECENT_PLANTS_KEY = "plant-log:recent-plants";
-const OBSERVATION_TAGS = [
-  { name: "신엽", icon: Leaf },
-  { name: "하엽", icon: Leaf },
-  { name: "과습", icon: Droplets },
-  { name: "병해충", icon: Bug },
-  { name: "꽃", icon: Flower2 },
-  { name: "기타", icon: MoreHorizontal },
-] as const;
+const DEFAULT_OBSERVATION_TAGS = ["신엽", "하엽", "과습", "병해충", "꽃", "기타"];
+const OBSERVATION_TAG_ICONS: Record<string, LucideIcon> = {
+  신엽: Leaf,
+  하엽: Leaf,
+  과습: Droplets,
+  병해충: Bug,
+  꽃: Flower2,
+  기타: MoreHorizontal,
+};
 
 type RecordTab = "water" | "observation" | "profile" | "more";
 type PlantsResponse = { plants: Plant[]; source: "notion" | "fallback" };
 type RecentPlantsResponse = { recentPlants?: RecentObservedPlant[] };
+type OptionsResponse = { observationTags?: string[] };
 
 function formatPlantName(plant: Plant) {
   return `${plant.category} - ${plant.name}`;
@@ -56,6 +59,7 @@ export function PlantLogForm() {
     try { return JSON.parse(stored) as string[]; } catch { return []; }
   });
   const [recentObservedPlants, setRecentObservedPlants] = useState<RecentObservedPlant[]>([]);
+  const [observationTags, setObservationTags] = useState<string[]>(DEFAULT_OBSERVATION_TAGS);
   const [photos, setPhotos] = useState<File[]>([]);
   const [observedDate, setObservedDate] = useState(getTodayValue);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -82,8 +86,19 @@ export function PlantLogForm() {
       .catch(() => setRecentObservedPlants([]));
   }, []);
 
+  const refreshOptions = useCallback(() => {
+    fetch("/api/options")
+      .then((response) => response.json() as Promise<OptionsResponse>)
+      .then((payload) => {
+        const nextTags = payload.observationTags?.map((tagName) => tagName.trim()).filter(Boolean) ?? [];
+        if (nextTags.length) setObservationTags([...new Set(nextTags)]);
+      })
+      .catch(() => undefined);
+  }, []);
+
   useEffect(() => { refreshPlants(); }, [refreshPlants]);
   useEffect(() => { refreshRecentPlants(); }, [refreshRecentPlants]);
+  useEffect(() => { refreshOptions(); }, [refreshOptions]);
   const selectedPlant = plants.find((plant) => plant.id === selectedPlantId);
   const selectedPlantLabel = selectedPlant ? formatPlantName(selectedPlant) : "";
   const profilePlant = plants.find((plant) => plant.id === profilePlantId);
@@ -183,7 +198,8 @@ export function PlantLogForm() {
                 <section>
                   <div className="mb-3 flex items-center justify-between"><h2 className="text-[15px] font-extrabold">관찰태그</h2><span className="text-[11px] text-[#909090]">여러 개를 선택할 수 있어요.</span></div>
                   <div className="grid grid-cols-3 gap-2">
-                    {OBSERVATION_TAGS.map(({ name, icon: Icon }) => {
+                    {observationTags.map((name) => {
+                      const Icon = OBSERVATION_TAG_ICONS[name] ?? Tag;
                       const isSelected = selectedTags.includes(name);
                       return <button key={name} type="button" onClick={() => toggleTag(name)} className={`flex min-h-12 items-center justify-center gap-1.5 rounded-2xl text-xs font-bold transition ${isSelected ? "bg-[#284F2A] text-white" : "bg-[#F0F1EE] text-[#333633]"}`}><Icon size={16} strokeWidth={1.8} aria-hidden="true" />{name}</button>;
                     })}
