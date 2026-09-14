@@ -1,4 +1,4 @@
-const CACHE_NAME = "plant-log-v8";
+const CACHE_NAME = "plant-log-v9";
 const APP_SHELL = ["/", "/icon.svg"];
 
 self.addEventListener("install", (event) => {

@@ -79,14 +79,15 @@ function parsePhotos(pages: ObservationPage[]) {
 
 function parseRecentPlants(pages: ObservationPage[]) {
   const recentPlants: RecentObservedPlant[] = [];
-  const seen = new Set<string>();
+  const seenPlantIds = new Set<string>();
+  const seenPlantNames = new Set<string>();
 
   for (const page of pages) {
     const plantName = readText(page.properties["식물명"]);
     const plantCategory = page.properties["분류"]?.select?.name?.trim() ?? "";
     const plantId = page.properties["식물"]?.relation?.[0]?.id;
-    const key = plantId || `${plantCategory}:${plantName}`;
-    if (!plantName || seen.has(key)) continue;
+    const nameKey = `${plantCategory}:${plantName}`.toLocaleLowerCase("ko");
+    if (!plantName || (plantId && seenPlantIds.has(plantId)) || seenPlantNames.has(nameKey)) continue;
 
     const firstPhoto = page.properties["사진"]?.files?.find((file) => readPhotoUrl(file));
     recentPlants.push({
@@ -96,7 +97,8 @@ function parseRecentPlants(pages: ObservationPage[]) {
       observedAt: page.properties["관찰일"]?.date?.start ?? undefined,
       photoUrl: firstPhoto ? readPhotoUrl(firstPhoto) : undefined,
     });
-    seen.add(key);
+    if (plantId) seenPlantIds.add(plantId);
+    seenPlantNames.add(nameKey);
   }
 
   return recentPlants;
