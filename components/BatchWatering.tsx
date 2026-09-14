@@ -185,7 +185,6 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
 
   function renderPlantRow(plant: Plant, due = false) {
     const isSelected = selectedIdSet.has(plant.id);
-    const photoUrl = getPlantPhoto(plant);
     const daysText = typeof plant.daysSinceWatered === "number"
       ? `${plant.daysSinceWatered}일 전 물줌`
       : "물준 기록 없음";
@@ -197,15 +196,12 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
         role="checkbox"
         aria-checked={isSelected}
         onClick={() => togglePlant(plant.id)}
-        className={`flex min-h-[68px] w-full items-center justify-between gap-3 rounded-[22px] bg-white px-3 py-2.5 text-left transition ${
+        className={`flex min-h-[60px] w-full items-center justify-between gap-3 rounded-[22px] bg-white px-4 py-2.5 text-left transition ${
           isSelected
             ? "ring-2 ring-[#284F2A]"
             : due ? "ring-1 ring-[#E5DFC4]" : ""
         }`}
       >
-        <span className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-[#E7EDE3] text-[#284F2A]">
-          {photoUrl ? <Image src={photoUrl} alt="" fill sizes="48px" className="object-cover" unoptimized onError={() => markPhotoFailed(photoUrl)} /> : <Sprout size={18} aria-hidden="true" />}
-        </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-bold text-stone-900">{plant.name}</span>
           <span className="mt-1 block truncate text-[11px] text-[#909090]">
@@ -266,7 +262,7 @@ export function BatchWatering({ plants, recentPlants = [], onWateringSaved }: Ba
       <section>
         <div className="mb-2 flex items-center justify-between"><h2 className="text-[15px] font-extrabold text-[#151515]">오늘 물 준 식물</h2><span className="text-xs font-bold text-[#284F2A]">{todayWateredPlants.length}개</span></div>
         {isTodayLoading ? <div className="h-14 animate-pulse rounded-2xl bg-white" /> : todayWateringError ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-center text-xs text-red-700">오늘 기록을 불러오지 못했어요.</div> : todayWateredPlants.length ? (
-          <div className="flex gap-2 overflow-x-auto pb-1">{todayWateredPlants.map((plant) => { const photoUrl = getPlantPhoto({ id: plant.id, name: plant.name, category: "" }); return <div key={plant.id || plant.name} className="flex w-32 shrink-0 items-center gap-2 rounded-2xl bg-white p-2"><span className="relative grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-xl bg-[#E7EDE3] text-[#284F2A]">{photoUrl ? <Image src={photoUrl} alt="" fill sizes="36px" className="object-cover" unoptimized onError={() => markPhotoFailed(photoUrl)} /> : <Check size={16} aria-hidden="true" />}</span><span className="min-w-0"><span className="block truncate text-xs font-bold">{plant.name}</span><span className="text-[10px] text-[#909090]">오늘 완료</span></span></div>; })}</div>
+          <div className="flex gap-2 overflow-x-auto pb-1">{todayWateredPlants.map((plant) => <div key={plant.id || plant.name} className="flex w-32 shrink-0 items-center gap-2 rounded-2xl bg-white p-2"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#E7EDE3] text-[#284F2A]"><Check size={16} aria-hidden="true" /></span><span className="min-w-0"><span className="block truncate text-xs font-bold">{plant.name}</span><span className="text-[10px] text-[#909090]">오늘 완료</span></span></div>)}</div>
         ) : <div className="rounded-2xl bg-white px-4 py-3 text-center text-xs text-[#909090]">아직 오늘 물 준 식물이 없어요.</div>}
       </section>
 
