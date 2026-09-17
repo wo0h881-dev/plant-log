@@ -15,13 +15,14 @@ type PlantSelectProps = {
   onSelect: (plant: Plant) => void;
   variant?: "row" | "search";
   openRequest?: number;
+  showPhotos?: boolean;
 };
 
 function formatPlantName(plant: Plant) {
   return `${plant.category} - ${plant.name}`;
 }
 
-export function PlantSelect({ plants, value, query, recentPlants, onQueryChange, onSelect, variant = "row", openRequest = 0 }: PlantSelectProps) {
+export function PlantSelect({ plants, value, query, recentPlants, onQueryChange, onSelect, variant = "row", openRequest = 0, showPhotos = true }: PlantSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -90,9 +91,9 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
           <label htmlFor="plant-search" className="mb-2 block text-[15px] font-extrabold text-[#151515]">식물 선택</label>
           {!isOpen ? (
             <button type="button" onClick={openList} className="flex min-h-16 w-full items-center gap-3 rounded-2xl bg-[#F0F1EE] px-3 text-left">
-              <span className="relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-[#DDE6D7] text-[#284F2A]">
+              {showPhotos ? <span className="relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-[#DDE6D7] text-[#284F2A]">
                 {selectedPlant?.coverPhotoUrl ? <Image src={selectedPlant.coverPhotoUrl} alt="" fill sizes="44px" className="object-cover" unoptimized /> : <Sprout size={19} aria-hidden="true" />}
-              </span>
+              </span> : null}
               <span className="min-w-0 flex-1">
                 <span className={`block truncate text-sm font-bold ${selectedPlant ? "text-[#151515]" : "text-[#909090]"}`}>{selectedPlant?.name ?? "식물을 선택하세요"}</span>
                 {selectedPlant ? <span className="mt-0.5 block truncate text-[11px] text-[#909090]">{selectedPlant.category}</span> : null}
@@ -118,9 +119,9 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
               const isSelected = formatPlantName(plant) === value;
               return (
                 <button key={plant.id} type="button" onClick={() => choosePlant(plant)} className={`flex min-h-12 w-full items-center gap-3 rounded-2xl px-2.5 text-left transition ${isSelected ? "bg-[#284F2A] text-white" : "text-[#151515] active:bg-[#F0F1EE]"}`}>
-                  <span className={`relative grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-xl ${isSelected ? "bg-white/15" : "bg-[#EEF3EB] text-[#284F2A]"}`}>
+                  {showPhotos ? <span className={`relative grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-xl ${isSelected ? "bg-white/15" : "bg-[#EEF3EB] text-[#284F2A]"}`}>
                     {plant.coverPhotoUrl ? <Image src={plant.coverPhotoUrl} alt="" fill sizes="36px" className="object-cover" unoptimized /> : <Sprout size={16} aria-hidden="true" />}
-                  </span>
+                  </span> : null}
                   <span className="min-w-0 flex-1 truncate text-sm font-bold">{plant.name}</span>
                   <span className={`shrink-0 text-[11px] ${isSelected ? "text-white/65" : "text-[#909090]"}`}>{plant.category}</span>
                 </button>

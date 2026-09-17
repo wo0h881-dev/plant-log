@@ -189,6 +189,8 @@ export function PlantLogForm() {
       setRepotSoils([]);
       setRepotReason("");
       setNote("");
+      setSelectedPlantId("");
+      setQuery("");
       setObservationSaveState("success");
       setObservationMessage(
         isRepotting
@@ -239,7 +241,7 @@ export function PlantLogForm() {
             <form onSubmit={saveObservation} className="space-y-3">
               <PlantPhotoUploader files={photos} onChange={setPhotos} onCaptureDateChange={(date) => setObservedDate(date ?? getTodayValue())} />
               <section className="space-y-5 rounded-[30px] bg-white p-4">
-                <PlantSelect plants={plants} value={selectedPlantLabel} query={query} recentPlants={recentPlants} onQueryChange={(value) => { setQuery(value); if (value !== selectedPlant?.name) setSelectedPlantId(""); }} onSelect={selectPlant} variant="row" />
+                <PlantSelect plants={plants} value={selectedPlantLabel} query={query} recentPlants={recentPlants} onQueryChange={(value) => { setQuery(value); if (value !== selectedPlant?.name) setSelectedPlantId(""); }} onSelect={selectPlant} variant="row" showPhotos={false} />
                 <label className="flex items-center justify-between gap-4"><span className="text-[15px] font-extrabold">관찰 날짜</span><input type="date" value={observedDate} onChange={(event) => setObservedDate(event.target.value)} className="h-9 min-w-32 rounded-xl border-0 bg-[#F0F1EE] px-2 text-xs font-bold outline-none focus:ring-1 focus:ring-[#284F2A]/30" /></label>
                 <section>
                   <div className="mb-3 flex items-center justify-between"><h2 className="text-[15px] font-extrabold">관찰태그</h2><span className="text-[11px] text-[#909090]">여러 개를 선택할 수 있어요.</span></div>
