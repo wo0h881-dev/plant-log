@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readEnvironmentNote } from "@/lib/observation-environment";
 import {
   createPlantLogPage,
   createSettingChangePage,
@@ -122,7 +123,13 @@ export async function POST(request: Request) {
     const repotSummary = hasRepottingContent
       ? `분갈이: ${previousSoilLabel} → ${nextSoilLabel}${repotReason ? `\n이유: ${repotReason}` : ""}`
       : "";
-    const observationNote = [note, repotSummary].filter(Boolean).join("\n\n");
+    let environmentNote: string;
+    try {
+      environmentNote = readEnvironmentNote(formData, selectedObservationTags.includes("온습도"));
+    } catch (error) {
+      return NextResponse.json({ message: error instanceof Error ? error.message : "온습도 값을 확인하세요." }, { status: 400 });
+    }
+    const observationNote = [note, repotSummary, environmentNote].filter(Boolean).join("\n\n");
     const hasObservationContent =
       photos.length > 0 || Boolean(observationNote) || Boolean(wateredAt) || selectedObservationTags.length > 0;
     const hasLightSettings = Boolean(settingLightName) || typeof settingLightWatt === "number";

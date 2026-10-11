@@ -10,6 +10,8 @@ type PlantPhotoUploaderProps = {
   files: File[];
   onChange: (files: File[]) => void;
   onCaptureDateChange: (date: string | null) => void;
+  onBusyChange?: (busy: boolean) => void;
+  title?: string;
 };
 
 function formatLocalDate(date: Date) {
@@ -26,7 +28,7 @@ async function readCaptureDate(file: File) {
   return date && !Number.isNaN(date.getTime()) ? formatLocalDate(date) : null;
 }
 
-export function PlantPhotoUploader({ files, onChange, onCaptureDateChange }: PlantPhotoUploaderProps) {
+export function PlantPhotoUploader({ files, onChange, onCaptureDateChange, onBusyChange, title = "오늘의 식물을 보여주세요" }: PlantPhotoUploaderProps) {
   const inputId = useId();
   const [isCompressing, setIsCompressing] = useState(false);
   const [error, setError] = useState("");
@@ -56,6 +58,7 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange }: Pla
     }
 
     setIsCompressing(true);
+    onBusyChange?.(true);
     try {
       const captureDate = await readCaptureDate(imageFiles[0]).catch(() => null);
       const compressedFiles = await Promise.all(imageFiles.map((file) => compressImage(file)));
@@ -65,6 +68,7 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange }: Pla
       setError(compressionError instanceof Error ? compressionError.message : "사진 처리에 실패했습니다.");
     } finally {
       setIsCompressing(false);
+      onBusyChange?.(false);
       event.target.value = "";
     }
   }
@@ -99,7 +103,7 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange }: Pla
           <>
             <ImagePlus size={58} strokeWidth={1} className="text-[#284F2A]/25" aria-hidden="true" />
             <div className="mt-4">
-              <span className="block text-lg font-black text-[#284F2A]">오늘의 식물을 보여주세요</span>
+              <span className="block text-lg font-black text-[#284F2A]">{isCompressing ? "사진 압축 중..." : title}</span>
               <span className="mt-1 block text-sm font-medium text-[#687565]">여러 장을 한 번에 선택할 수 있어요</span>
             </div>
           </>
@@ -118,6 +122,7 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange }: Pla
         type="file"
         accept="image/*"
         multiple
+        disabled={isCompressing}
         className="sr-only"
         onChange={handleChange}
       />

@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
 import {
-  createNotionHeaders,
   createWateringLogPage,
-  readNotionJson,
   resolveDataSourceId,
 } from "@/lib/notion";
-
-const NOTION_API_BASE = "https://api.notion.com/v1";
+import { readWateringHistory } from "@/lib/watering-history";
 
 type WateringPlant = {
   id: string;
@@ -27,10 +24,6 @@ type WateringLogPage = {
     title?: RichText[];
     relation?: Array<{ id?: string }>;
   }>;
-};
-
-type WateringQueryResponse = {
-  results: WateringLogPage[];
 };
 
 export const runtime = "nodejs";
@@ -55,10 +48,9 @@ function readTitle(page: WateringLogPage) {
 export async function GET(request: Request) {
   const token = process.env.NOTION_TOKEN;
   const wateringDatabaseId = process.env.NOTION_WATERING_DATABASE_ID;
-  const configuredWateringDataSourceId = process.env.NOTION_WATERING_DATA_SOURCE_ID;
   const requestedDate = new URL(request.url).searchParams.get("date") || getSeoulDateValue();
 
-  if (!token || !wateringDatabaseId) {
+  if (!token || (!wateringDatabaseId && !process.env.NOTION_WATERING_DATA_SOURCE_ID)) {
     return NextResponse.json({ plants: [], wateredAt: requestedDate }, { headers: { "Cache-Control": "no-store" } });
   }
 
@@ -67,20 +59,10 @@ export async function GET(request: Request) {
   }
 
   try {
-    const dataSourceId = configuredWateringDataSourceId || (await resolveDataSourceId(token, wateringDatabaseId));
-    const payload = await readNotionJson<WateringQueryResponse>(
-      await fetch(`${NOTION_API_BASE}/data_sources/${dataSourceId}/query`, {
-        method: "POST",
-        headers: createNotionHeaders(token),
-        body: JSON.stringify({
-          page_size: 100,
-          filter: { property: "날짜", date: { equals: requestedDate } },
-        }),
-      }),
-    );
+    const pages = await readWateringHistory({ property: "날짜", date: { equals: requestedDate } });
     const uniquePlants = new Map<string, WateringPlant>();
 
-    for (const page of payload.results) {
+    for (const page of pages) {
       const id = page.properties["식물"]?.relation?.[0]?.id ?? "";
       const name = readTitle(page);
       if (!name) continue;

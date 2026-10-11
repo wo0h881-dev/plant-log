@@ -1,8 +1,10 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, ArrowLeft, Bell, Bug, Check, Droplets, Flower2, Leaf, MoreHorizontal, MoreVertical, NotebookPen, Plus, RefreshCcw, Sprout, Tag } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { AlertCircle, ArrowLeft, Bell, Check, Leaf, MoreHorizontal, MoreVertical, NotebookPen, Plus, RefreshCcw, Sprout } from "lucide-react";
+import { AddPlantForm } from "@/components/AddPlantForm";
+import { ObservationTagPicker } from "@/components/ObservationTagPicker";
+import { canShowInWateringList, isWateredToday, type WateredPlant } from "@/lib/watering";
 import { BatchWatering } from "@/components/BatchWatering";
 import { ManagementCalendar } from "@/components/ManagementCalendar";
 import { PlantPhotoUploader } from "@/components/PlantPhotoUploader";
@@ -13,21 +15,12 @@ import { fallbackPlants } from "@/lib/plants";
 import type { Plant, RecentObservedPlant, SaveState } from "@/types/plant";
 
 const RECENT_PLANTS_KEY = "plant-log:recent-plants";
-const DEFAULT_OBSERVATION_TAGS = ["신엽", "하엽", "과습", "병해충", "꽃", "분갈이", "기타"];
-const OBSERVATION_TAG_ICONS: Record<string, LucideIcon> = {
-  신엽: Leaf,
-  하엽: Leaf,
-  과습: Droplets,
-  병해충: Bug,
-  꽃: Flower2,
-  분갈이: RefreshCcw,
-  기타: MoreHorizontal,
-};
+const DEFAULT_OBSERVATION_TAGS = ["신엽", "하엽", "과습", "뿌리", "상태이상", "해충", "꽃", "기타", "좋음", "안좋음", "분갈이", "온습도"];
 
 type RecordTab = "water" | "observation" | "profile" | "more";
 type PlantsResponse = { plants: Plant[]; source: "notion" | "fallback" };
 type RecentPlantsResponse = { recentPlants?: RecentObservedPlant[] };
-type OptionsResponse = { observationTags?: string[]; soilOptions?: string[] };
+type OptionsResponse = { observationTags?: string[]; soilOptions?: string[]; categoryOptions?: string[]; purchaseSourceOptions?: string[] };
 
 function formatPlantName(plant: Plant) {
   return `${plant.category} - ${plant.name}`;
@@ -54,7 +47,16 @@ export function PlantLogForm() {
   const [query, setQuery] = useState("");
   const [profileQuery, setProfileQuery] = useState("");
   const [profilePlantId, setProfilePlantId] = useState("");
-  const [profileOpenRequest, setProfileOpenRequest] = useState(0);
+  const [isAddingPlant, setIsAddingPlant] = useState(false);
+  const [todayWatered, setTodayWatered] = useState<WateredPlant[]>([]);
+  const [isTodayWateredLoaded, setIsTodayWateredLoaded] = useState(false);
+  const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
+  const [purchaseSourceOptions, setPurchaseSourceOptions] = useState<string[]>([]);
+  const [temperature, setTemperature] = useState("");
+  const [humidity, setHumidity] = useState("");
+  const [temperatureAbove, setTemperatureAbove] = useState(false);
+  const [humidityAbove, setHumidityAbove] = useState(false);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [recentPlants, setRecentPlants] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
     const stored = window.localStorage.getItem(RECENT_PLANTS_KEY);
@@ -102,6 +104,8 @@ export function PlantLogForm() {
         if (nextTags.length) setObservationTags([...new Set(nextTags)]);
         const nextSoils = payload.soilOptions?.map((soilName) => soilName.trim()).filter(Boolean) ?? [];
         if (nextSoils.length) setSoilOptions([...new Set(nextSoils)]);
+        setCategoryOptions(payload.categoryOptions ?? []);
+        setPurchaseSourceOptions(payload.purchaseSourceOptions ?? []);
       })
       .catch(() => undefined);
   }, []);
@@ -109,15 +113,19 @@ export function PlantLogForm() {
   useEffect(() => { refreshPlants(); }, [refreshPlants]);
   useEffect(() => { refreshRecentPlants(); }, [refreshRecentPlants]);
   useEffect(() => { refreshOptions(); }, [refreshOptions]);
+  const handleTodayWateredChange = useCallback((items: WateredPlant[]) => { setTodayWatered(items); setIsTodayWateredLoaded(true); }, []);
   const selectedPlant = plants.find((plant) => plant.id === selectedPlantId);
   const selectedPlantLabel = selectedPlant ? formatPlantName(selectedPlant) : "";
   const profilePlant = plants.find((plant) => plant.id === profilePlantId);
-  const dueCount = useMemo(() => plants.filter((plant) => plant.isWateringDue && !["자구", "사망"].includes(plant.category.trim())).length, [plants]);
+  const dueCount = useMemo(() => plants.filter((plant) => plant.isWateringDue && canShowInWateringList(plant) && !isWateredToday(plant, todayWatered)).length, [plants, todayWatered]);
   const isRepotting = selectedTags.includes("분갈이");
+  const isEnvironment = selectedTags.includes("온습도");
   const canSaveObservation = Boolean(
     selectedPlant &&
     (photos.length || selectedTags.length || note.trim()) &&
     (!isRepotting || repotSoils.length) &&
+    (!isEnvironment || temperature.trim() || humidity.trim()) &&
+    !isCompressing &&
     observationSaveState !== "saving",
   );
 
@@ -137,6 +145,7 @@ export function PlantLogForm() {
   }
 
   function openPlantFromCalendar(plant: Plant) {
+    setIsAddingPlant(false);
     selectProfilePlant(plant);
     setActiveTab("profile");
   }
@@ -154,7 +163,10 @@ export function PlantLogForm() {
       setRepotSoils([]);
       setRepotReason("");
     }
-    setSelectedTags((current) => current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag]);
+    if (tag === "온습도" && selectedTags.includes(tag)) {
+      setTemperature(""); setHumidity(""); setTemperatureAbove(false); setHumidityAbove(false);
+    }
+    setSelectedTags((current) => current.includes(tag) ? current.filter((item) => item !== tag) : [...current.filter((item) => !(tag === "좋음" && item === "안좋음") && !(tag === "안좋음" && item === "좋음")), tag]);
   }
 
   function toggleRepotSoil(soil: string) {
@@ -174,6 +186,12 @@ export function PlantLogForm() {
     formData.append("note", note.trim());
     formData.append("createdAt", observedDate);
     formData.append("observationTags", JSON.stringify(selectedTags));
+    if (isEnvironment) {
+      formData.append("temperature", temperature);
+      formData.append("humidity", humidity);
+      formData.append("temperatureAbove", String(temperatureAbove));
+      formData.append("humidityAbove", String(humidityAbove));
+    }
     if (isRepotting) {
       formData.append("repotSoils", JSON.stringify(repotSoils));
       formData.append("repotPreviousSoils", JSON.stringify(selectedPlant.currentSoils ?? []));
@@ -189,6 +207,7 @@ export function PlantLogForm() {
       setRepotSoils([]);
       setRepotReason("");
       setNote("");
+      setTemperature(""); setHumidity(""); setTemperatureAbove(false); setHumidityAbove(false);
       setSelectedPlantId("");
       setQuery("");
       setObservationSaveState("success");
@@ -206,7 +225,7 @@ export function PlantLogForm() {
   }
 
   const tabs = [
-    { id: "water" as const, label: "물주기", icon: Leaf, badge: dueCount },
+    { id: "water" as const, label: "물주기", icon: Leaf, badge: isTodayWateredLoaded && !isPlantsLoading ? dueCount : 0 },
     { id: "observation" as const, label: "관찰일지", icon: NotebookPen },
     { id: "profile" as const, label: "내 식물", icon: Sprout },
     { id: "more" as const, label: "더보기", icon: MoreHorizontal },
@@ -227,6 +246,7 @@ export function PlantLogForm() {
               isLoading={isPlantsLoading}
               isPhotoLoading={isPlantsLoading || isRecentPlantsLoading}
               onWateringSaved={refreshPlants}
+              onTodayWateredChange={handleTodayWateredChange}
             />
           </>
         ) : null}
@@ -239,20 +259,18 @@ export function PlantLogForm() {
               <span className="-mr-2 grid h-10 w-10 place-items-center"><MoreVertical size={21} aria-hidden="true" /></span>
             </header>
             <form onSubmit={saveObservation} className="space-y-3">
-              <PlantPhotoUploader files={photos} onChange={setPhotos} onCaptureDateChange={(date) => setObservedDate(date ?? getTodayValue())} />
+              <PlantPhotoUploader files={photos} onChange={setPhotos} onCaptureDateChange={(date) => setObservedDate(date ?? getTodayValue())} onBusyChange={setIsCompressing} />
               <section className="space-y-5 rounded-[30px] bg-white p-4">
                 <PlantSelect plants={plants} value={selectedPlantLabel} query={query} recentPlants={recentPlants} onQueryChange={(value) => { setQuery(value); if (value !== selectedPlant?.name) setSelectedPlantId(""); }} onSelect={selectPlant} variant="row" showPhotos={false} />
                 <label className="flex items-center justify-between gap-4"><span className="text-[15px] font-extrabold">관찰 날짜</span><input type="date" value={observedDate} onChange={(event) => setObservedDate(event.target.value)} className="h-9 min-w-32 rounded-xl border-0 bg-[#F0F1EE] px-2 text-xs font-bold outline-none focus:ring-1 focus:ring-[#284F2A]/30" /></label>
                 <section>
                   <div className="mb-3 flex items-center justify-between"><h2 className="text-[15px] font-extrabold">관찰태그</h2><span className="text-[11px] text-[#909090]">여러 개를 선택할 수 있어요.</span></div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {observationTags.map((name) => {
-                      const Icon = OBSERVATION_TAG_ICONS[name] ?? Tag;
-                      const isSelected = selectedTags.includes(name);
-                      return <button key={name} type="button" onClick={() => toggleTag(name)} className={`flex min-h-12 items-center justify-center gap-1.5 rounded-2xl text-xs font-bold transition ${isSelected ? "bg-[#284F2A] text-white" : "bg-[#F0F1EE] text-[#333633]"}`}><Icon size={16} strokeWidth={1.8} aria-hidden="true" />{name}</button>;
-                    })}
-                  </div>
+                  <ObservationTagPicker tags={observationTags} selected={selectedTags} onToggle={toggleTag} />
                 </section>
+                {isEnvironment ? <section className="space-y-3 rounded-3xl bg-[#F2F4EF] p-4"><h2 className="text-sm font-extrabold">온습도</h2>{([
+                  ["온도 (°C)", temperature, setTemperature, temperatureAbove, setTemperatureAbove, -50, 80],
+                  ["습도 (%)", humidity, setHumidity, humidityAbove, setHumidityAbove, 0, 100],
+                ] as const).map(([label, value, setter, above, setAbove, min, max]) => <div key={label} className="flex items-end gap-3"><label className="min-w-0 flex-1"><span className="mb-2 block text-xs font-bold text-[#777B74]">{label}</span><input type="number" step="any" min={min} max={max} value={value} onChange={(event) => setter(event.target.value)} className="h-11 w-full rounded-2xl bg-white px-3 text-sm outline-none focus:ring-1 focus:ring-[#284F2A]/30" /></label><label className="flex h-11 shrink-0 items-center gap-2 text-sm"><input type="checkbox" checked={above} onChange={(event) => setAbove(event.target.checked)} className="h-5 w-5 accent-[#284F2A]" />이상</label></div>)}</section> : null}
                 {isRepotting ? (
                   <section className="space-y-4 rounded-3xl bg-[#F2F4EF] p-4">
                     <div className="flex items-center justify-between gap-3">
@@ -293,11 +311,12 @@ export function PlantLogForm() {
           </>
         ) : null}
 
-        {activeTab === "profile" ? (
+        {activeTab === "profile" && isAddingPlant ? <AddPlantForm categories={[...new Set([...categoryOptions, ...plants.map((plant) => plant.category)])]} purchaseSources={purchaseSourceOptions} onClose={() => setIsAddingPlant(false)} onCreated={(plant) => { setPlants((current) => [...current.filter((item) => item.id !== plant.id), plant]); selectProfilePlant(plant); setIsAddingPlant(false); refreshPlants(); }} /> : null}
+        {activeTab === "profile" && !isAddingPlant ? (
           <>
-            <header className="mb-4 flex items-center justify-between"><h1 className="text-[32px] font-black leading-tight">내 식물</h1><button type="button" onClick={() => setProfileOpenRequest((current) => current + 1)} aria-label="식물 찾기" className="grid h-10 w-10 place-items-center rounded-full bg-[#151515] text-white"><Plus size={21} aria-hidden="true" /></button></header>
+            <header className="mb-4 flex items-center justify-between"><h1 className="text-[32px] font-black leading-tight">내 식물</h1><button type="button" onClick={() => setIsAddingPlant(true)} aria-label="새 식물 등록" className="grid h-10 w-10 place-items-center rounded-full bg-[#151515] text-white"><Plus size={21} aria-hidden="true" /></button></header>
             <div className="space-y-5">
-              <PlantSelect plants={plants} value={profilePlant ? formatPlantName(profilePlant) : ""} query={profileQuery} recentPlants={[]} onQueryChange={(value) => { setProfileQuery(value); if (!value || value !== profilePlant?.name) setProfilePlantId(""); }} onSelect={selectProfilePlant} variant="search" openRequest={profileOpenRequest} />
+              <PlantSelect plants={plants} value={profilePlant ? formatPlantName(profilePlant) : ""} query={profileQuery} recentPlants={[]} onQueryChange={(value) => { setProfileQuery(value); if (!value || value !== profilePlant?.name) setProfilePlantId(""); }} onSelect={selectProfilePlant} variant="search" showPhotos={false} />
               {profilePlant ? <PlantOverview key={profilePlant.id} plant={profilePlant} /> : <RecentObservedPlants plants={plants} recentPlants={recentObservedPlants} onSelect={selectProfilePlant} />}
             </div>
           </>

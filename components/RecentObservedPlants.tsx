@@ -63,17 +63,13 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
         </div>
         {showAllPlants && isLoadingAllPlants ? (
           <div className="grid grid-cols-2 gap-3" aria-label="최근 관찰 식물 불러오는 중">
-            {Array.from({ length: 4 }, (_, index) => <span key={index} className="aspect-[4/3] animate-pulse rounded-[22px] bg-[#E7EAE4]" />)}
+            {Array.from({ length: 4 }, (_, index) => <span key={index} className="h-20 animate-pulse rounded-[22px] bg-[#E7EAE4]" />)}
           </div>
         ) : showAllPlants ? (
           <div className="grid grid-cols-2 gap-3">
             {items.map(({ recent, plant }) => {
-              const photoUrl = recent.photoUrl ?? plant.coverPhotoUrl;
               return (
                 <button key={plant.id} type="button" onClick={() => onSelect(plant)} className="overflow-hidden rounded-[22px] bg-white text-left transition active:scale-[0.98]">
-                  <span className="relative grid aspect-[4/3] w-full place-items-center overflow-hidden bg-[#DCE7D5] text-[#284F2A]">
-                    {photoUrl ? <Image src={photoUrl} alt={plant.name} fill sizes="(max-width: 390px) 44vw, 170px" className="object-cover" unoptimized /> : <Sprout size={30} aria-hidden="true" />}
-                  </span>
                   <span className="block px-3 py-2.5">
                     <span className="block truncate text-[13px] font-extrabold text-[#151515]">{plant.name}</span>
                     <span className="mt-0.5 block truncate text-[10px] text-[#909090]">{formatDate(recent.observedAt)}</span>
@@ -85,13 +81,9 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
         ) : items.length ? (
           <div className="-mx-5 flex gap-3 overflow-x-auto px-5 pb-1">
             {previewItems.map(({ recent, plant }) => {
-              const photoUrl = recent.photoUrl ?? plant.coverPhotoUrl;
               return (
-                <button key={plant.id} type="button" onClick={() => onSelect(plant)} className="w-[78px] shrink-0 text-left">
-                  <span className="relative grid aspect-square w-full place-items-center overflow-hidden rounded-[18px] bg-[#DCE7D5] text-[#284F2A]">
-                    {photoUrl ? <Image src={photoUrl} alt={plant.name} fill sizes="78px" className="object-cover" unoptimized /> : <Sprout size={24} aria-hidden="true" />}
-                  </span>
-                  <span className="mt-2 block truncate text-xs font-extrabold text-[#151515]">{plant.name}</span>
+                <button key={plant.id} type="button" onClick={() => onSelect(plant)} className="w-32 shrink-0 rounded-2xl bg-white px-3 py-3 text-left">
+                  <span className="block truncate text-xs font-extrabold text-[#151515]">{plant.name}</span>
                   <span className="mt-0.5 block text-[10px] text-[#909090]">{formatDate(recent.observedAt)}</span>
                 </button>
               );
@@ -118,17 +110,6 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
         </div>
       ) : null}
 
-      {!showAllPlants && items.length ? (
-        <div>
-          <div className="mb-3 flex items-center justify-between"><h2 className="text-[17px] font-black text-[#151515]">최근 사진</h2><span className="text-xs font-semibold text-[#909090]">{Math.min(items.length, 4)}개</span></div>
-          <div className="grid grid-cols-4 gap-2.5">
-            {items.slice(0, 4).map(({ recent, plant }) => {
-              const photoUrl = recent.photoUrl ?? plant.coverPhotoUrl;
-              return <button key={`photo-${plant.id}`} type="button" onClick={() => onSelect(plant)} className="min-w-0 text-left"><span className="relative grid aspect-square w-full place-items-center overflow-hidden rounded-2xl bg-[#DCE7D5] text-[#284F2A]">{photoUrl ? <Image src={photoUrl} alt={plant.name} fill sizes="76px" className="object-cover" unoptimized /> : <Sprout size={19} aria-hidden="true" />}</span><span className="mt-1.5 block text-[10px] text-[#777B74]">{formatDate(recent.observedAt)}</span></button>;
-            })}
-          </div>
-        </div>
-      ) : null}
     </section>
   );
 }

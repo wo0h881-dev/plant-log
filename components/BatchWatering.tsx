@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { AlertCircle, ArrowRight, CalendarDays, Check, ChevronDown, Sprout, X } from "lucide-react";
 import { matchesPlantSearch } from "@/lib/plant-search";
+import { canShowInWateringList, isWateredToday, seoulDate, type WateredPlant } from "@/lib/watering";
 import { cacheWateringHeroPhoto, clearCachedWateringHeroPhoto, readCachedWateringHeroPhoto } from "@/lib/watering-hero-cache";
 import type { Plant, RecentObservedPlant, SaveState } from "@/types/plant";
 
@@ -13,10 +14,10 @@ type BatchWateringProps = {
   isLoading?: boolean;
   isPhotoLoading?: boolean;
   onWateringSaved?: () => void;
+  onTodayWateredChange?: (plants: WateredPlant[]) => void;
 };
 
 type WateringResult = { plantId: string; plantName: string; ok: boolean; message?: string };
-type WateredPlant = { id: string; name: string };
 type WateringResponse = {
   successCount?: number;
   failureCount?: number;
@@ -24,16 +25,6 @@ type WateringResponse = {
   message?: string;
 };
 type TodayWateringResponse = { plants?: WateredPlant[]; message?: string };
-
-function getTodayValue() {
-  const today = new Date();
-  const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60_000);
-  return localDate.toISOString().slice(0, 10);
-}
-
-function canShowInWateringList(plant: Plant) {
-  return !["자구", "사망"].includes(plant.category.trim());
-}
 
 const subscribeToCachedHeroPhoto = () => () => undefined;
 const getServerCachedHeroPhoto = () => undefined;
@@ -44,8 +35,9 @@ export function BatchWatering({
   isLoading = false,
   isPhotoLoading = false,
   onWateringSaved,
+  onTodayWateredChange,
 }: BatchWateringProps) {
-  const today = getTodayValue();
+  const today = seoulDate();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dismissedDueIds, setDismissedDueIds] = useState<string[]>([]);
   const [isDueOpen, setIsDueOpen] = useState(false);
@@ -60,6 +52,7 @@ export function BatchWatering({
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [message, setMessage] = useState("");
   const [results, setResults] = useState<WateringResult[]>([]);
+  const isListLoading = isLoading || isTodayLoading;
 
   const refreshTodayWatered = useCallback(() => {
     fetch(`/api/watering-logs?date=${today}`)
@@ -69,11 +62,10 @@ export function BatchWatering({
         return payload;
       })
       .then((payload) => {
-        setTodayWateredPlants(payload.plants ?? []);
+        setTodayWateredPlants((current) => [...new Map([...current, ...(payload.plants ?? [])].map((plant) => [plant.id || plant.name, plant])).values()]);
         setTodayWateringError(false);
       })
       .catch(() => {
-        setTodayWateredPlants([]);
         setTodayWateringError(true);
       })
       .finally(() => setIsTodayLoading(false));
@@ -83,9 +75,11 @@ export function BatchWatering({
     refreshTodayWatered();
   }, [refreshTodayWatered]);
 
+  useEffect(() => { if (!isTodayLoading) onTodayWateredChange?.(todayWateredPlants); }, [todayWateredPlants, onTodayWateredChange, isTodayLoading]);
+
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const dismissedDueIdSet = useMemo(() => new Set(dismissedDueIds), [dismissedDueIds]);
-  const wateringPlants = useMemo(() => plants.filter(canShowInWateringList), [plants]);
+  const wateringPlants = useMemo(() => plants.filter((plant) => canShowInWateringList(plant) && !dismissedDueIdSet.has(plant.id) && !isWateredToday(plant, todayWateredPlants, today)), [plants, dismissedDueIdSet, todayWateredPlants, today]);
   const duePlants = useMemo(
     () => wateringPlants
       .filter((plant) => plant.isWateringDue && !dismissedDueIdSet.has(plant.id))
@@ -121,7 +115,7 @@ export function BatchWatering({
     ];
     return candidates.find((url) => url && !failedPhotoUrlSet.has(url));
   }, [failedPhotoUrlSet, plants, recentPhotoByPlant]);
-  const dueHeroPhoto = isPhotoLoading ? undefined : duePlants.map(getPlantPhoto).find(Boolean);
+  const dueHeroPhoto = isPhotoLoading || isTodayLoading ? undefined : duePlants.map(getPlantPhoto).find(Boolean);
   const cachedHeroPhoto = useSyncExternalStore(
     subscribeToCachedHeroPhoto,
     readCachedWateringHeroPhoto,
@@ -267,12 +261,12 @@ export function BatchWatering({
   return (
     <div className="space-y-5">
       <section className="overflow-hidden rounded-[30px] bg-[#284F2A] text-white">
-        <button type="button" onClick={() => setIsDueOpen((current) => !current)} disabled={isLoading} className={`relative flex w-full items-end justify-between overflow-hidden text-left transition-[height,padding] duration-300 ease-out ${isDueOpen ? "h-[145px] p-4" : "h-[255px] p-5"}`} aria-expanded={isDueOpen}>
+        <button type="button" onClick={() => setIsDueOpen((current) => !current)} disabled={isListLoading} className={`relative flex w-full items-end justify-between overflow-hidden text-left transition-[height,padding] duration-300 ease-out ${isDueOpen ? "h-[145px] p-4" : "h-[255px] p-5"}`} aria-expanded={isDueOpen}>
           {displayedHeroPhoto ? <Image src={displayedHeroPhoto} alt="" fill priority sizes="(max-width: 390px) 100vw, 390px" className="object-cover object-center" unoptimized onError={handleDisplayedHeroPhotoError} /> : <span className="absolute inset-0 grid place-items-center bg-[#DCE7D5] text-[#284F2A]">{isLoading ? null : <Sprout size={74} strokeWidth={1} aria-hidden="true" />}</span>}
           <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
           <span className="relative pb-0.5">
             <span className={`block font-extrabold transition-[font-size] duration-300 ${isDueOpen ? "text-base" : "text-lg"}`}>물줄 때 된 식물</span>
-            {isLoading ? <span className="mt-2 block text-sm font-bold leading-5" aria-live="polite">물줄 식물을<br />확인하고 있어요</span> : duePlants.length ? <span className={`mt-1 block font-black leading-none transition-[font-size] duration-300 ${isDueOpen ? "text-[34px]" : "text-[46px]"}`}>{duePlants.length}<span className="ml-1 text-base">개</span></span> : <span className="mt-2 block text-sm font-bold leading-5" aria-live="polite">오늘은 물줄 식물이<br />없어요</span>}
+            {isListLoading ? <span className="mt-2 block text-sm font-bold leading-5" aria-live="polite">물줄 식물을<br />확인하고 있어요</span> : duePlants.length ? <span className={`mt-1 block font-black leading-none transition-[font-size] duration-300 ${isDueOpen ? "text-[34px]" : "text-[46px]"}`}>{duePlants.length}<span className="ml-1 text-base">개</span></span> : <span className="mt-2 block text-sm font-bold leading-5" aria-live="polite">오늘은 물줄 식물이<br />없어요</span>}
           </span>
           <span className={`relative grid shrink-0 place-items-center rounded-full bg-[#151515] text-white transition-[width,height] duration-300 ${isDueOpen ? "h-10 w-10" : "h-11 w-11"}`}>
             {isDueOpen ? <ChevronDown size={21} className="rotate-180" aria-hidden="true" /> : <ArrowRight size={20} aria-hidden="true" />}
@@ -293,7 +287,7 @@ export function BatchWatering({
       <section>
         <button type="button" onClick={() => setIsOtherOpen((current) => !current)} className="mb-3 flex w-full items-center justify-between text-left" aria-expanded={isOtherOpen}>
           <span className="text-lg font-black text-[#151515]">다른 식물 물주기</span>
-          <span className="flex items-center gap-1.5 text-sm font-semibold text-[#909090]">{wateringPlants.length}개 <ChevronDown size={17} className={`transition ${isOtherOpen ? "rotate-180" : ""}`} aria-hidden="true" /></span>
+          <span className="flex items-center gap-1.5 text-sm font-semibold text-[#909090]">{isListLoading ? "확인 중" : `${wateringPlants.length}개`} <ChevronDown size={17} className={`transition ${isOtherOpen ? "rotate-180" : ""}`} aria-hidden="true" /></span>
         </button>
         {isOtherOpen ? (
           <div>
@@ -301,7 +295,7 @@ export function BatchWatering({
               <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름 또는 초성으로 검색" className="h-10 w-full rounded-full border-0 bg-[#EDEEEA] px-4 pr-10 text-sm outline-none placeholder:text-[#909090] focus:ring-1 focus:ring-[#284F2A]/30" />
               {query ? <button type="button" onClick={() => setQuery("")} aria-label="검색어 지우기" className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center text-[#777B74]"><X size={16} aria-hidden="true" /></button> : null}
             </div>
-            <div className="max-h-[25rem] space-y-2 overflow-y-auto">{otherPlants.length ? otherPlants.map((plant) => renderPlantRow(plant)) : <p className="py-5 text-center text-sm text-[#909090]">검색 결과가 없습니다.</p>}</div>
+            <div className="max-h-[25rem] space-y-2 overflow-y-auto">{isListLoading ? <p className="py-5 text-center text-sm text-[#909090]">오늘 물준 기록을 확인하고 있어요.</p> : otherPlants.length ? otherPlants.map((plant) => renderPlantRow(plant)) : <p className="py-5 text-center text-sm text-[#909090]">검색 결과가 없습니다.</p>}</div>
           </div>
         ) : null}
       </section>

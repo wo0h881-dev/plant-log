@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Droplets, NotebookPen, RefreshCcw } from "lucide-react";
 import type { Plant, PlantCalendarEvent } from "@/types/plant";
+import { PlantSelect } from "@/components/PlantSelect";
+import { matchesPlantSearch } from "@/lib/plant-search";
 
 type ManagementCalendarProps = {
   plants: Plant[];
@@ -46,6 +48,9 @@ export function ManagementCalendar({ plants, onSelectPlant }: ManagementCalendar
   const [events, setEvents] = useState<PlantCalendarEvent[]>([]);
   const [loadedMonth, setLoadedMonth] = useState("");
   const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const [plantId, setPlantId] = useState("");
+  const selectedPlant = plants.find((plant) => plant.id === plantId);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -71,9 +76,15 @@ export function ManagementCalendar({ plants, onSelectPlant }: ManagementCalendar
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, PlantCalendarEvent[]>();
-    for (const event of events) map.set(event.date, [...(map.get(event.date) ?? []), event]);
+    for (const event of events) {
+      const plant = plants.find((item) => item.id === event.plantId);
+      const matches = plantId
+        ? (event.plantId ? event.plantId === plantId : event.plantName === selectedPlant?.name)
+        : matchesPlantSearch(plant ?? { name: event.plantName, category: "" }, query);
+      if (matches) map.set(event.date, [...(map.get(event.date) ?? []), event]);
+    }
     return map;
-  }, [events]);
+  }, [events, plants, plantId, query, selectedPlant?.name]);
   const selectedEvents = eventsByDate.get(selectedDate) ?? [];
   const isLoading = loadedMonth !== month;
   const days = buildMonthDays(month);
@@ -91,6 +102,12 @@ export function ManagementCalendar({ plants, onSelectPlant }: ManagementCalendar
         <h1 className="text-[32px] font-black leading-tight">관리 캘린더</h1>
         <p className="mt-1 text-[13px] font-medium text-[#777B74]">물주기와 관찰 기록을 날짜별로 확인해요.</p>
       </header>
+
+      <div className="mb-5">
+        <PlantSelect plants={plants} value={selectedPlant ? `${selectedPlant.category} - ${selectedPlant.name}` : ""} query={query} recentPlants={[]} variant="search" showPhotos={false}
+          onQueryChange={(value) => { setQuery(value); if (value !== selectedPlant?.name) setPlantId(""); }}
+          onSelect={(plant) => { setPlantId(plant.id); setQuery(plant.name); }} />
+      </div>
 
       <section className="rounded-[26px] bg-white p-4">
         <div className="flex items-center justify-between">

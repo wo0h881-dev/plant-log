@@ -16,7 +16,7 @@ export function getKoreanInitials(value: string) {
   }).join("");
 }
 
-export function matchesPlantSearch(plant: Plant, query: string) {
+export function matchesPlantSearch(plant: Pick<Plant, "name" | "category">, query: string) {
   const normalizedQuery = compact(query);
   if (!normalizedQuery) return true;
 

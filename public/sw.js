@@ -1,4 +1,4 @@
-const CACHE_NAME = "plant-log-v14";
+const CACHE_NAME = "plant-log-v15";
 const HERO_CACHE_NAME = "plant-log-watering-hero-v1";
 const APP_SHELL = ["/", "/icon.svg"];
 

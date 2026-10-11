@@ -1,20 +1,13 @@
 import { NextResponse } from "next/server";
-import { getDataSourceOptions, resolveDataSourceId } from "@/lib/notion";
+import { getDataSourceOptionGroups, resolveDataSourceId } from "@/lib/notion";
 
-const FALLBACK_OBSERVATION_TAGS = ["신엽", "하엽", "과습", "병해충", "꽃", "분갈이", "기타"];
+const FALLBACK_OBSERVATION_TAGS = ["신엽", "하엽", "과습", "뿌리", "상태이상", "해충", "꽃", "기타", "좋음", "안좋음", "분갈이", "온습도"];
 const HIDDEN_OBSERVATION_TAGS = new Set(["분갈이 필요"]);
 const FALLBACK_SOIL_OPTIONS = ["배흙", "수태", "세라미스", "펄라이트"];
 const FALLBACK_POT_OPTIONS = ["슬릿분", "토분", "플분", "투명분", "행잉분", "기타"];
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-async function readOptions(token: string, dataSourceId: string | undefined, propertyName: string, fallback: string[]) {
-  if (!dataSourceId) return fallback;
-
-  const options = await getDataSourceOptions(token, dataSourceId, propertyName);
-  return options.length ? options : fallback;
-}
 
 export async function GET() {
   const token = process.env.NOTION_TOKEN;
@@ -43,19 +36,23 @@ export async function GET() {
       configuredPlantsDataSourceId ||
       (plantsDatabaseId ? await resolveDataSourceId(token, plantsDatabaseId) : undefined);
 
-    const [observationTags, soilOptions, potOptions] = await Promise.all([
-      readOptions(token, observationDataSourceId, "관찰태그", FALLBACK_OBSERVATION_TAGS),
-      readOptions(token, plantsDataSourceId, "현재 흙", FALLBACK_SOIL_OPTIONS),
-      readOptions(token, plantsDataSourceId, "현재 화분", FALLBACK_POT_OPTIONS),
+    const [observationOptions, plantOptions] = await Promise.all([
+      observationDataSourceId ? getDataSourceOptionGroups(token, observationDataSourceId) : {} as Record<string, string[]>,
+      plantsDataSourceId ? getDataSourceOptionGroups(token, plantsDataSourceId) : {} as Record<string, string[]>,
     ]);
+    const observationTags = observationOptions["관찰태그"] ?? [];
+    const soilOptions = plantOptions["현재 흙"]?.length ? plantOptions["현재 흙"] : FALLBACK_SOIL_OPTIONS;
+    const potOptions = plantOptions["현재 화분"]?.length ? plantOptions["현재 화분"] : FALLBACK_POT_OPTIONS;
 
     return NextResponse.json(
       {
         observationTags: [
-          ...new Set([...observationTags.filter((tag) => !HIDDEN_OBSERVATION_TAGS.has(tag)), "분갈이"]),
+          ...new Set([...observationTags.filter((tag) => !HIDDEN_OBSERVATION_TAGS.has(tag)), ...FALLBACK_OBSERVATION_TAGS]),
         ],
         soilOptions,
         potOptions,
+        categoryOptions: plantOptions["대분류"] ?? [],
+        purchaseSourceOptions: plantOptions["구매처"] ?? [],
         source: "notion",
       },
       { headers: { "Cache-Control": "no-store" } },

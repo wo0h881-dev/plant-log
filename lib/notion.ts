@@ -160,7 +160,7 @@ export async function resolveDataSourceId(token: string, databaseId: string) {
   return dataSourceId;
 }
 
-export async function getDataSourceOptions(token: string, dataSourceId: string, propertyName: string) {
+export async function getDataSourceOptionGroups(token: string, dataSourceId: string) {
   const dataSource = await readNotionJson<NotionDataSource>(
     await fetch(`${NOTION_API_BASE}/data_sources/${dataSourceId}`, {
       method: "GET",
@@ -168,20 +168,47 @@ export async function getDataSourceOptions(token: string, dataSourceId: string, 
     }),
   );
 
-  const property = dataSource.properties?.[propertyName];
-  const options =
-    property?.type === "multi_select"
-      ? property.multi_select?.options
-      : property?.type === "select"
-        ? property.select?.options
-        : [];
+  return Object.fromEntries(Object.entries(dataSource.properties ?? {}).map(([name, property]) => {
+    const options = property.type === "multi_select" ? property.multi_select?.options : property.select?.options;
+    return [name, options?.map((option) => option.name?.trim() ?? "").filter(Boolean) ?? []];
+  }));
+}
 
-  return options?.map((option) => option.name?.trim() ?? "").filter(Boolean) ?? [];
+export async function getDataSourceOptions(token: string, dataSourceId: string, propertyName: string) {
+  return (await getDataSourceOptionGroups(token, dataSourceId))[propertyName] ?? [];
 }
 
 export async function getDatabasePropertyOptions(token: string, databaseId: string, propertyName: string) {
   const dataSourceId = await resolveDataSourceId(token, databaseId);
   return getDataSourceOptions(token, dataSourceId, propertyName);
+}
+
+export async function createPlantPage({ token, parentId, name, category, purchaseSource, adoptedAt, price, wateringCycleDays, photos }: {
+  token: string; parentId: string; name: string; category: string;
+  purchaseSource?: string; adoptedAt?: string; price?: number; wateringCycleDays?: number;
+  photos: UploadedPlantPhoto[];
+}) {
+  return readNotionJson<Parameters<typeof import("@/lib/plants").parseNotionPlantPage>[0]>(
+    await fetch(`${NOTION_API_BASE}/pages`, {
+      method: "POST", headers: notionHeaders(token),
+      body: JSON.stringify({
+        parent: { type: "data_source_id", data_source_id: parentId },
+        properties: {
+          식물명: { title: [{ text: { content: name } }] },
+          대분류: { select: { name: category } },
+          ...(purchaseSource ? { 구매처: { select: { name: purchaseSource } } } : {}),
+          ...(adoptedAt ? { 입양날짜: { date: { start: adoptedAt } } } : {}),
+          ...(price !== undefined ? { 가격: { number: price } } : {}),
+          ...(wateringCycleDays !== undefined ? { "관수 주기": { number: wateringCycleDays } } : {}),
+        },
+        ...(photos.length ? { cover: { type: "file_upload", file_upload: { id: photos[0].id } } } : {}),
+        children: photos.map((photo) => ({
+          object: "block", type: "image",
+          image: { type: "file_upload", file_upload: { id: photo.id } },
+        })),
+      }),
+    }),
+  );
 }
 
 export async function createPlantLogPage({
