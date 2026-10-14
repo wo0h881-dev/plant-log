@@ -135,3 +135,46 @@ test("today records and actual statistics read every page", async () => {
   assert.equal(filters.length, 4);
   assert.deepEqual(filters[2].and[1], { property: "식물", relation: { contains: plantId } });
 });
+
+const renameRequest = (body) => new Request("http://localhost/api/plants", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+test("rename updates only the existing plant title and keeps its ID", async () => {
+  const original = { ...returnedPage({ 식물명: { title: [{ text: { content: "밤비노 핑크" } }] }, 대분류: { select: { name: "자구" } }, "현재 흙": { multi_select: [{ name: "세라미스" }] } }), parent: { data_source_id: plantId } };
+  const writes = [];
+  global.fetch = async (url, options) => {
+    assert.ok(url.endsWith(`/pages/${plantId}`));
+    if (options.method !== "PATCH") return json(original);
+    const payload = JSON.parse(options.body);
+    writes.push(payload);
+    return json({ ...original, properties: { ...original.properties, ...returnedPage(payload.properties).properties } });
+  };
+  const response = await plantsApi.PATCH(renameRequest({ plantId, name: "  밤비노 핑크 2호  " }));
+  assert.equal(response.status, 200);
+  const { plant } = await response.json();
+  assert.equal(plant.id, plantId);
+  assert.equal(plant.name, "밤비노 핑크 2호");
+  assert.deepEqual(plant.currentSoils, ["세라미스"]);
+  assert.deepEqual(writes, [{ properties: { 식물명: { title: [{ text: { content: "밤비노 핑크 2호" } }] } } }]);
+});
+
+test("rename rejects invalid input without accessing Notion", async () => {
+  for (const body of [{ plantId, name: " " }, { plantId, name: "a".repeat(101) }, { plantId: "bad", name: "새 이름" }, { plantId, name: 1 }, null]) {
+    assert.equal((await plantsApi.PATCH(renameRequest(body))).status, 400);
+  }
+});
+
+test("rename cannot update another database or an archived plant", async () => {
+  for (const extra of [{ parent: { data_source_id: "22222222-2222-4222-8222-222222222222" } }, { parent: { data_source_id: plantId }, in_trash: true }]) {
+    let calls = 0;
+    global.fetch = async () => { calls++; return json({ ...returnedPage({ 식물명: { title: [] } }), ...extra }); };
+    assert.equal((await plantsApi.PATCH(renameRequest({ plantId, name: "새 이름" }))).status, 404);
+    assert.equal(calls, 1);
+  }
+});
+
+test("rename reports a Notion write failure", async () => {
+  global.fetch = async (_url, options) => options.method === "PATCH"
+    ? Response.json({ message: "write failed" }, { status: 500 })
+    : json({ ...returnedPage({ 식물명: { title: [] } }), parent: { data_source_id: plantId } });
+  assert.equal((await plantsApi.PATCH(renameRequest({ plantId, name: "새 이름" }))).status, 500);
+});

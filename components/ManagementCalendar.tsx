@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Droplets, NotebookPen, RefreshCcw } from "lucide-react";
 import type { Plant, PlantCalendarEvent } from "@/types/plant";
 import { PlantSelect } from "@/components/PlantSelect";
+import { PlantCareSummary } from "@/components/PlantCareSummary";
 import { matchesPlantSearch } from "@/lib/plant-search";
 
 type ManagementCalendarProps = {
@@ -139,6 +140,8 @@ export function ManagementCalendar({ plants, onSelectPlant }: ManagementCalendar
         <div className="mt-4 flex justify-center gap-4 border-t border-[#EEEFEA] pt-3 text-[10px] font-semibold text-[#777B74]"><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#4F9DB6]" />물주기</span><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#568455]" />관찰일지</span><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#B28748]" />분갈이</span></div>
       </section>
 
+      {selectedPlant ? <PlantCareSummary key={selectedPlant.id} plant={selectedPlant} /> : null}
+
       <section className="mt-5">
         <div className="mb-3 flex items-center justify-between"><h2 className="text-[17px] font-black">{formatSelectedDate(selectedDate)}</h2><span className="text-xs font-semibold text-[#909090]">{selectedEvents.length}개</span></div>
         {isLoading ? <div className="rounded-[22px] bg-white px-4 py-7 text-center text-sm text-[#909090]">기록을 불러오는 중...</div> : null}
@@ -150,7 +153,7 @@ export function ManagementCalendar({ plants, onSelectPlant }: ManagementCalendar
           const isRepotting = event.type === "repotting";
           const eventLabel = isWatering ? "물주기" : isRepotting ? "분갈이" : event.tags?.join(" · ") || "관찰일지";
           const iconStyle = isWatering ? "bg-[#E3F1F5] text-[#377E96]" : isRepotting ? "bg-[#F3EBDD] text-[#8B6937]" : "bg-[#E7EFE3] text-[#284F2A]";
-          return <button key={event.id} type="button" disabled={!plant} onClick={() => { if (plant) onSelectPlant(plant); }} className="flex w-full items-center gap-3 rounded-[22px] bg-white p-3 text-left transition enabled:active:scale-[0.99]"><span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${iconStyle}`}>{isWatering ? <Droplets size={19} aria-hidden="true" /> : isRepotting ? <RefreshCcw size={18} aria-hidden="true" /> : <NotebookPen size={18} aria-hidden="true" />}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-extrabold">{event.plantName}</span><span className="mt-0.5 block truncate text-[11px] text-[#909090]">{eventLabel}{event.note ? ` · ${event.note}` : ""}</span></span><ChevronRight size={16} className="shrink-0 text-[#A3A5A0]" aria-hidden="true" /></button>;
+          return <button key={event.id} type="button" disabled={!plant} onClick={() => { if (plant) onSelectPlant(plant); }} className="flex w-full items-center gap-3 rounded-[22px] bg-white p-3 text-left transition enabled:active:scale-[0.99]"><span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${iconStyle}`}>{isWatering ? <Droplets size={19} aria-hidden="true" /> : isRepotting ? <RefreshCcw size={18} aria-hidden="true" /> : <NotebookPen size={18} aria-hidden="true" />}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-extrabold">{plant?.name ?? event.plantName}</span><span className="mt-0.5 block truncate text-[11px] text-[#909090]">{eventLabel}{event.note ? ` · ${event.note}` : ""}</span></span><ChevronRight size={16} className="shrink-0 text-[#A3A5A0]" aria-hidden="true" /></button>;
         })}</div> : null}
       </section>
     </>

@@ -41,6 +41,7 @@ export function BatchWatering({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dismissedDueIds, setDismissedDueIds] = useState<string[]>([]);
   const [isDueOpen, setIsDueOpen] = useState(false);
+  const [isPupsOpen, setIsPupsOpen] = useState(false);
   const [isOtherOpen, setIsOtherOpen] = useState(true);
   const [query, setQuery] = useState("");
   const [wateredDate, setWateredDate] = useState(today);
@@ -91,6 +92,9 @@ export function BatchWatering({
     [query, wateringPlants],
   );
   const dueSelectedCount = duePlants.filter((plant) => selectedIdSet.has(plant.id)).length;
+  const dueMaturePlants = duePlants.filter((plant) => plant.category.trim() !== "자구");
+  const duePups = duePlants.filter((plant) => plant.category.trim() === "자구");
+  const selectedPupCount = duePups.filter((plant) => selectedIdSet.has(plant.id)).length;
   const areAllDueSelected = duePlants.length > 0 && dueSelectedCount === duePlants.length;
   const successfulResults = results.filter((result) => result.ok);
   const failedResults = results.filter((result) => !result.ok);
@@ -274,7 +278,19 @@ export function BatchWatering({
         </button>
         {isDueOpen ? (
           <div className="bg-[#F2F4EF] p-3 text-[#151515]">
-            {duePlants.length ? <><button type="button" onClick={toggleAllDuePlants} className="mb-2.5 min-h-10 w-full rounded-2xl bg-white text-sm font-extrabold text-[#284F2A]">{areAllDueSelected ? "전체해제" : "전체선택"}</button><div className="max-h-80 space-y-2 overflow-y-auto">{duePlants.map((plant) => renderPlantRow(plant, true))}</div></> : <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-4 text-sm text-[#777B74]"><Check size={18} className="text-[#284F2A]" aria-hidden="true" />오늘 확인할 물주기 알림이 없습니다.</div>}
+            {duePlants.length ? <>
+              <button type="button" onClick={toggleAllDuePlants} className="mb-2.5 min-h-10 w-full rounded-2xl bg-white text-sm font-extrabold text-[#284F2A]">{areAllDueSelected ? "전체해제" : "전체선택"}</button>
+              <div className="max-h-80 space-y-2 overflow-y-auto">
+                {dueMaturePlants.map((plant) => renderPlantRow(plant, true))}
+                {duePups.length ? <section className="border-t border-[#DDE3D7] pt-2">
+                  <button type="button" onClick={() => setIsPupsOpen((current) => !current)} aria-expanded={isPupsOpen} aria-controls="due-pups" className="flex min-h-12 w-full items-center justify-between gap-2 px-2 text-left">
+                    <span className="flex items-center gap-2 text-sm font-extrabold"><Sprout size={17} aria-hidden="true" />자구 <span className="text-xs font-semibold text-[#777B74]">{duePups.length}개{selectedPupCount ? ` · 선택 ${selectedPupCount}` : ""}</span></span>
+                    <ChevronDown size={18} className={isPupsOpen ? "rotate-180" : ""} aria-hidden="true" />
+                  </button>
+                  {isPupsOpen ? <div id="due-pups" className="space-y-2">{duePups.map((plant) => renderPlantRow(plant, true))}</div> : null}
+                </section> : null}
+              </div>
+            </> : <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-4 text-sm text-[#777B74]"><Check size={18} className="text-[#284F2A]" aria-hidden="true" />오늘 확인할 물주기 알림이 없습니다.</div>}
           </div>
         ) : null}
       </section>
