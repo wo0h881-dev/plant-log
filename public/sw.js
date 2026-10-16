@@ -1,6 +1,6 @@
 importScripts("/cover-icon-cache.js");
 
-const CACHE_NAME = "plant-log-v19";
+const CACHE_NAME = "plant-log-v20";
 const HERO_CACHE_NAME = "plant-log-watering-hero-v1";
 const COVER_ICON_CACHE_NAME = "plant-log-cover-icons-v1";
 const APP_SHELL = ["/", "/icon.svg", "/cover-icon-cache.js"];

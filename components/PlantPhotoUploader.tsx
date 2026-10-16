@@ -108,7 +108,7 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange, onBus
             </div>
           </>
         )}
-        <span className="absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-lg bg-[#191F28] text-white">
+        <span className="absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-lg bg-[#4263EB] text-white">
           <Camera size={19} aria-hidden="true" />
         </span>
         {previews.length ? (

@@ -10,7 +10,7 @@ async function main() {
   try {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, serviceWorkers: "block" });
     page.setDefaultTimeout(45000);
-    const errors = []; page.on("pageerror", (error) => errors.push(error.message));
+    const errors = []; page.on("pageerror", (error) => { errors.push(error.message); console.error(error.message); });
     const plant = { id: "11111111-1111-4111-8111-111111111111", name: "밤비노 핑크", category: "알로카시아", coverPhotoUrl: "/fixture/cover.jpg", wateringCycleDays: 2 };
     const photos = [{ id: "recent-1", name: "최근 사진", url: "/fixture/recent.jpg", date: "2026-10-16" }, { id: "old-1", name: "이전 사진", url: "/fixture/old.jpg", date: "2026-10-15" }];
     const svg = await fs.readFile(path.join(__dirname, "../public/icon.svg"));
@@ -34,12 +34,13 @@ async function main() {
     const nav = page.getByRole("navigation");
     await nav.getByRole("button", { name: "내 식물", exact: true }).click();
     const mainPhoto = page.getByRole("button", { name: "최근 사진 보기", exact: true });
-    assert.equal(await mainPhoto.locator("img").getAttribute("src"), "/fixture/cover.jpg");
+    await mainPhoto.locator("img").waitFor();
+    assert.equal(new URL(await mainPhoto.locator("img").getAttribute("src"), base).pathname, "/fixture/cover.jpg");
     await mainPhoto.click();
     await page.getByRole("dialog").waitFor();
     await page.getByRole("dialog").locator('img[src$="/fixture/recent.jpg"]').waitFor();
     await page.getByRole("button", { name: "사진 닫기", exact: true }).click();
-    assert.equal(await page.getByRole("button", { name: "최근 사진 보기", exact: true }).locator("img").getAttribute("src"), "/fixture/cover.jpg");
+    assert.equal(new URL(await page.getByRole("button", { name: "최근 사진 보기", exact: true }).locator("img").getAttribute("src"), base).pathname, "/fixture/cover.jpg");
     await page.getByRole("button", { name: "관수 주기 변경", exact: true }).click();
     await page.getByLabel("관수 주기 (일)").fill("5");
     await page.getByRole("button", { name: "관수 주기 저장", exact: true }).click();
@@ -50,14 +51,14 @@ async function main() {
     await page.getByRole("button", { name: "커버로 지정", exact: true }).click();
     await page.getByRole("dialog").waitFor({ state: "detached" });
     assert.ok(lastCover.includes('name="photoId"\r\n\r\nold-1'));
-    assert.equal(await page.getByRole("button", { name: "최근 사진 보기", exact: true }).locator("img").getAttribute("src"), "/fixture/selected-cover.jpg");
+    assert.equal(new URL(await page.getByRole("button", { name: "최근 사진 보기", exact: true }).locator("img").getAttribute("src"), base).pathname, "/fixture/selected-cover.jpg");
     const png = Buffer.from(await page.evaluate(() => { const canvas = document.createElement("canvas"); canvas.width = canvas.height = 16; const ctx = canvas.getContext("2d"); ctx.fillStyle = "#284F2A"; ctx.fillRect(0, 0, 16, 16); return canvas.toDataURL("image/png").split(",")[1]; }), "base64");
     await page.getByRole("button", { name: "커버사진 변경", exact: true }).click();
     await page.getByRole("dialog").locator('input[type="file"]').setInputFiles({ name: "new-cover.png", mimeType: "image/png", buffer: png });
     await page.getByRole("button", { name: "커버로 지정", exact: true }).click();
     await page.getByRole("dialog").waitFor({ state: "detached" });
     assert.ok(lastCover.includes('name="photo"'));
-    assert.equal(await page.getByRole("button", { name: "최근 사진 보기", exact: true }).locator("img").getAttribute("src"), "/fixture/uploaded-cover.jpg");
+    assert.equal(new URL(await page.getByRole("button", { name: "최근 사진 보기", exact: true }).locator("img").getAttribute("src"), base).pathname, "/fixture/uploaded-cover.jpg");
     const out = process.env.QA_OUTPUT || path.join(__dirname, "../.next/qa"); await fs.mkdir(out, { recursive: true });
     await page.screenshot({ path: path.join(out, "cover-and-cycle.png"), fullPage: true });
     assert.deepEqual(errors, []);

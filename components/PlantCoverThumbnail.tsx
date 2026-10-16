@@ -36,8 +36,8 @@ export const PlantCoverThumbnail = memo(function PlantCoverThumbnail({ src }: { 
     return observeVisibility(element, () => setVisible(true));
   }, [src]);
 
-  return <span ref={container} className="relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-[#EEF3EB] text-[#6A8565]" aria-hidden="true">
-    {!loaded ? <Sprout size={19} strokeWidth={1.5} /> : null}
+  return <span ref={container} className="relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-[#EEF2FF] text-[#8192BE]" aria-hidden="true">
+    {!loaded ? src && !failed ? <span className="photo-skeleton"><span className="photo-skeleton-shine" /></span> : <Sprout size={19} strokeWidth={1.5} /> : null}
     {src && visible && !failed ? <Image
       src={src} alt="" width={44} height={44} sizes="44px" loading="lazy" decoding="async" fetchPriority="low"
       loader={coverIconLoader}

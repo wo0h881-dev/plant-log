@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronRight, Search, Sprout, X } from "lucide-react";
 import { matchesPlantSearch } from "@/lib/plant-search";
 import type { Plant } from "@/types/plant";
@@ -26,6 +26,7 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const inputId = useId();
   const normalizedQuery = query.trim().toLowerCase();
   const filteredPlants = plants.filter((plant) => matchesPlantSearch(plant, normalizedQuery));
   const selectedPlant = plants.find((plant) => formatPlantName(plant) === value);
@@ -36,6 +37,8 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
   }
 
   function choosePlant(plant: Plant) {
+    inputRef.current?.blur();
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     onSelect(plant);
     setIsOpen(false);
   }
@@ -62,7 +65,7 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
       <Search size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#777B74]" aria-hidden="true" />
       <input
         ref={inputRef}
-        id={variant === "search" ? "profile-plant-search" : "plant-search"}
+        id={inputId}
         type="search"
         value={query}
         onFocus={() => setIsOpen(true)}
@@ -70,7 +73,7 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
         onChange={(event) => { onQueryChange(event.target.value); setIsOpen(true); }}
         placeholder="식물 검색"
         aria-label="식물 검색"
-        onKeyDown={(event) => { if (event.key === "Escape") setIsOpen(false); }}
+        onKeyDown={(event) => { if (event.key === "Escape") { inputRef.current?.blur(); setIsOpen(false); } }}
         className="field pl-11 pr-11"
       />
       {query ? (
@@ -85,10 +88,10 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
     <section ref={containerRef} className="relative">
       {variant === "row" ? (
         <>
-          <label htmlFor="plant-search" className="section-title mb-3 block">식물 선택</label>
+          <label htmlFor={inputId} className="section-title mb-3 block">식물 선택</label>
           {!isOpen ? (
             <button type="button" onClick={openList} className="flex min-h-14 w-full items-center gap-3 rounded-lg bg-[#F5F6F8] px-4 text-left">
-              {showPhotos ? <span className="relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-[#DDE6D7] text-[#284F2A]">
+              {showPhotos ? <span className="relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-[#E7EDFF] text-[#4263EB]">
                 {selectedPlant?.coverPhotoUrl ? <Image src={selectedPlant.coverPhotoUrl} alt="" fill sizes="44px" className="object-cover" unoptimized /> : <Sprout size={19} aria-hidden="true" />}
               </span> : null}
               <span className="min-w-0 flex-1">
@@ -107,7 +110,7 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
             <div className="mb-2 flex gap-2 overflow-x-auto px-1 pb-1">
               {recentPlants.map((plantName) => {
                 const plant = plants.find((item) => formatPlantName(item) === plantName);
-                return plant ? <button key={plantName} type="button" onClick={() => choosePlant(plant)} className="shrink-0 rounded-full bg-[#EEF3EB] px-3 py-2 text-xs font-bold text-[#284F2A]">{plant.name}</button> : null;
+                return plant ? <button key={plantName} type="button" onClick={() => choosePlant(plant)} className="shrink-0 rounded-full bg-[#EEF2FF] px-3 py-2 text-xs font-bold text-[#4263EB]">{plant.name}</button> : null;
               })}
             </div>
           ) : null}
@@ -115,8 +118,8 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
             {filteredPlants.length ? filteredPlants.map((plant) => {
               const isSelected = formatPlantName(plant) === value;
               return (
-                <button key={plant.id} type="button" onClick={() => choosePlant(plant)} className={`flex min-h-12 w-full items-center gap-3 rounded-md px-2.5 text-left transition ${isSelected ? "bg-[#EDF4EE] text-[#284F2A]" : "text-[#191F28] active:bg-[#F5F6F8]"}`}>
-                  {showPhotos ? <span className={`relative grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-xl ${isSelected ? "bg-white/15" : "bg-[#EEF3EB] text-[#284F2A]"}`}>
+                <button key={plant.id} type="button" onClick={() => choosePlant(plant)} className={`flex min-h-12 w-full items-center gap-3 rounded-md px-2.5 text-left transition ${isSelected ? "bg-[#EEF2FF] text-[#4263EB]" : "text-[#191F28] active:bg-[#F5F6F8]"}`}>
+                  {showPhotos ? <span className={`relative grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-xl ${isSelected ? "bg-white/15" : "bg-[#EEF2FF] text-[#4263EB]"}`}>
                     {plant.coverPhotoUrl ? <Image src={plant.coverPhotoUrl} alt="" fill sizes="36px" className="object-cover" unoptimized /> : <Sprout size={16} aria-hidden="true" />}
                   </span> : null}
                   <span className="min-w-0 flex-1 break-words text-sm font-medium">{plant.name}</span>

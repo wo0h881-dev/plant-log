@@ -37,10 +37,10 @@ export function PlantNameEditor({ plant, onSaved }: { plant: Plant; onSaved: (pl
   return <section aria-label="식물 이름 변경">
     {editing ? <form onSubmit={save} className="flex items-end gap-2">
       <label className="min-w-0 flex-1"><span className="mb-2 block text-xs font-medium text-[#8B929B]">새 식물명</span><input autoFocus value={name} onChange={(event) => setName(event.target.value)} required maxLength={100} disabled={saving} className="field" /></label>
-      <button type="submit" disabled={saving || !name.trim() || name.trim() === plant.name} aria-label="이름 변경 저장" title="이름 변경 저장" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#284F2A] text-white disabled:opacity-40"><Check size={19} aria-hidden="true" /></button>
+      <button type="submit" disabled={saving || !name.trim() || name.trim() === plant.name} aria-label="이름 변경 저장" title="이름 변경 저장" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#4263EB] text-white disabled:opacity-40"><Check size={19} aria-hidden="true" /></button>
       <button type="button" disabled={saving} onClick={() => { setEditing(false); setError(""); }} aria-label="이름 변경 취소" title="이름 변경 취소" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white text-[#777B74]"><X size={19} aria-hidden="true" /></button>
-    </form> : <div className="flex items-center justify-between border-t border-[#ECEEF1] pt-3"><span className="text-xs text-[#8B929B]">식물 이름</span><button type="button" onClick={() => { setName(plant.name); setEditing(true); setMessage(""); setError(""); }} className="flex min-h-10 items-center gap-2 px-2 text-xs font-medium text-[#284F2A]"><Pencil size={14} aria-hidden="true" />이름 변경</button></div>}
+    </form> : <div className="flex items-center justify-between border-t border-[#ECEEF1] pt-3"><span className="text-xs text-[#8B929B]">식물 이름</span><button type="button" onClick={() => { setName(plant.name); setEditing(true); setMessage(""); setError(""); }} className="flex min-h-10 items-center gap-2 px-2 text-xs font-medium text-[#4263EB]"><Pencil size={14} aria-hidden="true" />이름 변경</button></div>}
     {error ? <p role="alert" className="mt-2 text-xs text-red-700">{error}</p> : null}
-    {message ? <p role="status" className="mt-2 text-right text-xs text-[#284F2A]">{message}</p> : null}
+    {message ? <p role="status" className="mt-2 text-right text-xs text-[#4263EB]">{message}</p> : null}
   </section>;
 }

@@ -1,14 +1,15 @@
 "use client";
 
-import Image from "next/image";
-import { ArrowRight, ChevronRight, Heart, Sprout } from "lucide-react";
-import { useState } from "react";
-import type { Plant, RecentObservedPlant } from "@/types/plant";
+import { ArrowRight, ChevronRight, Heart } from "lucide-react";
+import { useEffect, useState } from "react";
+import type { Plant, PlantPhotoSummary, RecentObservedPlant } from "@/types/plant";
+import { PlantPhotoCarousel } from "@/components/PlantPhotoCarousel";
+import { plantCarouselPhotos } from "@/lib/plant-photos";
 
 type RecentObservedPlantsProps = {
   plants: Plant[];
   recentPlants: RecentObservedPlant[];
-  onSelect: (plant: Plant, openPhotos?: boolean) => void;
+  onSelect: (plant: Plant, openPhotos?: boolean, photoId?: string) => void;
 };
 
 function formatDate(dateValue?: string) {
@@ -28,7 +29,18 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
     return plant ? [{ recent, plant }] : [];
   });
   const featured = items[0];
-  const featuredPhotoUrl = featured?.plant.coverPhotoUrl;
+  const featuredId = featured?.plant.id;
+  const featuredName = featured?.plant.name;
+  const [featuredPhotos, setFeaturedPhotos] = useState<{ plantId: string; photos: PlantPhotoSummary[] }>();
+  useEffect(() => {
+    if (!featuredId) return;
+    const controller = new AbortController();
+    fetch(`/api/plant-details?${new URLSearchParams({ plantId: featuredId, plantName: featuredName ?? "" })}`, { signal: controller.signal })
+      .then(async (response) => { if (!response.ok) throw new Error("사진 조회 실패"); return response.json(); })
+      .then((payload) => { if (!controller.signal.aborted) setFeaturedPhotos({ plantId: featuredId, photos: payload.photos ?? [] }); })
+      .catch(() => { if (!controller.signal.aborted) setFeaturedPhotos({ plantId: featuredId, photos: [] }); });
+    return () => controller.abort();
+  }, [featuredId, featuredName]);
   const previewItems = items.slice(0, 8);
 
   function toggleAllPlants() {
@@ -96,10 +108,9 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
 
       {!showAllPlants && featured ? (
         <div>
-          <div className="detail-photo">
-            <button type="button" onClick={() => onSelect(featured.plant, true)} aria-label="최근 사진 보기" className="absolute inset-0">{featuredPhotoUrl ? <Image src={featuredPhotoUrl} alt={featured.plant.name} fill priority sizes="(max-width: 440px) 100vw, 440px" className="object-cover object-center" unoptimized /> : <span className="absolute inset-0 grid place-items-center text-[#A7B4A6]"><Sprout size={56} strokeWidth={1} aria-hidden="true" /></span>}</button>
+          <PlantPhotoCarousel key={`${featured.plant.id}:${featured.plant.coverPhotoUrl}`} photos={plantCarouselPhotos(featured.plant.id, featured.plant.name, featured.plant.coverPhotoUrl, featuredPhotos?.plantId === featured.plant.id ? featuredPhotos.photos : [])} loading={featuredPhotos?.plantId !== featured.plant.id} onOpen={(photo) => onSelect(featured.plant, true, photo.id === `${featured.plant.id}-cover` ? undefined : photo.id)} controls={
             <button type="button" onClick={() => setIsFavorite((current) => !current)} className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-white/95 text-[#191F28]" title={isFavorite ? "즐겨찾기 해제" : "즐겨찾기"} aria-label={isFavorite ? "즐겨찾기 해제" : "즐겨찾기"}><Heart size={17} fill={isFavorite ? "currentColor" : "none"} aria-hidden="true" /></button>
-          </div>
+          } />
           <button type="button" onClick={() => onSelect(featured.plant)} className="flex w-full items-center justify-between gap-4 py-4 text-left">
             <span className="min-w-0">
               <span className="mb-1 block truncate text-[11px] text-[#8B929B]">{featured.plant.scientificName ?? featured.plant.category}</span>

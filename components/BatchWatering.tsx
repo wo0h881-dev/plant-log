@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AlertCircle, CalendarDays, Check, ChevronDown, Sprout, X } from "lucide-react";
 import { matchesPlantSearch } from "@/lib/plant-search";
 import { canShowInWateringList, isWateredToday, seoulDate, type WateredPlant } from "@/lib/watering";
@@ -54,6 +54,7 @@ export function BatchWatering({
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [message, setMessage] = useState("");
   const [results, setResults] = useState<WateringResult[]>([]);
+  const submitting = useRef(false);
   const isListLoading = isLoading || isTodayLoading;
 
   const refreshTodayWatered = useCallback(() => {
@@ -161,6 +162,7 @@ export function BatchWatering({
   }
 
   function togglePlant(plantId: string) {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     setSelectedIds((current) =>
       current.includes(plantId) ? current.filter((id) => id !== plantId) : [...current, plantId],
     );
@@ -177,7 +179,8 @@ export function BatchWatering({
 
   async function saveWateringLogs() {
     const selectedPlants = wateringPlants.filter((plant) => selectedIdSet.has(plant.id));
-    if (!selectedPlants.length) return;
+    if (!selectedPlants.length || submitting.current) return;
+    submitting.current = true;
 
     setSaveState("saving");
     setMessage("");
@@ -226,7 +229,7 @@ export function BatchWatering({
     } catch (error) {
       setSaveState("error");
       setMessage(error instanceof Error ? error.message : "물주기 기록 저장에 실패했습니다.");
-    }
+    } finally { submitting.current = false; }
   }
 
   function renderPlantRow(plant: Plant, due = false) {
@@ -253,7 +256,7 @@ export function BatchWatering({
               : daysText}
           </span>
         </span>
-        <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-md border transition ${isSelected ? "border-[#284F2A] bg-[#284F2A] text-white" : "border-[#D6DAE0] bg-white text-transparent"}`}>
+        <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-md border transition ${isSelected ? "border-[#4263EB] bg-[#4263EB] text-white" : "border-[#D6DAE0] bg-white text-transparent"}`}>
           <Check size={16} strokeWidth={3} aria-hidden="true" />
         </span>
       </button>
@@ -261,22 +264,22 @@ export function BatchWatering({
   }
 
   return (
-    <div className="space-y-6">
+    <fieldset disabled={saveState === "saving"} aria-busy={saveState === "saving"} className="space-y-6 min-w-0">
       <section>
         <button type="button" onClick={() => setIsDueOpen((current) => !current)} disabled={isListLoading} className={`relative flex w-full items-center justify-between gap-4 overflow-hidden rounded-lg bg-[#F5F6F8] p-5 text-left transition-[height] duration-200 ${isDueOpen ? "h-[116px]" : "h-[172px]"}`} aria-expanded={isDueOpen}>
           <span className="relative z-10 min-w-0 flex-1">
             <span className="block text-[13px] font-semibold text-[#626B76]">물줄 때 된 식물</span>
-            {isListLoading ? <span className="mt-3 block text-sm leading-5 text-[#8B929B]" aria-live="polite">물줄 식물을<br />확인하고 있어요</span> : duePlants.length ? <span className={`mt-2 block font-bold leading-none text-[#4869D8] ${isDueOpen ? "text-[30px]" : "text-[40px]"}`}>{duePlants.length}<span className="ml-1.5 text-base font-medium text-[#626B76]">개</span></span> : <span className="mt-3 block text-sm leading-5 text-[#626B76]" aria-live="polite">오늘은 물줄 식물이<br />없어요</span>}
+            {isListLoading ? <span className="mt-3 block text-sm leading-5 text-[#8B929B]" aria-live="polite">물줄 식물을<br />확인하고 있어요</span> : duePlants.length ? <span className={`mt-2 block font-bold leading-none text-[#4263EB] ${isDueOpen ? "text-[30px]" : "text-[40px]"}`}>{duePlants.length}<span className="ml-1.5 text-base font-medium text-[#626B76]">개</span></span> : <span className="mt-3 block text-sm leading-5 text-[#626B76]" aria-live="polite">오늘은 물줄 식물이<br />없어요</span>}
             <span className="mt-3 flex items-center gap-1 text-[11px] font-medium text-[#626B76]">{isDueOpen ? "목록 접기" : "목록 확인"}<ChevronDown size={14} className={isDueOpen ? "rotate-180" : ""} aria-hidden="true" /></span>
           </span>
-          <span className={`relative w-[42%] shrink-0 overflow-hidden rounded-lg bg-[#E9EEEA] transition-[height] duration-200 ${isDueOpen ? "h-[76px]" : "h-[132px]"}`}>
-            {displayedHeroPhoto ? <Image src={displayedHeroPhoto} alt="" fill priority sizes="160px" className="object-cover object-center" unoptimized onError={handleDisplayedHeroPhotoError} /> : <span className="absolute inset-0 grid place-items-center text-[#8DA68C]">{isLoading ? null : <Sprout size={42} strokeWidth={1.2} aria-hidden="true" />}</span>}
+          <span className={`relative w-[42%] shrink-0 overflow-hidden rounded-lg bg-[#EEF2FF] transition-[height] duration-200 ${isDueOpen ? "h-[76px]" : "h-[132px]"}`}>
+            {displayedHeroPhoto ? <Image src={displayedHeroPhoto} alt="" fill priority sizes="160px" className="object-cover object-center" unoptimized onError={handleDisplayedHeroPhotoError} /> : isPhotoLoading || isTodayLoading || dueHeroPhoto ? <span className="photo-skeleton" aria-hidden="true"><span className="photo-skeleton-shine" /></span> : <span className="absolute inset-0 grid place-items-center text-[#8C9DC5]"><Sprout size={42} strokeWidth={1.2} aria-hidden="true" /></span>}
           </span>
         </button>
         {isDueOpen ? (
           <div className="pt-3 text-[#191F28]">
             {duePlants.length ? <>
-              <div className="flex items-center justify-between border-b border-[#ECEEF1] pb-2"><span className="text-xs text-[#8B929B]">{dueSelectedCount ? `${dueSelectedCount}개 선택` : "물 준 식물 선택"}</span><button type="button" onClick={toggleAllDuePlants} className="min-h-10 px-2 text-xs font-semibold text-[#284F2A]">{areAllDueSelected ? "전체해제" : "전체선택"}</button></div>
+              <div className="flex items-center justify-between border-b border-[#ECEEF1] pb-2"><span className="text-xs text-[#8B929B]">{dueSelectedCount ? `${dueSelectedCount}개 선택` : "물 준 식물 선택"}</span><button type="button" onClick={toggleAllDuePlants} className="min-h-10 px-2 text-xs font-semibold text-[#4263EB]">{areAllDueSelected ? "전체해제" : "전체선택"}</button></div>
               <div className="max-h-80 overflow-y-auto">
                 {dueMaturePlants.map((plant) => renderPlantRow(plant, true))}
                 {duePups.length ? <section className="border-t border-[#DDE3D7] pt-2">
@@ -287,7 +290,7 @@ export function BatchWatering({
                   {isPupsOpen ? <div id="due-pups">{duePups.map((plant) => renderPlantRow(plant, true))}</div> : null}
                 </section> : null}
               </div>
-            </> : <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-4 text-sm text-[#777B74]"><Check size={18} className="text-[#284F2A]" aria-hidden="true" />오늘 확인할 물주기 알림이 없습니다.</div>}
+            </> : <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-4 text-sm text-[#777B74]"><Check size={18} className="text-[#4263EB]" aria-hidden="true" />오늘 확인할 물주기 알림이 없습니다.</div>}
           </div>
         ) : null}
       </section>
@@ -316,13 +319,13 @@ export function BatchWatering({
       <section className="section-divider">
         <div className="mb-3 flex items-center justify-between"><h2 className="section-title">오늘 물 준 식물</h2><span className="text-xs font-medium text-[#8B929B]">{todayWateredPlants.length}개</span></div>
         {isTodayLoading ? <div className="h-14 animate-pulse rounded-2xl bg-white" /> : todayWateringError ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-center text-xs text-red-700">오늘 기록을 불러오지 못했어요.</div> : todayWateredPlants.length ? (
-          <div className="flex gap-2 overflow-x-auto pb-1">{todayWateredPlants.map((plant) => <div key={plant.id || plant.name} className="flex w-36 shrink-0 items-center gap-2 rounded-lg border border-[#ECEEF1] p-3"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#EDF4EE] text-[#284F2A]"><Check size={14} aria-hidden="true" /></span><span className="min-w-0"><span className="block truncate text-xs font-semibold">{plant.name}</span><span className="text-[10px] text-[#909090]">오늘 완료</span></span></div>)}</div>
+          <div className="flex gap-2 overflow-x-auto pb-1">{todayWateredPlants.map((plant) => <div key={plant.id || plant.name} className="flex w-36 shrink-0 items-center gap-2 rounded-lg border border-[#ECEEF1] p-3"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#EEF2FF] text-[#4263EB]"><Check size={14} aria-hidden="true" /></span><span className="min-w-0"><span className="block truncate text-xs font-semibold">{plant.name}</span><span className="text-[10px] text-[#909090]">오늘 완료</span></span></div>)}</div>
         ) : <div className="rounded-2xl bg-white px-4 py-3 text-center text-xs text-[#909090]">아직 오늘 물 준 식물이 없어요.</div>}
       </section>
 
-      {message ? <div className={`rounded-2xl px-4 py-3 text-sm ${saveState === "error" ? "bg-red-50 text-red-700" : "bg-[#E7EFE3] text-[#284F2A]"}`}><div className="flex items-start gap-2">{saveState === "error" ? <AlertCircle size={17} className="mt-0.5 shrink-0" aria-hidden="true" /> : <Check size={17} className="mt-0.5 shrink-0" aria-hidden="true" />}<div><p className="font-semibold">{message}</p>{successfulResults.length ? <p className="mt-1">성공: {successfulResults.map((result) => result.plantName).join(", ")}</p> : null}{failedResults.length ? <p className="mt-1">실패: {failedResults.map((result) => result.plantName).join(", ")}</p> : null}</div></div></div> : null}
+      {message ? <div className={`rounded-2xl px-4 py-3 text-sm ${saveState === "error" ? "bg-red-50 text-red-700" : "bg-[#EEF2FF] text-[#4263EB]"}`}><div className="flex items-start gap-2">{saveState === "error" ? <AlertCircle size={17} className="mt-0.5 shrink-0" aria-hidden="true" /> : <Check size={17} className="mt-0.5 shrink-0" aria-hidden="true" />}<div><p className="font-semibold">{message}</p>{successfulResults.length ? <p className="mt-1">성공: {successfulResults.map((result) => result.plantName).join(", ")}</p> : null}{failedResults.length ? <p className="mt-1">실패: {failedResults.map((result) => result.plantName).join(", ")}</p> : null}</div></div></div> : null}
 
       {selectedIds.length ? <div className="save-dock"><button type="button" onClick={saveWateringLogs} disabled={saveState === "saving"} className="primary-button">{saveState === "saving" ? "저장 중..." : failedResults.length ? `실패한 ${selectedIds.length}개 다시 저장` : `${selectedIds.length}개 물주기 저장`}</button></div> : null}
-    </div>
+    </fieldset>
   );
 }

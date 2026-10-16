@@ -60,18 +60,22 @@ async function main() {
     }
     await page.screenshot({ path: path.join(out, "design-water-open.png") });
     const nav = page.getByRole("navigation");
-    assert.deepEqual(await nav.getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.lastElementChild.textContent)), ["물주기", "관찰일지", "내 식물", "더보기"]);
-    for (const [label, file] of [["관찰일지", "observation"], ["내 식물", "plants"], ["더보기", "calendar"]]) {
+    assert.deepEqual(await nav.getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.lastElementChild.textContent)), ["물주기", "관찰일지", "내 식물", "캘린더"]);
+    for (const [label, file] of [["관찰일지", "observation"], ["내 식물", "plants"], ["캘린더", "calendar"]]) {
       await nav.getByRole("button", { name: label, exact: true }).click();
-      if (label === "내 식물") await page.getByRole("heading", { name: "최근 관찰한 식물", exact: true }).waitFor();
-      if (label === "더보기") await page.getByText("기록을 불러오는 중...", { exact: true }).waitFor({ state: "detached" });
+      if (label === "내 식물") {
+        await page.getByRole("heading", { name: "최근 관찰한 식물", exact: true }).waitFor();
+        await page.locator("[data-screen]:not([hidden])").getByText("사진 확인 중", { exact: true }).waitFor({ state: "detached" });
+      }
+      if (label === "캘린더") await page.getByText("기록을 불러오는 중...", { exact: true }).waitFor({ state: "detached" });
       await page.waitForLoadState("networkidle");
-      await page.evaluate(async () => Promise.all([...document.images].map((image) => image.decode().catch(() => {}))));
+      await page.locator("[data-screen]:not([hidden]) img").evaluateAll(async (images) => Promise.all(images.map((image) => image.decode().catch(() => {}))));
+      await page.waitForFunction(() => [...document.querySelectorAll('[data-screen]:not([hidden]) img')].every((image) => getComputedStyle(image).opacity === "1" || image.complete && image.naturalWidth === 0));
       await page.screenshot({ path: path.join(out, `design-${file}.png`) });
       for (const width of [320, 390, 430, 768]) {
         await page.setViewportSize({ width, height: 844 });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${label} overflows at ${width}`);
-        const input = page.getByPlaceholder("식물 검색");
+        const input = page.locator("[data-screen]:not([hidden])").getByPlaceholder("식물 검색");
         if (await input.count()) assert.ok(await input.evaluate((element) => parseFloat(getComputedStyle(element).paddingLeft) >= 40));
       }
       await page.setViewportSize({ width: 390, height: 844 });

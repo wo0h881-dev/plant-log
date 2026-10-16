@@ -22,6 +22,7 @@ require.extensions[".ts"] = (module, filename) => {
 const { calculateWateringStats, canShowInWateringList, isWateredToday, normalizeDay } = require("../lib/watering.ts");
 const { readEnvironmentNote } = require("../lib/observation-environment.ts");
 const { canOptimizePlantCover, NOTION_COVER_HOST } = require("../lib/plant-cover.ts");
+const { plantCarouselPhotos, uniquePlantPhotos } = require("../lib/plant-photos.ts");
 const plantsApi = require("../app/api/plants/route.ts");
 const coverApi = require("../app/api/plant-cover/route.ts");
 const observationApi = require("../app/api/plant-logs/route.ts");
@@ -64,6 +65,18 @@ test("cover optimization allows only local files and the known Notion host", () 
   assert.equal(canOptimizePlantCover(`https://${NOTION_COVER_HOST}:444/photo.jpg`), false);
   assert.equal(canOptimizePlantCover("//example.com/photo.jpg"), false);
   assert.equal(canOptimizePlantCover("invalid"), false);
+});
+
+test("carousel keeps cover first, deduplicates signed files, and preserves meaningful external queries", () => {
+  const src = `https://${NOTION_COVER_HOST}/photo.jpg`;
+  const recent = [
+    { id: "same", name: "same", url: `${src}?X-Amz-Signature=renewed` },
+    { id: "new", name: "new", url: "https://example.com/photo?id=2" },
+  ];
+  const photos = plantCarouselPhotos(plantId, "식물", `${src}?X-Amz-Signature=old`, recent);
+  assert.deepEqual(photos.map((photo) => photo.id), [`${plantId}-cover`, "new"]);
+  assert.equal(uniquePlantPhotos([{ id: "1", url: "https://example.com/photo?id=1" }, { id: "2", url: "https://example.com/photo?id=2" }]).length, 2);
+  assert.equal(plantCarouselPhotos(plantId, "식물", undefined, []).length, 0);
 });
 
 test("watering means deduplicate days and ignore invalid/future dates", () => {
