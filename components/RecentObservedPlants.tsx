@@ -4,6 +4,7 @@ import { ArrowRight, ChevronRight, Heart } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { Plant, PlantPhotoSummary, RecentObservedPlant } from "@/types/plant";
 import { PlantPhotoCarousel } from "@/components/PlantPhotoCarousel";
+import { PlantCoverThumbnail } from "@/components/PlantCoverThumbnail";
 import { plantCarouselPhotos } from "@/lib/plant-photos";
 
 type RecentObservedPlantsProps = {
@@ -81,7 +82,8 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
           <div className="grid grid-cols-2 gap-3">
             {items.map(({ recent, plant }) => {
               return (
-                <button key={plant.id} type="button" onClick={() => onSelect(plant)} className="recent-plant">
+                <button key={plant.id} type="button" onClick={() => onSelect(plant)} className="recent-plant flex items-center gap-2.5">
+                  <PlantCoverThumbnail key={plant.coverPhotoUrl ?? "no-cover"} src={plant.coverPhotoUrl} />
                   <span className="block">
                     <span className="mb-2 block text-[10px] text-[#8B929B]">{plant.category}</span>
                     <span className="block break-words text-[13px] font-semibold">{plant.name}</span>

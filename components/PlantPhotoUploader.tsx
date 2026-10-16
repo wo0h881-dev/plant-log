@@ -1,8 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { ChangeEvent, useEffect, useId, useMemo, useState } from "react";
-import { Camera, ImagePlus } from "lucide-react";
+import { ChangeEvent, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Camera, ImagePlus, X } from "lucide-react";
 import { parse } from "exifr";
 import { compressImage } from "@/lib/imageCompression";
 
@@ -32,6 +32,7 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange, onBus
   const inputId = useId();
   const [isCompressing, setIsCompressing] = useState(false);
   const [error, setError] = useState("");
+  const processing = useRef(false);
   const previews = useMemo(
     () => files.map((file) => ({ name: file.name, url: URL.createObjectURL(file) })),
     [files],
@@ -42,14 +43,12 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange, onBus
   }, [previews]);
 
   async function handleChange(event: ChangeEvent<HTMLInputElement>) {
-    const selected = Array.from(event.target.files ?? []);
+    const input = event.currentTarget;
+    const selected = Array.from(input.files ?? []);
+    input.value = "";
+    if (processing.current || !selected.length) return;
     setError("");
-
-    if (!selected.length) {
-      onChange([]);
-      onCaptureDateChange(null);
-      return;
-    }
+    if (files.length + selected.length > 20) { setError("사진은 총 20장까지 선택할 수 있어요."); return; }
 
     const imageFiles = selected.filter((file) => file.type.startsWith("image/"));
     if (imageFiles.length !== selected.length) {
@@ -57,31 +56,34 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange, onBus
       return;
     }
 
+    processing.current = true;
     setIsCompressing(true);
     onBusyChange?.(true);
     try {
-      const captureDate = await readCaptureDate(imageFiles[0]).catch(() => null);
-      const compressedFiles = await Promise.all(imageFiles.map((file) => compressImage(file)));
-      onChange(compressedFiles);
-      onCaptureDateChange(captureDate);
+      const captureDate = !files.length ? await readCaptureDate(imageFiles[0]).catch(() => null) : null;
+      const compressedFiles: File[] = [];
+      for (const file of imageFiles) compressedFiles.push(await compressImage(file));
+      const nextFiles = [...files, ...compressedFiles];
+      if (nextFiles.reduce((size, file) => size + file.size, 0) > 4_000_000) throw new Error("사진은 압축 후 합계 4MB 이하로 선택해주세요.");
+      onChange(nextFiles);
+      if (!files.length) onCaptureDateChange(captureDate);
     } catch (compressionError) {
       setError(compressionError instanceof Error ? compressionError.message : "사진 처리에 실패했습니다.");
     } finally {
       setIsCompressing(false);
+      processing.current = false;
       onBusyChange?.(false);
-      event.target.value = "";
     }
   }
 
   return (
     <section className="overflow-hidden rounded-lg bg-[#F5F6F8]">
-      <label
-        htmlFor={inputId}
-        className="relative flex min-h-[190px] cursor-pointer flex-col items-center justify-center text-center transition active:opacity-90"
+      <div
+        className="relative flex min-h-[190px] flex-col items-center justify-center text-center"
       >
         {previews.length ? (
           <div className="grid min-h-[224px] w-full grid-cols-2 gap-1">
-            {previews.slice(0, 4).map((preview, index) => (
+            {previews.map((preview, index) => (
               <div key={preview.url} className={`relative overflow-hidden bg-white ${previews.length === 1 ? "col-span-2 min-h-[224px]" : "min-h-28"}`}>
                 <Image
                   src={preview.url}
@@ -91,11 +93,7 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange, onBus
                   className="h-full w-full object-cover"
                   unoptimized
                 />
-                {index === 3 && previews.length > 4 ? (
-                  <div className="absolute inset-0 grid place-items-center bg-stone-950/50 text-lg font-bold text-white">
-                    +{previews.length - 4}
-                  </div>
-                ) : null}
+                <button type="button" disabled={isCompressing} onClick={() => { onChange(files.filter((_, position) => position !== index)); }} aria-label={`사진 ${index + 1} 삭제`} title="사진 삭제" className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-black/50 text-white"><X size={16} /></button>
               </div>
             ))}
           </div>
@@ -108,15 +106,13 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange, onBus
             </div>
           </>
         )}
-        <span className="absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-lg bg-[#4263EB] text-white">
-          <Camera size={19} aria-hidden="true" />
-        </span>
         {previews.length ? (
           <span className="absolute bottom-4 left-4 rounded-full bg-white/90 px-3 py-2 text-xs font-black text-stone-800 backdrop-blur">
             {isCompressing ? "사진 압축 중..." : `${files.length}장 선택됨`}
           </span>
         ) : null}
-      </label>
+      </div>
+      <label htmlFor={inputId} className={`flex min-h-12 items-center justify-center gap-2 border-t border-white px-4 text-sm font-semibold text-[#4263EB] ${isCompressing ? "pointer-events-none opacity-50" : "cursor-pointer"}`}><Camera size={19} aria-hidden="true" />{isCompressing ? "사진 처리 중..." : title}</label>
       <input
         id={inputId}
         type="file"

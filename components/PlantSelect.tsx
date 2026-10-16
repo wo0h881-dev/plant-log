@@ -1,8 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useId, useRef, useState } from "react";
-import { Check, ChevronRight, Search, Sprout, X } from "lucide-react";
+import { Check, ChevronRight, Search, X } from "lucide-react";
+import { PlantCoverThumbnail } from "@/components/PlantCoverThumbnail";
 import { matchesPlantSearch } from "@/lib/plant-search";
 import type { Plant } from "@/types/plant";
 
@@ -91,9 +91,7 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
           <label htmlFor={inputId} className="section-title mb-3 block">식물 선택</label>
           {!isOpen ? (
             <button type="button" onClick={openList} className="flex min-h-14 w-full items-center gap-3 rounded-lg bg-[#F5F6F8] px-4 text-left">
-              {showPhotos ? <span className="relative grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-[#E7EDFF] text-[#4263EB]">
-                {selectedPlant?.coverPhotoUrl ? <Image src={selectedPlant.coverPhotoUrl} alt="" fill sizes="44px" className="object-cover" unoptimized /> : <Sprout size={19} aria-hidden="true" />}
-              </span> : null}
+              {showPhotos ? <PlantCoverThumbnail key={selectedPlant?.coverPhotoUrl ?? "no-cover"} src={selectedPlant?.coverPhotoUrl} /> : null}
               <span className="min-w-0 flex-1">
                 <span className={`block truncate text-sm font-bold ${selectedPlant ? "text-[#151515]" : "text-[#909090]"}`}>{selectedPlant?.name ?? "식물을 선택하세요"}</span>
                 {selectedPlant ? <span className="mt-0.5 block truncate text-[11px] text-[#909090]">{selectedPlant.category}</span> : null}
@@ -119,9 +117,7 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
               const isSelected = formatPlantName(plant) === value;
               return (
                 <button key={plant.id} type="button" onClick={() => choosePlant(plant)} className={`flex min-h-12 w-full items-center gap-3 rounded-md px-2.5 text-left transition ${isSelected ? "bg-[#EEF2FF] text-[#4263EB]" : "text-[#191F28] active:bg-[#F5F6F8]"}`}>
-                  {showPhotos ? <span className={`relative grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-xl ${isSelected ? "bg-white/15" : "bg-[#EEF2FF] text-[#4263EB]"}`}>
-                    {plant.coverPhotoUrl ? <Image src={plant.coverPhotoUrl} alt="" fill sizes="36px" className="object-cover" unoptimized /> : <Sprout size={16} aria-hidden="true" />}
-                  </span> : null}
+                  {showPhotos ? <PlantCoverThumbnail key={plant.coverPhotoUrl ?? "no-cover"} src={plant.coverPhotoUrl} /> : null}
                   <span className="min-w-0 flex-1 break-words text-sm font-medium">{plant.name}</span>
                   <span className="max-w-[35%] shrink-0 break-words text-right text-[11px] text-[#909090]">{plant.category}</span>{isSelected ? <Check size={14} className="shrink-0" aria-hidden="true" /> : null}
                 </button>

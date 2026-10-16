@@ -8,6 +8,7 @@ import { PlantNameEditor } from "@/components/PlantNameEditor";
 import { PlantCareSummary } from "@/components/PlantCareSummary";
 import { PlantCoverEditor } from "@/components/PlantCoverEditor";
 import { PlantWateringCycleEditor } from "@/components/PlantWateringCycleEditor";
+import { PlantCategoryEditor } from "@/components/PlantCategoryEditor";
 import { PlantPhotoCarousel } from "@/components/PlantPhotoCarousel";
 import { plantCarouselPhotos } from "@/lib/plant-photos";
 
@@ -22,7 +23,7 @@ function formatDate(dateValue?: string, short = false) {
   return new Intl.DateTimeFormat("ko-KR", short ? { month: "numeric", day: "numeric" } : { year: "numeric", month: "long", day: "numeric" }).format(new Date(`${dateValue.slice(0, 10)}T12:00:00`));
 }
 
-export function PlantOverview({ plant, onPlantRenamed, initialGalleryOpen = false, initialGalleryPhotoId }: { plant: Plant; onPlantRenamed: (plant: Plant) => void; initialGalleryOpen?: boolean; initialGalleryPhotoId?: string }) {
+export function PlantOverview({ plant, categories, onOpenCalendar, onPlantRenamed, initialGalleryOpen = false, initialGalleryPhotoId }: { plant: Plant; categories: string[]; onOpenCalendar: (plant: Plant) => void; onPlantRenamed: (plant: Plant) => void; initialGalleryOpen?: boolean; initialGalleryPhotoId?: string }) {
   const [observations, setObservations] = useState<PlantObservationSummary[]>([]);
   const [photos, setPhotos] = useState<PlantPhotoSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,9 +68,10 @@ export function PlantOverview({ plant, onPlantRenamed, initialGalleryOpen = fals
         </div>
       </section>
 
-      <PlantCareSummary key={plant.id} plant={plant} />
+      <PlantCareSummary key={plant.id} plant={plant} onOpenCalendar={onOpenCalendar} />
 
       <PlantNameEditor plant={plant} onSaved={onPlantRenamed} />
+      <PlantCategoryEditor plant={plant} categories={categories} onSaved={onPlantRenamed} />
       <PlantWateringCycleEditor plant={plant} onSaved={onPlantRenamed} />
 
       <section className="section-divider">

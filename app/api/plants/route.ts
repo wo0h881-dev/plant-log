@@ -82,8 +82,11 @@ export async function POST(request: Request) {
     const adoptedAt = text("adoptedAt");
     const price = text("price");
     const cycle = text("wateringCycleDays");
+    const motherIds: unknown = JSON.parse(text("motherPlantIds") || "[]");
+    if (!Array.isArray(motherIds) || motherIds.length > 100 || motherIds.some((id) => typeof id !== "string" || !hasNotionPageId(id))) return NextResponse.json({ message: "모주 선택값을 확인하세요." }, { status: 400 });
+    const motherPlantIds = [...new Set(motherIds as string[])];
     const photos = form.getAll("photos").filter((value): value is File => value instanceof File && value.size > 0);
-    if (![name, category, purchaseSource, adoptedAt, price, cycle].some(Boolean) && !photos.length) {
+    if (![name, category, purchaseSource, adoptedAt, price, cycle].some(Boolean) && !photos.length && !motherPlantIds.length) {
       return NextResponse.json({ message: "정보나 사진을 하나 이상 입력하세요." }, { status: 400 });
     }
     if ([name, category, purchaseSource].some((value) => value.length > 100)) return NextResponse.json({ message: "이름과 선택 항목은 100자 이내로 입력하세요." }, { status: 400 });
@@ -95,6 +98,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "사진은 이미지 20장 이내, 압축 후 합계 4MB 이하로 선택하세요." }, { status: 400 });
     }
     const parentId = source || await resolveDataSourceId(token, database!);
+    for (const id of motherPlantIds) await readEditablePlant(token, id);
     const uploaded = [];
     for (const photo of photos) uploaded.push(await uploadFileToNotion(token, photo));
     const page = await createPlantPage({
@@ -102,10 +106,11 @@ export async function POST(request: Request) {
       category: category || "기타", purchaseSource: purchaseSource || undefined,
       adoptedAt: adoptedAt || undefined, price: price ? Number(price) : undefined,
       wateringCycleDays: cycle ? Number(cycle) : undefined, photos: uploaded,
+      motherPlantIds,
     });
     return NextResponse.json({ plant: parseNotionPlantPage(page) }, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ message: error instanceof Error ? error.message : "식물 등록에 실패했습니다." }, { status: 500 });
+    return NextResponse.json({ message: error instanceof Error ? error.message : "식물 등록에 실패했습니다." }, { status: error instanceof PlantRequestError ? error.status : error instanceof SyntaxError ? 400 : 500 });
   }
 }
 
@@ -119,8 +124,10 @@ export async function PATCH(request: Request) {
   const name = typeof payload?.name === "string" ? payload.name.trim() : "";
   const hasName = payload != null && Object.hasOwn(payload, "name");
   const hasCycle = payload != null && Object.hasOwn(payload, "wateringCycleDays");
+  const hasCategory = payload != null && Object.hasOwn(payload, "category");
+  const category = typeof payload?.category === "string" ? payload.category.trim() : "";
   const cycle = payload?.wateringCycleDays;
-  if (!hasNotionPageId(plantId) || (!hasName && !hasCycle) || (hasName && (!name || name.length > 100))) return NextResponse.json({ message: "식물과 변경할 값을 확인하세요. 이름은 1~100자로 입력하세요." }, { status: 400 });
+  if (!hasNotionPageId(plantId) || (!hasName && !hasCycle && !hasCategory) || (hasName && (!name || name.length > 100)) || (hasCategory && (!category || category.length > 100))) return NextResponse.json({ message: "식물과 변경할 값을 확인하세요. 이름과 대분류는 1~100자로 입력하세요." }, { status: 400 });
   if (hasCycle && cycle !== null && (typeof cycle !== "number" || !Number.isFinite(cycle) || cycle < 1)) return NextResponse.json({ message: "관수 주기는 1일 이상의 숫자로 입력하세요." }, { status: 400 });
   try {
     const page = await readEditablePlant(token, plantId);
@@ -131,6 +138,7 @@ export async function PATCH(request: Request) {
       properties[title] = { title: [{ text: { content: name } }] };
     }
     if (hasCycle) properties["관수 주기"] = { number: cycle };
+    if (hasCategory) properties["대분류"] = { select: { name: category } };
     const updated = await readNotionJson<EditablePlantPage>(await fetch(`${NOTION_API_BASE}/pages/${plantId}`, {
       method: "PATCH", headers: createNotionHeaders(token),
       body: JSON.stringify({ properties }),

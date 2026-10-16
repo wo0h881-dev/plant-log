@@ -10,7 +10,7 @@ function formatDate(value?: string) {
   return new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric" }).format(new Date(`${value.slice(0, 10)}T12:00:00`));
 }
 
-export function PlantCareSummary({ plant }: { plant: Plant }) {
+export function PlantCareSummary({ plant, onOpenCalendar }: { plant: Plant; onOpenCalendar?: (plant: Plant) => void }) {
   const [stats, setStats] = useState<WateringStats | null>(null);
   const [error, setError] = useState("");
 
@@ -29,9 +29,14 @@ export function PlantCareSummary({ plant }: { plant: Plant }) {
   return <section className="mt-6" aria-label={`${plant.name} 관리 정보`}>
     <h2 className="section-title">{plant.name} 관리 정보</h2>
     <div className="metric-grid">
-      <div className="min-w-0"><Droplets size={16} className="text-[#4263EB]" aria-hidden="true" /><p className="mt-2 text-[11px] text-[#8B929B]">최근 물</p><p className="mt-1 text-xs font-semibold">{stats ? formatDate(stats.lastWateredAt) : error ? "조회 실패" : "확인 중"}</p></div>
-      <div className="min-w-0"><RefreshCcw size={16} className="text-[#8192BE]" aria-hidden="true" /><p className="mt-2 text-[11px] text-[#8B929B]">분갈이</p><p className="mt-1 text-xs font-semibold">{formatDate(plant.lastRepottedAt)}</p></div>
-      <div className="min-w-0"><Layers3 size={16} className="text-[#8192BE]" aria-hidden="true" /><p className="mt-2 text-[11px] text-[#8B929B]">현재 흙</p><p className="mt-1 break-words text-xs font-semibold">{plant.currentSoils?.join(" + ") || "기록 없음"}</p></div>
+      {([
+        ["최근 물", Droplets, stats ? formatDate(stats.lastWateredAt) : error ? "조회 실패" : "확인 중"],
+        ["분갈이", RefreshCcw, formatDate(plant.lastRepottedAt)],
+        ["현재 흙", Layers3, plant.currentSoils?.join(" + ") || "기록 없음"],
+      ] as const).map(([label, Icon, value]) => {
+        const content = <><Icon size={16} className="text-[#4263EB]" aria-hidden="true" /><span className="mt-2 block text-[11px] text-[#8B929B]">{label}</span><span className="mt-1 block break-words text-xs font-semibold">{value}</span></>;
+        return onOpenCalendar ? <button key={label} type="button" onClick={() => onOpenCalendar(plant)} aria-label={`${plant.name} ${label} 캘린더 보기`} className="min-h-11 min-w-0 text-left">{content}</button> : <div key={label} className="min-w-0">{content}</div>;
+      })}
     </div>
     <div className="space-y-4 py-5">
       <h3 className="text-sm font-semibold">실제 물주기</h3>

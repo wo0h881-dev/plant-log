@@ -29,7 +29,7 @@ async function main() {
       if (url.pathname === "/api/plant-photos") data = { photos: [] };
       if (url.pathname === "/api/watering-stats") data = { wateringDays: 0, recentIntervals: 0 };
       if (url.pathname === "/api/calendar") data = { events: [] };
-      if (url.pathname === "/api/plant-logs") { observationRequests++; await saveGate; }
+      if (url.pathname === "/api/plant-logs") { if (req.method() === "POST") { observationRequests++; await saveGate; } else data = { recentObservation: null }; }
       await route.fulfill({ json: data });
     });
     await page.goto(process.env.APP_URL || "http://127.0.0.1:3001", { waitUntil: "domcontentloaded" });

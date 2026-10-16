@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } 
 import { AlertCircle, ArrowLeft, CalendarDays, Check, Droplets, NotebookPen, Plus, RefreshCcw, Sprout } from "lucide-react";
 import { AddPlantForm } from "@/components/AddPlantForm";
 import { ObservationTagPicker } from "@/components/ObservationTagPicker";
+import { ObservationSaveChoice, type RecentObservation } from "@/components/ObservationSaveChoice";
 import { BatchWatering } from "@/components/BatchWatering";
 import { ManagementCalendar } from "@/components/ManagementCalendar";
 import { PlantPhotoUploader } from "@/components/PlantPhotoUploader";
@@ -51,6 +52,7 @@ export function PlantLogForm() {
   const [profilePlantId, setProfilePlantId] = useState("");
   const [profileOpenPhotos, setProfileOpenPhotos] = useState(false);
   const [profilePhotoId, setProfilePhotoId] = useState<string>();
+  const [calendarFilter, setCalendarFilter] = useState({ plantId: "", query: "" });
   const [isAddingPlant, setIsAddingPlant] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
   const [purchaseSourceOptions, setPurchaseSourceOptions] = useState<string[]>([]);
@@ -61,9 +63,7 @@ export function PlantLogForm() {
   const [isCompressing, setIsCompressing] = useState(false);
   const [recentPlants, setRecentPlants] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
-    const stored = window.localStorage.getItem(RECENT_PLANTS_KEY);
-    if (!stored) return [];
-    try { return JSON.parse(stored) as string[]; } catch { return []; }
+    try { const stored = window.localStorage.getItem(RECENT_PLANTS_KEY); const parsed: unknown = stored ? JSON.parse(stored) : []; return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : []; } catch { return []; }
   });
   const [recentObservedPlants, setRecentObservedPlants] = useState<RecentObservedPlant[]>([]);
   const [observationTags, setObservationTags] = useState<string[]>(DEFAULT_OBSERVATION_TAGS);
@@ -76,6 +76,7 @@ export function PlantLogForm() {
   const [note, setNote] = useState("");
   const [observationSaveState, setObservationSaveState] = useState<SaveState>("idle");
   const [observationMessage, setObservationMessage] = useState("");
+  const [recentObservationChoice, setRecentObservationChoice] = useState<RecentObservation | null>(null);
   useLayoutEffect(() => {
     const frame = requestAnimationFrame(() => window.scrollTo(0, scrollPositions.current[activeTab] ?? 0));
     return () => cancelAnimationFrame(frame);
@@ -138,7 +139,7 @@ export function PlantLogForm() {
     (!isRepotting || repotSoils.length) &&
     (!isEnvironment || temperature.trim() || humidity.trim()) &&
     !isCompressing &&
-    observationSaveState !== "saving",
+    observationSaveState !== "saving" && !recentObservationChoice,
   );
 
   function selectPlant(plant: Plant) {
@@ -163,7 +164,8 @@ export function PlantLogForm() {
     setPlants((current) => current.map((plant) => plant.id === updated.id ? updated : plant));
     if (profilePlantId === updated.id) setProfileQuery(updated.name);
     if (selectedPlantId === updated.id) setQuery(updated.name);
-    setRecentObservedPlants((current) => current.map((recent) => recent.plantId === updated.id ? { ...recent, plantName: updated.name } : recent));
+    setRecentObservedPlants((current) => current.map((recent) => recent.plantId === updated.id ? { ...recent, plantName: updated.name, plantCategory: updated.category } : recent));
+    if (calendarFilter.plantId === updated.id) setCalendarFilter({ plantId: updated.id, query: updated.name });
     if (previous) {
       const nextRecent = recentPlants.map((label) => label === formatPlantName(previous) ? formatPlantName(updated) : label);
       setRecentPlants(nextRecent);
@@ -175,6 +177,12 @@ export function PlantLogForm() {
     setIsAddingPlant(false);
     selectProfilePlant(plant);
     changeTab("profile");
+  }
+
+  function openCalendarForPlant(plant: Plant) {
+    setCalendarFilter({ plantId: plant.id, query: plant.name });
+    scrollPositions.current.more = 0;
+    changeTab("more");
   }
 
   function storeRecentPlant() {
@@ -206,7 +214,31 @@ export function PlantLogForm() {
     observationSubmitting.current = true;
     setObservationSaveState("saving");
     setObservationMessage("");
+    try {
+      const params = new URLSearchParams({ plantId: selectedPlant.id, date: observedDate });
+      const response = await fetch(`/api/plant-logs?${params}`, { cache: "no-store" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message ?? "최근 관찰일지 확인에 실패했습니다.");
+      if (payload.recentObservation) {
+        setRecentObservationChoice(payload.recentObservation as RecentObservation);
+        setObservationSaveState("idle");
+        return;
+      }
+    } catch (error) {
+      setObservationSaveState("error");
+      setObservationMessage(error instanceof Error ? error.message : "최근 관찰일지 확인에 실패했습니다.");
+      return;
+    } finally { observationSubmitting.current = false; }
+    await persistObservation();
+  }
+
+  async function persistObservation(appendToPageId?: string) {
+    if (!selectedPlant || observationSubmitting.current) return;
+    observationSubmitting.current = true;
+    setObservationSaveState("saving");
+    setObservationMessage("");
     const formData = new FormData();
+    if (appendToPageId) formData.append("appendToPageId", appendToPageId);
     photos.forEach((photo) => formData.append("photos", photo));
     formData.append("plantId", selectedPlant.id);
     formData.append("plantName", selectedPlant.name);
@@ -238,11 +270,12 @@ export function PlantLogForm() {
       setTemperature(""); setHumidity(""); setTemperatureAbove(false); setHumidityAbove(false);
       setSelectedPlantId("");
       setQuery("");
-      setObservationSaveState("success");
+      setRecentObservationChoice(null);
+      setObservationSaveState(payload.warning ? "error" : "success");
       setObservationMessage(
-        isRepotting
+        payload.warning ?? (appendToPageId ? "기존 관찰일지에 추가했습니다." : isRepotting
           ? "관찰일지와 분갈이 기록을 Notion에 저장했습니다."
-          : "관찰일지를 Notion에 저장했습니다.",
+          : "관찰일지를 Notion에 저장했습니다."),
       );
       refreshRecentPlants();
       refreshPlants();
@@ -274,6 +307,7 @@ export function PlantLogForm() {
               isLoading={isPlantsLoading}
               isPhotoLoading={isPlantsLoading || isRecentPlantsLoading}
               onWateringSaved={refreshPlants}
+              onSelectPlant={openPlantFromCalendar}
             />
           </section>
         ) : null}
@@ -285,7 +319,7 @@ export function PlantLogForm() {
               <button type="button" onClick={() => changeTab("water")} aria-label="물주기로 돌아가기" title="물주기로 돌아가기" className="icon-button"><ArrowLeft size={22} aria-hidden="true" /></button>
             </header>
             <form onSubmit={saveObservation} className="space-y-6">
-              <fieldset disabled={observationSaveState === "saving"} className="space-y-6" aria-busy={observationSaveState === "saving"}>
+              <fieldset disabled={observationSaveState === "saving" || Boolean(recentObservationChoice)} className="space-y-6" aria-busy={observationSaveState === "saving"}>
               <PlantPhotoUploader files={photos} onChange={setPhotos} onCaptureDateChange={(date) => setObservedDate(date ?? getTodayValue())} onBusyChange={setIsCompressing} />
               <section className="space-y-6">
                 <PlantSelect plants={plants} value={selectedPlantLabel} query={query} recentPlants={recentPlants} onQueryChange={(value) => { setQuery(value); if (value !== selectedPlant?.name) setSelectedPlantId(""); }} onSelect={selectPlant} variant="row" showPhotos={false} />
@@ -340,20 +374,22 @@ export function PlantLogForm() {
         ) : null}
 
         {visitedTabs.includes("profile") ? <section data-screen="profile" hidden={activeTab !== "profile"}>
-        {isAddingPlant ? <AddPlantForm categories={[...new Set([...categoryOptions, ...plants.map((plant) => plant.category)])]} purchaseSources={purchaseSourceOptions} onClose={() => setIsAddingPlant(false)} onCreated={(plant) => { setPlants((current) => [...current.filter((item) => item.id !== plant.id), plant]); selectProfilePlant(plant); setIsAddingPlant(false); refreshPlants(); }} /> : null}
+        {isAddingPlant ? <AddPlantForm plants={plants} categories={[...new Set([...categoryOptions, ...plants.map((plant) => plant.category)])]} purchaseSources={purchaseSourceOptions} onClose={() => setIsAddingPlant(false)} onCreated={(plant) => { setPlants((current) => [...current.filter((item) => item.id !== plant.id), plant]); selectProfilePlant(plant); setIsAddingPlant(false); refreshPlants(); }} /> : null}
         {!isAddingPlant ? (
           <>
             <header className="screen-header"><div><h1 className="screen-title">내 식물</h1><p className="screen-description">{isPlantsLoading ? "식물을 불러오고 있어요." : `${plants.length}개의 식물과 함께하고 있어요.`}</p></div><button type="button" onClick={() => setIsAddingPlant(true)} aria-label="새 식물 등록" title="새 식물 등록" className="grid h-10 w-10 place-items-center rounded-lg bg-[#EEF2FF] text-[#4263EB]"><Plus size={21} aria-hidden="true" /></button></header>
             <div className="space-y-5">
-              <PlantSelect plants={plants} value={profilePlant ? formatPlantName(profilePlant) : ""} query={profileQuery} recentPlants={[]} onQueryChange={(value) => { setProfileQuery(value); if (!value || value !== profilePlant?.name) setProfilePlantId(""); }} onSelect={selectProfilePlant} variant="search" showPhotos={false} />
-              {profilePlant ? <PlantOverview key={profilePlant.id} plant={profilePlant} onPlantRenamed={handlePlantRenamed} initialGalleryOpen={profileOpenPhotos} initialGalleryPhotoId={profilePhotoId} /> : <RecentObservedPlants plants={plants} recentPlants={recentObservedPlants} onSelect={selectProfilePlant} />}
+              <PlantSelect plants={plants} value={profilePlant ? formatPlantName(profilePlant) : ""} query={profileQuery} recentPlants={[]} onQueryChange={(value) => { setProfileQuery(value); if (!value || value !== profilePlant?.name) setProfilePlantId(""); }} onSelect={selectProfilePlant} variant="search" />
+              {profilePlant ? <PlantOverview key={profilePlant.id} plant={profilePlant} categories={[...new Set([...categoryOptions, ...plants.map((item) => item.category)])]} onOpenCalendar={openCalendarForPlant} onPlantRenamed={handlePlantRenamed} initialGalleryOpen={profileOpenPhotos} initialGalleryPhotoId={profilePhotoId} /> : <RecentObservedPlants plants={plants} recentPlants={recentObservedPlants} onSelect={selectProfilePlant} />}
             </div>
           </>
         ) : null}
         </section> : null}
 
-        {visitedTabs.includes("more") ? <section data-screen="more" hidden={activeTab !== "more"}><ManagementCalendar plants={plants} onSelectPlant={openPlantFromCalendar} /></section> : null}
+        {visitedTabs.includes("more") ? <section data-screen="more" hidden={activeTab !== "more"}><ManagementCalendar plants={plants} onSelectPlant={openPlantFromCalendar} filter={calendarFilter} onFilterChange={setCalendarFilter} /></section> : null}
       </div>
+
+      {recentObservationChoice && selectedPlant ? <ObservationSaveChoice recent={recentObservationChoice} plantName={selectedPlant.name} busy={observationSaveState === "saving"} error={observationSaveState === "error" ? observationMessage : ""} onChoose={(append) => { void persistObservation(append ? recentObservationChoice.id : undefined); }} onClose={() => { setRecentObservationChoice(null); setObservationSaveState("idle"); setObservationMessage(""); }} /> : null}
 
       <nav className="bottom-nav" aria-label="주요 화면">
         <div className="grid grid-cols-4 gap-1">

@@ -47,7 +47,7 @@ async function main() {
       else if (url.pathname === "/api/plant-details") data = url.searchParams.has("plantId") ? { observations: [], photos: [1, 2].map((n) => ({ id: `photo-${n}`, name: "사진", url: `/fixture/${n === 1 ? "one" : "two"}.png`, date: today })) } : { recentPlants: [{ plantId: ids[2], plantName: plants[2].name, plantCategory: "자구", photoUrl: "/fixture/one.png", observedAt: today }] };
       else if (url.pathname === "/api/plant-photos") data = { photos: [] };
       else if (url.pathname === "/api/watering-stats") { statsRequests++; data = { lastWateredAt: today, daysSinceWatered: 0, recentAverageDays: 2, averageDays: 3, wateringDays: 8, recentIntervals: 5 }; }
-      else if (url.pathname === "/api/plant-logs") { observation = req.postData(); data = {}; }
+      else if (url.pathname === "/api/plant-logs") { if (req.method() === "POST") observation = req.postData(); data = { recentObservation: null }; }
       else if (url.pathname === "/api/calendar") data = { events: plants.slice(0, 3).map((plant) => ({ id: plant.id, type: "watering", date: today, plantId: plant.id, plantName: plant.name })) };
       else throw new Error(`Unhandled endpoint ${url.pathname}`);
       await route.fulfill({ status: 200, json: data });
@@ -93,7 +93,7 @@ async function main() {
     await nav.getByRole("button", { name: "내 식물", exact: true }).click();
     assert.ok(await page.locator("[data-screen]:not([hidden]) img").count() <= 2);
     await page.locator("[data-screen]:not([hidden])").getByPlaceholder("식물 검색").fill("ㅍㅋ");
-    assert.equal(await page.getByRole("button", { name: "밤비노 핑크 자구", exact: true }).locator("img").count(), 0);
+    await page.getByRole("button", { name: "밤비노 핑크 자구", exact: true }).locator("img").waitFor();
     await page.getByRole("button", { name: "밤비노 핑크 자구", exact: true }).click();
     await page.locator("[data-screen]:not([hidden])").getByText("아직 관찰 기록이 없어요.").waitFor();
     await page.locator("[data-screen]:not([hidden])").getByText("전체 평균 (8일 기록)").waitFor();

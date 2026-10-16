@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { readEnvironmentNote } from "@/lib/observation-environment";
+import { appendObservation, findRecentObservation, readAppendableObservation } from "@/lib/notion-observation";
+import { PlantRequestError } from "@/lib/notion-plant-page";
+import { normalizeDay } from "@/lib/watering";
 import {
   createPlantLogPage,
   createSettingChangePage,
@@ -12,7 +15,23 @@ import {
 
 export const runtime = "nodejs";
 
+export async function GET(request: Request) {
+  const token = process.env.NOTION_TOKEN;
+  const source = process.env.NOTION_DATA_SOURCE_ID;
+  const database = process.env.NOTION_DATABASE_ID;
+  const params = new URL(request.url).searchParams;
+  const plantId = params.get("plantId") ?? "";
+  const date = params.get("date") ?? "";
+  if (!hasNotionPageId(plantId) || !/^\d{4}-\d{2}-\d{2}$/.test(date) || normalizeDay(date) !== date) return NextResponse.json({ message: "식물과 관찰 날짜를 확인하세요." }, { status: 400 });
+  if (!token || (!source && !database)) return NextResponse.json({ message: "관찰일지 DB 연결을 확인하세요." }, { status: 500 });
+  try {
+    const recentObservation = await findRecentObservation(token, source || await resolveDataSourceId(token, database!), plantId, date);
+    return NextResponse.json({ recentObservation }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) { return NextResponse.json({ message: error instanceof Error ? error.message : "최근 관찰일지 확인에 실패했습니다." }, { status: 500 }); }
+}
+
 export async function POST(request: Request) {
+  let savedObservation: { id: string; url?: string } | null = null;
   const token = process.env.NOTION_TOKEN;
   const databaseId = process.env.NOTION_DATABASE_ID;
   const plantsDatabaseId = process.env.NOTION_PLANTS_DATABASE_ID;
@@ -30,6 +49,7 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const photos = formData.getAll("photos").filter((photo): photo is File => photo instanceof File);
     const plantId = String(formData.get("plantId") ?? "").trim();
+    const appendToPageId = String(formData.get("appendToPageId") ?? "").trim();
     const plantName = String(formData.get("plantName") ?? "").trim();
     const plantCategory = String(formData.get("plantCategory") ?? "").trim();
     const note = String(formData.get("note") ?? "").trim();
@@ -68,7 +88,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "분갈이 흙 선택값이 올바르지 않습니다." }, { status: 400 });
     }
 
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(createdAt) || Number.isNaN(Date.parse(`${createdAt}T00:00:00Z`))) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(createdAt) || normalizeDay(createdAt) !== createdAt) {
       return NextResponse.json({ message: "올바른 관찰 날짜를 선택하세요." }, { status: 400 });
     }
 
@@ -141,7 +161,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "사진, 메모, 물 줌 기록, 세팅 변경 중 하나는 입력하세요." }, { status: 400 });
     }
 
-    if (hasObservationContent && !databaseId) {
+    if (hasObservationContent && !databaseId && !configuredDataSourceId) {
       return NextResponse.json({ message: "NOTION_DATABASE_ID를 설정하세요." }, { status: 500 });
     }
 
@@ -159,18 +179,25 @@ export async function POST(request: Request) {
     if (photos.some((photo) => !photo.type.startsWith("image/"))) {
       return NextResponse.json({ message: "이미지 파일만 업로드할 수 있습니다." }, { status: 400 });
     }
+    if (photos.length > 20 || photos.reduce((size, photo) => size + photo.size, 0) > 4_000_000) return NextResponse.json({ message: "사진은 총 20장 이내, 압축 후 합계 4MB 이하로 선택하세요." }, { status: 400 });
 
     const parentId =
-      hasObservationContent && databaseId
-        ? configuredDataSourceId || (await resolveDataSourceId(token, databaseId))
+      hasObservationContent && (databaseId || configuredDataSourceId)
+        ? configuredDataSourceId || (await resolveDataSourceId(token, databaseId!))
         : undefined;
+    if (appendToPageId) {
+      if (!parentId) throw new PlantRequestError("추가할 관찰일지 DB 연결을 확인하세요.");
+      await readAppendableObservation(token, parentId, appendToPageId, plantId, createdAt);
+    }
     const uploadedPhotos = [];
 
     for (const photo of photos) {
       uploadedPhotos.push(await uploadFileToNotion(token, photo));
     }
 
-    const page = parentId
+    const page = parentId && appendToPageId
+      ? await appendObservation({ token, source: parentId, pageId: appendToPageId, plantId, date: createdAt, note: observationNote, tags: selectedObservationTags, photos: uploadedPhotos })
+      : parentId
       ? await createPlantLogPage({
           token,
           parentId,
@@ -184,6 +211,7 @@ export async function POST(request: Request) {
           photos: uploadedPhotos,
         })
       : null;
+    savedObservation = page;
 
     let wateringPage = null;
     if (wateredAt && wateringDatabaseId) {
@@ -291,9 +319,12 @@ export async function POST(request: Request) {
       wateredAt,
       note,
       createdAt,
+      appended: Boolean(appendToPageId),
+      warning: page && "warning" in page ? page.warning : undefined,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "저장에 실패했습니다.";
-    return NextResponse.json({ message }, { status: 500 });
+    if (savedObservation) return NextResponse.json({ pageId: savedObservation.id, pageUrl: savedObservation.url, warning: `관찰일지는 저장했지만 부가 기록 처리에 실패했어요: ${message} 중복 저장하지 말고 Notion 기록을 확인해주세요.` });
+    return NextResponse.json({ message }, { status: error instanceof PlantRequestError ? error.status : 500 });
   }
 }

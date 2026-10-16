@@ -16,6 +16,7 @@ type BatchWateringProps = {
   isPhotoLoading?: boolean;
   onWateringSaved?: () => void;
   onTodayWateredChange?: (plants: WateredPlant[]) => void;
+  onSelectPlant?: (plant: Plant) => void;
 };
 
 type WateringResult = { plantId: string; plantName: string; ok: boolean; message?: string };
@@ -37,6 +38,7 @@ export function BatchWatering({
   isPhotoLoading = false,
   onWateringSaved,
   onTodayWateredChange,
+  onSelectPlant,
 }: BatchWateringProps) {
   const today = seoulDate();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -94,6 +96,7 @@ export function BatchWatering({
     [query, wateringPlants],
   );
   const dueSelectedCount = duePlants.filter((plant) => selectedIdSet.has(plant.id)).length;
+  const selectedWateringCount = wateringPlants.filter((plant) => selectedIdSet.has(plant.id)).length;
   const dueMaturePlants = duePlants.filter((plant) => plant.category.trim() !== "자구");
   const duePups = duePlants.filter((plant) => plant.category.trim() === "자구");
   const selectedPupCount = duePups.filter((plant) => selectedIdSet.has(plant.id)).length;
@@ -269,7 +272,7 @@ export function BatchWatering({
         <button type="button" onClick={() => setIsDueOpen((current) => !current)} disabled={isListLoading} className={`relative flex w-full items-center justify-between gap-4 overflow-hidden rounded-lg bg-[#F5F6F8] p-5 text-left transition-[height] duration-200 ${isDueOpen ? "h-[116px]" : "h-[172px]"}`} aria-expanded={isDueOpen}>
           <span className="relative z-10 min-w-0 flex-1">
             <span className="block text-[13px] font-semibold text-[#626B76]">물줄 때 된 식물</span>
-            {isListLoading ? <span className="mt-3 block text-sm leading-5 text-[#8B929B]" aria-live="polite">물줄 식물을<br />확인하고 있어요</span> : duePlants.length ? <span className={`mt-2 block font-bold leading-none text-[#4263EB] ${isDueOpen ? "text-[30px]" : "text-[40px]"}`}>{duePlants.length}<span className="ml-1.5 text-base font-medium text-[#626B76]">개</span></span> : <span className="mt-3 block text-sm leading-5 text-[#626B76]" aria-live="polite">오늘은 물줄 식물이<br />없어요</span>}
+            {isListLoading ? <span className="mt-3 block text-sm leading-5 text-[#8B929B]" aria-live="polite">물줄 식물을<br />확인하고 있어요</span> : duePlants.length ? <span className={`mt-2 block font-bold leading-none text-[#4263EB] ${isDueOpen ? "text-[30px]" : "text-[40px]"}`}>{dueMaturePlants.length}<span className="ml-1.5 text-base font-medium text-[#626B76]">개</span></span> : <span className="mt-3 block text-sm leading-5 text-[#626B76]" aria-live="polite">오늘은 물줄 식물이<br />없어요</span>}
             <span className="mt-3 flex items-center gap-1 text-[11px] font-medium text-[#626B76]">{isDueOpen ? "목록 접기" : "목록 확인"}<ChevronDown size={14} className={isDueOpen ? "rotate-180" : ""} aria-hidden="true" /></span>
           </span>
           <span className={`relative w-[42%] shrink-0 overflow-hidden rounded-lg bg-[#EEF2FF] transition-[height] duration-200 ${isDueOpen ? "h-[76px]" : "h-[132px]"}`}>
@@ -303,7 +306,7 @@ export function BatchWatering({
       <section>
         <button type="button" onClick={() => setIsOtherOpen((current) => !current)} className="mb-3 flex w-full items-center justify-between text-left" aria-expanded={isOtherOpen}>
           <span className="section-title">다른 식물 물주기</span>
-          <span className="flex items-center gap-1.5 text-sm font-semibold text-[#909090]">{isListLoading ? "확인 중" : `${wateringPlants.length}개`} <ChevronDown size={17} className={`transition ${isOtherOpen ? "rotate-180" : ""}`} aria-hidden="true" /></span>
+          <span className="flex items-center gap-1.5 text-sm font-semibold text-[#909090]">{isListLoading ? "확인 중" : `${wateringPlants.filter((plant) => plant.category.trim() !== "자구").length}개`} <ChevronDown size={17} className={`transition ${isOtherOpen ? "rotate-180" : ""}`} aria-hidden="true" /></span>
         </button>
         {isOtherOpen ? (
           <div>
@@ -319,13 +322,16 @@ export function BatchWatering({
       <section className="section-divider">
         <div className="mb-3 flex items-center justify-between"><h2 className="section-title">오늘 물 준 식물</h2><span className="text-xs font-medium text-[#8B929B]">{todayWateredPlants.length}개</span></div>
         {isTodayLoading ? <div className="h-14 animate-pulse rounded-2xl bg-white" /> : todayWateringError ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-center text-xs text-red-700">오늘 기록을 불러오지 못했어요.</div> : todayWateredPlants.length ? (
-          <div className="flex gap-2 overflow-x-auto pb-1">{todayWateredPlants.map((plant) => <div key={plant.id || plant.name} className="flex w-36 shrink-0 items-center gap-2 rounded-lg border border-[#ECEEF1] p-3"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#EEF2FF] text-[#4263EB]"><Check size={14} aria-hidden="true" /></span><span className="min-w-0"><span className="block truncate text-xs font-semibold">{plant.name}</span><span className="text-[10px] text-[#909090]">오늘 완료</span></span></div>)}</div>
+          <div className="flex gap-2 overflow-x-auto pb-1">{todayWateredPlants.map((watered) => {
+            const plant = watered.id ? plants.find((item) => item.id.replaceAll("-", "").toLowerCase() === watered.id?.replaceAll("-", "").toLowerCase()) : plants.find((item) => item.name === watered.name);
+            return <button key={watered.id || watered.name} type="button" disabled={!plant || !onSelectPlant} onClick={() => { if (plant) onSelectPlant?.(plant); }} aria-label={`${watered.name} 식물 상세 보기`} className="flex w-36 shrink-0 items-center gap-2 rounded-lg border border-[#ECEEF1] p-3 text-left"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#EEF2FF] text-[#4263EB]"><Check size={14} aria-hidden="true" /></span><span className="min-w-0"><span className="block truncate text-xs font-semibold">{watered.name}</span><span className="text-[10px] text-[#909090]">오늘 완료</span></span></button>;
+          })}</div>
         ) : <div className="rounded-2xl bg-white px-4 py-3 text-center text-xs text-[#909090]">아직 오늘 물 준 식물이 없어요.</div>}
       </section>
 
       {message ? <div className={`rounded-2xl px-4 py-3 text-sm ${saveState === "error" ? "bg-red-50 text-red-700" : "bg-[#EEF2FF] text-[#4263EB]"}`}><div className="flex items-start gap-2">{saveState === "error" ? <AlertCircle size={17} className="mt-0.5 shrink-0" aria-hidden="true" /> : <Check size={17} className="mt-0.5 shrink-0" aria-hidden="true" />}<div><p className="font-semibold">{message}</p>{successfulResults.length ? <p className="mt-1">성공: {successfulResults.map((result) => result.plantName).join(", ")}</p> : null}{failedResults.length ? <p className="mt-1">실패: {failedResults.map((result) => result.plantName).join(", ")}</p> : null}</div></div></div> : null}
 
-      {selectedIds.length ? <div className="save-dock"><button type="button" onClick={saveWateringLogs} disabled={saveState === "saving"} className="primary-button">{saveState === "saving" ? "저장 중..." : failedResults.length ? `실패한 ${selectedIds.length}개 다시 저장` : `${selectedIds.length}개 물주기 저장`}</button></div> : null}
+      {selectedWateringCount ? <div className="save-dock"><button type="button" onClick={saveWateringLogs} disabled={saveState === "saving"} className="primary-button">{saveState === "saving" ? "저장 중..." : failedResults.length ? `실패한 ${selectedWateringCount}개 다시 저장` : `${selectedWateringCount}개 물주기 저장`}</button></div> : null}
     </fieldset>
   );
 }

@@ -183,10 +183,11 @@ export async function getDatabasePropertyOptions(token: string, databaseId: stri
   return getDataSourceOptions(token, dataSourceId, propertyName);
 }
 
-export async function createPlantPage({ token, parentId, name, category, purchaseSource, adoptedAt, price, wateringCycleDays, photos }: {
+export async function createPlantPage({ token, parentId, name, category, purchaseSource, adoptedAt, price, wateringCycleDays, motherPlantIds, photos }: {
   token: string; parentId: string; name: string; category: string;
   purchaseSource?: string; adoptedAt?: string; price?: number; wateringCycleDays?: number;
   photos: UploadedPlantPhoto[];
+  motherPlantIds?: string[];
 }) {
   return readNotionJson<Parameters<typeof import("@/lib/plants").parseNotionPlantPage>[0]>(
     await fetch(`${NOTION_API_BASE}/pages`, {
@@ -200,6 +201,7 @@ export async function createPlantPage({ token, parentId, name, category, purchas
           ...(adoptedAt ? { 입양날짜: { date: { start: adoptedAt } } } : {}),
           ...(price !== undefined ? { 가격: { number: price } } : {}),
           ...(wateringCycleDays !== undefined ? { "관수 주기": { number: wateringCycleDays } } : {}),
+          ...(motherPlantIds?.length ? { 모주: { relation: motherPlantIds.map((id) => ({ id })) } } : {}),
         },
         ...(photos.length ? { cover: { type: "file_upload", file_upload: { id: photos[0].id } } } : {}),
         children: photos.map((photo) => ({

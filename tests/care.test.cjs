@@ -28,6 +28,7 @@ const coverApi = require("../app/api/plant-cover/route.ts");
 const observationApi = require("../app/api/plant-logs/route.ts");
 const wateringApi = require("../app/api/watering-logs/route.ts");
 const statsApi = require("../app/api/watering-stats/route.ts");
+const { isRecentObservation } = require("../lib/notion-observation.ts");
 const plantId = "11111111-1111-4111-8111-111111111111";
 const originalFetch = global.fetch;
 const envKeys = ["NOTION_TOKEN", "NOTION_PLANTS_DATA_SOURCE_ID", "NOTION_DATA_SOURCE_ID", "NOTION_DATABASE_ID", "NOTION_WATERING_DATA_SOURCE_ID"];
@@ -274,4 +275,119 @@ test("cover upload validates input and reports a partial body-image failure", as
   const response = await coverApi.POST(request(form));
   assert.equal(response.status, 200);
   assert.ok((await response.json()).warning.includes("본문"));
+});
+
+test("mother-only registration links existing plants and rejects foreign or malformed relations", async () => {
+  const original = { ...returnedPage({ 식물명: { title: [{ text: { content: "모주" } }] } }), parent: { data_source_id: plantId } };
+  let saved;
+  global.fetch = async (_url, options) => {
+    if (options.method !== "POST") return json(original);
+    saved = JSON.parse(options.body); return json(returnedPage(saved.properties));
+  };
+  assert.equal((await plantsApi.POST(request(createForm({ motherPlantIds: JSON.stringify([plantId, plantId]) })))).status, 201);
+  assert.deepEqual(saved.properties.모주.relation, [{ id: plantId }]);
+  for (const value of ['["wrong"]', '{}', 'not json']) assert.equal((await plantsApi.POST(request(createForm({ motherPlantIds: value })))).status, 400);
+  let reads = 0;
+  global.fetch = async () => { reads++; return json({ ...original, parent: { data_source_id: "22222222-2222-4222-8222-222222222222" } }); };
+  assert.equal((await plantsApi.POST(request(createForm({ motherPlantIds: JSON.stringify([plantId]) })))).status, 404);
+  assert.equal(reads, 1);
+});
+
+test("category editing only updates the select and preserves the plant and soil", async () => {
+  const original = { ...returnedPage({ 식물명: { title: [{ text: { content: "밤비노" } }] }, 대분류: { select: { name: "자구" } }, "현재 흙": { multi_select: [{ name: "세라미스" }] } }), parent: { data_source_id: plantId } };
+  let saved;
+  global.fetch = async (_url, options) => {
+    if (options.method !== "PATCH") return json(original);
+    saved = JSON.parse(options.body); return json({ ...original, properties: { ...original.properties, ...returnedPage(saved.properties).properties } });
+  };
+  for (const category of ["부활중", "알로카시아", "사망"]) {
+    const response = await plantsApi.PATCH(renameRequest({ plantId, category }));
+    assert.equal(response.status, 200);
+    const { plant } = await response.json();
+    assert.equal(plant.category, category); assert.equal(plant.name, "밤비노"); assert.deepEqual(plant.currentSoils, ["세라미스"]);
+    assert.deepEqual(saved, { properties: { 대분류: { select: { name: category } } } });
+  }
+  for (const category of [" ", 1, "a".repeat(101)]) assert.equal((await plantsApi.PATCH(renameRequest({ plantId, category }))).status, 400);
+});
+
+const observationId = "22222222-2222-4222-8222-222222222222";
+function recentPage(extra = {}) {
+  return { id: observationId, created_time: new Date(Date.now() - 60_000).toISOString(), parent: { data_source_id: plantId }, properties: {
+    식물: { relation: [{ id: plantId }] }, 관찰일: { date: { start: "2026-10-16" } },
+    관찰일지: { rich_text: [{ type: "text", plain_text: "기존 메모", text: { content: "기존 메모" }, annotations: { bold: true } }] },
+    관찰태그: { multi_select: [{ name: "신엽" }, { name: "안좋음" }] },
+    사진: { files: [{ type: "file", name: "old.jpg", file: { url: "https://notion.example/old.jpg", expiry_time: "2099-01-01" } }] },
+  }, ...extra };
+}
+const observationForm = (extra = {}) => createForm({ plantId, plantName: "밤비노", plantCategory: "알로카시아", createdAt: "2026-10-16", observationTags: '["좋음"]', note: "새 메모", ...extra });
+
+test("recent observation eligibility uses creation time, plant, source and observed day", () => {
+  const now = Date.now();
+  for (const age of [0, 120_000, 300_000]) assert.ok(isRecentObservation(recentPage({ created_time: new Date(now - age).toISOString() }), plantId, plantId, "2026-10-16", now));
+  for (const age of [-1000, 300_001]) assert.equal(isRecentObservation(recentPage({ created_time: new Date(now - age).toISOString() }), plantId, plantId, "2026-10-16", now), false);
+  assert.equal(isRecentObservation(recentPage(), observationId, plantId, "2026-10-16", now), false);
+  assert.equal(isRecentObservation(recentPage(), plantId, observationId, "2026-10-16", now), false);
+  assert.equal(isRecentObservation(recentPage(), plantId, plantId, "2026-10-15", now), false);
+  assert.equal(isRecentObservation(recentPage({ in_trash: true }), plantId, plantId, "2026-10-16", now), false);
+});
+
+test("recent lookup scopes its Notion query and never writes", async () => {
+  let body;
+  global.fetch = async (url, options) => { assert.ok(url.endsWith("/query")); body = JSON.parse(options.body); return json({ results: [recentPage()] }); };
+  const response = await observationApi.GET(new Request(`http://localhost/api/plant-logs?plantId=${plantId}&date=2026-10-16`));
+  assert.equal(response.status, 200); assert.equal((await response.json()).recentObservation.id, observationId);
+  assert.deepEqual(body.filter.and.slice(0, 2), [{ property: "식물", relation: { contains: plantId } }, { property: "관찰일", date: { equals: "2026-10-16" } }]);
+  assert.equal((await observationApi.GET(new Request(`http://localhost/api/plant-logs?plantId=${plantId}&date=2026-02-30`))).status, 400);
+});
+
+test("append keeps old attachments, rich text and body while merging tags", async () => {
+  const writes = []; let reads = 0;
+  global.fetch = async (url, options) => {
+    if (url.endsWith("/file_uploads")) return json({ id: "new-photo", status: "pending" });
+    if (url.endsWith("/send")) return json({ id: "new-photo", status: "uploaded" });
+    if (options.method !== "PATCH") { reads++; return json(recentPage()); }
+    writes.push({ url, body: JSON.parse(options.body) }); return json({ id: observationId });
+  };
+  const form = observationForm({ appendToPageId: observationId }); form.append("photos", new File(["image"], "new.jpg", { type: "image/jpeg" }));
+  const response = await observationApi.POST(request(form));
+  assert.equal(response.status, 200); assert.equal((await response.json()).appended, true); assert.equal(reads, 2);
+  const properties = writes[0].body.properties;
+  assert.deepEqual(properties.관찰태그.multi_select, [{ name: "신엽" }, { name: "좋음" }]);
+  assert.equal(properties.관찰일지.rich_text.map((part) => part.text.content).join(""), "기존 메모\n\n새 메모");
+  assert.equal(properties.관찰일지.rich_text[0].annotations.bold, true);
+  assert.deepEqual(properties.사진.files, [{ type: "file", name: "old.jpg", file: { url: "https://notion.example/old.jpg" } }, { type: "file_upload", name: "new.jpg", file_upload: { id: "new-photo" } }]);
+  assert.equal(properties.식물, undefined); assert.equal(properties.관찰일, undefined);
+  assert.ok(writes[1].url.endsWith(`/blocks/${observationId}/children`)); assert.equal(writes[1].body.children.length, 1);
+});
+
+test("append rejects expired, wrong-plant, wrong-source and different-day targets before uploading", async () => {
+  for (const page of [recentPage({ created_time: new Date(Date.now() - 360_000).toISOString() }), recentPage({ parent: { data_source_id: observationId } }), recentPage({ properties: { ...recentPage().properties, 식물: { relation: [{ id: observationId }] } } }), recentPage({ properties: { ...recentPage().properties, 관찰일: { date: { start: "2026-10-15" } } } })]) {
+    let requests = 0;
+    global.fetch = async (_url, options) => { assert.notEqual(options.method, "POST"); assert.notEqual(options.method, "PATCH"); requests++; return json(page); };
+    assert.equal((await observationApi.POST(request(observationForm({ appendToPageId: observationId })))).status, 409);
+    assert.equal(requests, 1);
+  }
+});
+
+test("append validates again after photo upload, and partial body errors return a warning instead of inviting duplicate retry", async () => {
+  for (const expireAfterUpload of [true, false]) {
+    let reads = 0, writes = 0;
+    global.fetch = async (url, options) => {
+      if (url.endsWith("/file_uploads")) return json({ id: "new-photo", status: "pending" });
+      if (url.endsWith("/send")) return json({ id: "new-photo", status: "uploaded" });
+      if (url.endsWith("/children")) return Response.json({ message: "body failed" }, { status: 500 });
+      if (options.method === "PATCH") { writes++; return json({ id: observationId }); }
+      reads++; return json(recentPage(reads === 2 && expireAfterUpload ? { created_time: new Date(Date.now() - 360_000).toISOString() } : {}));
+    };
+    const form = observationForm({ appendToPageId: observationId }); form.append("photos", new File(["image"], "new.jpg", { type: "image/jpeg" }));
+    const response = await observationApi.POST(request(form));
+    assert.equal(response.status, expireAfterUpload ? 409 : 200); assert.equal(writes, expireAfterUpload ? 0 : 1);
+    if (!expireAfterUpload) { const payload = await response.json(); assert.equal(payload.pageId, observationId); assert.ok(payload.warning.includes("본문")); }
+  }
+});
+
+test("observation rejects combined upload limit before external requests", async () => {
+  const form = observationForm();
+  for (let i = 0; i < 21; i++) form.append("photos", new File(["image"], `${i}.jpg`, { type: "image/jpeg" }));
+  assert.equal((await observationApi.POST(request(form))).status, 400);
 });

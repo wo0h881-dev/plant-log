@@ -10,6 +10,8 @@ import { matchesPlantSearch } from "@/lib/plant-search";
 type ManagementCalendarProps = {
   plants: Plant[];
   onSelectPlant: (plant: Plant) => void;
+  filter: { plantId: string; query: string };
+  onFilterChange: (filter: { plantId: string; query: string }) => void;
 };
 
 function toDateValue(date: Date) {
@@ -42,15 +44,14 @@ function formatSelectedDate(date: string) {
   return new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", weekday: "short" }).format(new Date(`${date}T12:00:00`));
 }
 
-export function ManagementCalendar({ plants, onSelectPlant }: ManagementCalendarProps) {
+export function ManagementCalendar({ plants, onSelectPlant, filter, onFilterChange }: ManagementCalendarProps) {
   const today = toDateValue(new Date());
   const [month, setMonth] = useState(getMonthValue);
   const [selectedDate, setSelectedDate] = useState(today);
   const [events, setEvents] = useState<PlantCalendarEvent[]>([]);
   const [loadedMonth, setLoadedMonth] = useState("");
   const [error, setError] = useState("");
-  const [query, setQuery] = useState("");
-  const [plantId, setPlantId] = useState("");
+  const { query, plantId } = filter;
   const selectedPlant = plants.find((plant) => plant.id === plantId);
 
   useEffect(() => {
@@ -105,8 +106,8 @@ export function ManagementCalendar({ plants, onSelectPlant }: ManagementCalendar
 
       <div className="mb-5">
         <PlantSelect plants={plants} value={selectedPlant ? `${selectedPlant.category} - ${selectedPlant.name}` : ""} query={query} recentPlants={[]} variant="search" showPhotos={false}
-          onQueryChange={(value) => { setQuery(value); if (value !== selectedPlant?.name) setPlantId(""); }}
-          onSelect={(plant) => { setPlantId(plant.id); setQuery(plant.name); }} />
+          onQueryChange={(value) => onFilterChange({ query: value, plantId: value === selectedPlant?.name ? plantId : "" })}
+          onSelect={(plant) => onFilterChange({ plantId: plant.id, query: plant.name })} />
       </div>
 
       <section className="border-y border-[#ECEEF1] py-4">
