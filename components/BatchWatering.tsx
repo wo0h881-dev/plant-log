@@ -7,6 +7,7 @@ import { matchesPlantSearch } from "@/lib/plant-search";
 import { canShowInWateringList, isWateredToday, seoulDate, type WateredPlant } from "@/lib/watering";
 import { cacheWateringHeroPhoto, clearCachedWateringHeroPhoto, readCachedWateringHeroPhoto } from "@/lib/watering-hero-cache";
 import type { Plant, RecentObservedPlant, SaveState } from "@/types/plant";
+import { PlantCoverThumbnail } from "@/components/PlantCoverThumbnail";
 
 type BatchWateringProps = {
   plants: Plant[];
@@ -247,6 +248,7 @@ export function BatchWatering({
             : due ? "ring-1 ring-[#E5DFC4]" : ""
         }`}
       >
+        <PlantCoverThumbnail key={plant.coverPhotoUrl ?? "no-cover"} src={plant.coverPhotoUrl} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-bold text-stone-900">{plant.name}</span>
           <span className="mt-1 block truncate text-[11px] text-[#909090]">

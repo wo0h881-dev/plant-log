@@ -21,6 +21,7 @@ require.extensions[".ts"] = (module, filename) => {
 
 const { calculateWateringStats, canShowInWateringList, isWateredToday, normalizeDay } = require("../lib/watering.ts");
 const { readEnvironmentNote } = require("../lib/observation-environment.ts");
+const { canOptimizePlantCover, NOTION_COVER_HOST } = require("../lib/plant-cover.ts");
 const plantsApi = require("../app/api/plants/route.ts");
 const observationApi = require("../app/api/plant-logs/route.ts");
 const wateringApi = require("../app/api/watering-logs/route.ts");
@@ -52,6 +53,16 @@ test("watering hides dead plants and only moss-containing pups", () => {
   assert.equal(canShowInWateringList({ ...plant, category: "알로카시아", currentSoils: ["수태"] }), true);
   assert.equal(isWateredToday(plant, [{ id: plantId.replaceAll("-", ""), name: "다른 이름" }], "2026-10-11"), true);
   assert.equal(isWateredToday({ ...plant, lastWateredAt: "2026-10-10T16:00:00Z" }, [], "2026-10-11"), true);
+});
+
+test("cover optimization allows only local files and the known Notion host", () => {
+  assert.equal(canOptimizePlantCover("/fixture/cover.jpg"), true);
+  assert.equal(canOptimizePlantCover(`https://${NOTION_COVER_HOST}/photo.jpg?signature=test`), true);
+  assert.equal(canOptimizePlantCover(`http://${NOTION_COVER_HOST}/photo.jpg`), false);
+  assert.equal(canOptimizePlantCover(`https://${NOTION_COVER_HOST}.example.com/photo.jpg`), false);
+  assert.equal(canOptimizePlantCover(`https://${NOTION_COVER_HOST}:444/photo.jpg`), false);
+  assert.equal(canOptimizePlantCover("//example.com/photo.jpg"), false);
+  assert.equal(canOptimizePlantCover("invalid"), false);
 });
 
 test("watering means deduplicate days and ignore invalid/future dates", () => {

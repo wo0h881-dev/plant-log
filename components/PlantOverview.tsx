@@ -6,6 +6,7 @@ import { ArrowRight, ExternalLink, Heart, History, Sprout } from "lucide-react";
 import type { Plant, PlantObservationSummary, PlantPhotoSummary } from "@/types/plant";
 import { PlantPhotoGallery } from "@/components/PlantPhotoGallery";
 import { PlantNameEditor } from "@/components/PlantNameEditor";
+import { PlantCareSummary } from "@/components/PlantCareSummary";
 
 type DetailsResponse = {
   observations?: PlantObservationSummary[];
@@ -63,6 +64,8 @@ export function PlantOverview({ plant, onPlantRenamed }: { plant: Plant; onPlant
           <button type="button" onClick={() => setGalleryOpen(true)} aria-label="식물 사진 크게 보기" className="pointer-events-auto grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-[#151515]"><ArrowRight size={17} aria-hidden="true" /></button>
         </div>
       </section>
+
+      <PlantCareSummary key={plant.id} plant={plant} />
 
       <PlantNameEditor plant={plant} onSaved={onPlantRenamed} />
 

@@ -26,8 +26,9 @@ async function main() {
     let rename;
     let failRename = true;
     let statsRequests = 0;
-    const pixel = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64");
-    await page.route("**/fixture/*.png", (route) => route.fulfill({ contentType: "image/png", body: pixel }));
+    const pixel = await fs.readFile(path.join(__dirname, "..", "public", "icon.svg"));
+    await page.route("**/fixture/*.png", (route) => route.fulfill({ contentType: "image/svg+xml", body: pixel }));
+    await page.route("**/_next/image?**", (route) => route.fulfill({ contentType: "image/svg+xml", body: pixel }));
     await page.route("**/api/**", async (route) => {
       const req = route.request();
       const url = new URL(req.url());
@@ -95,9 +96,10 @@ async function main() {
     assert.equal(await page.getByRole("button", { name: "밤비노 핑크 자구", exact: true }).locator("img").count(), 0);
     await page.getByRole("button", { name: "밤비노 핑크 자구", exact: true }).click();
     await page.getByText("아직 관찰 기록이 없어요.").waitFor();
-    assert.equal(await page.getByRole("heading", { name: "실제 물주기" }).count(), 0);
+    await page.getByText("전체 평균 (8일 기록)").waitFor();
+    assert.equal(await page.getByRole("heading", { name: "실제 물주기" }).count(), 1);
     assert.equal(await page.getByRole("button", { name: "사진 크게 보기", exact: true }).count(), 0);
-    assert.equal(statsRequests, 0);
+    assert.ok(statsRequests >= 1);
     assert.equal(await page.locator("img").count(), 1);
     await page.screenshot({ path: path.join(out, "plant-details.png"), fullPage: true });
     await page.getByRole("button", { name: "식물 사진 크게 보기", exact: true }).click();
