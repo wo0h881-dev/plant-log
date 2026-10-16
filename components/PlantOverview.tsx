@@ -50,20 +50,22 @@ export function PlantOverview({ plant, onPlantRenamed, initialGalleryOpen = fals
 
   return (
     <div className="space-y-5">
-      <section className="relative min-h-[265px] overflow-hidden rounded-[30px] bg-[#DCE7D5]">
+      <section>
+        <div className="detail-photo">
         <button type="button" onClick={() => setGalleryOpen(true)} aria-label="최근 사진 보기" className="absolute inset-0">
-          {plant.coverPhotoUrl ? <Image src={plant.coverPhotoUrl} alt={plant.name} fill sizes="(max-width: 390px) 100vw, 390px" className="object-cover object-center" unoptimized /> : <span className="absolute inset-0 grid place-items-center text-[#284F2A]"><Sprout size={72} strokeWidth={1} aria-hidden="true" /></span>}
+          {plant.coverPhotoUrl ? <Image src={plant.coverPhotoUrl} alt={plant.name} fill sizes="(max-width: 440px) 100vw, 440px" className="object-cover object-center" unoptimized /> : <span className="absolute inset-0 grid place-items-center text-[#A7B4A6]"><Sprout size={56} strokeWidth={1} aria-hidden="true" /></span>}
         </button>
-        <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/5 to-transparent" />
-        <button type="button" onClick={() => setCoverEditorOpen(true)} aria-label="커버사진 변경" title="커버사진 변경" className="absolute left-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-[#151515] text-white"><Camera size={17} /></button>
-        <button type="button" onClick={() => setIsFavorite((current) => !current)} className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-[#151515] text-white" aria-label={isFavorite ? "즐겨찾기 해제" : "즐겨찾기"}><Heart size={17} fill={isFavorite ? "currentColor" : "none"} aria-hidden="true" /></button>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-4 text-white">
+        <button type="button" onClick={() => setCoverEditorOpen(true)} aria-label="커버사진 변경" title="커버사진 변경" className="absolute left-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-white/95 text-[#191F28]"><Camera size={17} /></button>
+        <button type="button" onClick={() => setIsFavorite((current) => !current)} className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-white/95 text-[#191F28]" title={isFavorite ? "즐겨찾기 해제" : "즐겨찾기"} aria-label={isFavorite ? "즐겨찾기 해제" : "즐겨찾기"}><Heart size={17} fill={isFavorite ? "currentColor" : "none"} aria-hidden="true" /></button>
+        <button type="button" onClick={() => setGalleryOpen(true)} aria-label="식물 사진 크게 보기" title="식물 사진 크게 보기" className="absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-full bg-white/95 text-[#191F28]"><ArrowRight size={17} aria-hidden="true" /></button>
+        </div>
+        <div className="detail-identity">
           <div className="min-w-0">
-            <h2 className="truncate text-xl font-black">{plant.name}</h2>
-            <p className="mt-0.5 truncate text-xs font-semibold text-white/75">{plant.scientificName ?? plant.category}</p>
-            <p className="mt-2 line-clamp-1 text-[11px] text-white/85">{plant.description ?? (plant.isWateringDue ? "오늘 물줄 차례예요." : "최근 기록과 관리 정보를 확인해보세요.")}</p>
+            <p className="mb-1.5 text-[11px] text-[#8B929B]">{plant.scientificName ?? plant.category}</p>
+            <h2 className="break-words text-[23px] font-bold">{plant.name}</h2>
+            {plant.description ? <p className="mt-2 text-xs leading-5 text-[#8B929B]">{plant.description}</p> : null}
+            {plant.isWateringDue ? <span className="mt-3 inline-flex items-center rounded-md bg-[#EFF3FC] px-2 py-1 text-[11px] font-medium text-[#4869D8]">물주기 확인이 필요해요</span> : null}
           </div>
-          <button type="button" onClick={() => setGalleryOpen(true)} aria-label="식물 사진 크게 보기" className="pointer-events-auto grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-[#151515]"><ArrowRight size={17} aria-hidden="true" /></button>
         </div>
       </section>
 
@@ -72,8 +74,8 @@ export function PlantOverview({ plant, onPlantRenamed, initialGalleryOpen = fals
       <PlantNameEditor plant={plant} onSaved={onPlantRenamed} />
       <PlantWateringCycleEditor plant={plant} onSaved={onPlantRenamed} />
 
-      <section className="rounded-[22px] bg-white p-4">
-        <div className="flex items-center gap-2"><History size={17} className="text-[#284F2A]" aria-hidden="true" /><h2 className="text-[15px] font-black text-[#151515]">최근 관찰</h2></div>
+      <section className="section-divider">
+        <div className="flex items-center gap-2"><History size={17} className="text-[#8B929B]" aria-hidden="true" /><h2 className="section-title">최근 관찰</h2></div>
         {isLoading ? <p className="py-6 text-center text-sm text-[#909090]">기록을 불러오는 중...</p> : null}
         {!isLoading && error ? <p className="mt-3 rounded-2xl bg-red-50 px-3 py-3 text-sm text-red-700">{error}</p> : null}
         {!isLoading && !error && !observations.length ? <p className="py-6 text-center text-sm text-[#909090]">아직 관찰 기록이 없어요.</p> : null}

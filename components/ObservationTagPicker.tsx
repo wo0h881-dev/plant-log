@@ -12,6 +12,6 @@ export function ObservationTagPicker({ tags, selected, onToggle }: { tags: strin
   return <div className="space-y-3">{[status, ["좋음", "안좋음"], ["분갈이", "온습도"]].map((group, index) => <div key={index} role="group" aria-label={["상태", "상태 평가", "관리 기록"][index]} className={`grid gap-2 ${index === 0 ? "grid-cols-3" : "grid-cols-2 border-t border-[#EEEFEA] pt-3"}`}>{group.map((name) => {
     const Icon = icons[name] ?? Tag;
     const active = selected.includes(name);
-    return <button key={name} type="button" aria-pressed={active} onClick={() => onToggle(name)} className={`flex min-h-12 items-center justify-center gap-1.5 rounded-2xl px-1 text-xs font-bold ${active ? "bg-[#284F2A] text-white" : "bg-[#F0F1EE] text-[#333633]"}`}><Icon size={16} aria-hidden="true" /><span className="break-all">{name}</span></button>;
+    return <button key={name} type="button" aria-pressed={active} onClick={() => onToggle(name)} className="tag-button"><Icon size={15} className="shrink-0" aria-hidden="true" /><span className="break-all">{name}</span></button>;
   })}</div>)}</div>;
 }

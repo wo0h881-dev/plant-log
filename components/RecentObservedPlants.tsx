@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowRight, Heart, Sprout } from "lucide-react";
+import { ArrowRight, ChevronRight, Heart, Sprout } from "lucide-react";
 import { useState } from "react";
 import type { Plant, RecentObservedPlant } from "@/types/plant";
 
@@ -53,38 +53,40 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
   }
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-7">
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-[17px] font-black text-[#151515]">최근 관찰한 식물</h2>
-          <button type="button" onClick={toggleAllPlants} className="min-h-9 rounded-full px-2 text-xs font-semibold text-[#6F746C] transition active:bg-[#E8EAE5]">
-            {showAllPlants ? "최근보기" : "전체보기"} <span aria-hidden="true">{showAllPlants ? "‹" : "›"}</span>
+          <h2 className="section-title">최근 관찰한 식물</h2>
+          <button type="button" onClick={toggleAllPlants} className="flex min-h-10 items-center gap-1 px-1 text-xs font-medium text-[#8B929B]">
+            {showAllPlants ? "최근보기" : "전체보기"}<ChevronRight size={13} className={showAllPlants ? "rotate-180" : ""} aria-hidden="true" />
           </button>
         </div>
         {showAllPlants && isLoadingAllPlants ? (
           <div className="grid grid-cols-2 gap-3" aria-label="최근 관찰 식물 불러오는 중">
-            {Array.from({ length: 4 }, (_, index) => <span key={index} className="h-20 animate-pulse rounded-[22px] bg-[#E7EAE4]" />)}
+            {Array.from({ length: 4 }, (_, index) => <span key={index} className="h-20 animate-pulse rounded-lg bg-[#F5F6F8]" />)}
           </div>
         ) : showAllPlants ? (
           <div className="grid grid-cols-2 gap-3">
             {items.map(({ recent, plant }) => {
               return (
-                <button key={plant.id} type="button" onClick={() => onSelect(plant)} className="overflow-hidden rounded-[22px] bg-white text-left transition active:scale-[0.98]">
-                  <span className="block px-3 py-2.5">
-                    <span className="block truncate text-[13px] font-extrabold text-[#151515]">{plant.name}</span>
-                    <span className="mt-0.5 block truncate text-[10px] text-[#909090]">{formatDate(recent.observedAt)}</span>
+                <button key={plant.id} type="button" onClick={() => onSelect(plant)} className="recent-plant">
+                  <span className="block">
+                    <span className="mb-2 block text-[10px] text-[#8B929B]">{plant.category}</span>
+                    <span className="block break-words text-[13px] font-semibold">{plant.name}</span>
+                    <span className="mt-2 block truncate text-[10px] text-[#909090]">{formatDate(recent.observedAt)}</span>
                   </span>
                 </button>
               );
             })}
           </div>
         ) : items.length ? (
-          <div className="-mx-5 flex gap-3 overflow-x-auto px-5 pb-1">
+          <div className="flex gap-2.5 overflow-x-auto pb-1">
             {previewItems.map(({ recent, plant }) => {
               return (
-                <button key={plant.id} type="button" onClick={() => onSelect(plant)} className="w-32 shrink-0 rounded-2xl bg-white px-3 py-3 text-left">
-                  <span className="block truncate text-xs font-extrabold text-[#151515]">{plant.name}</span>
-                  <span className="mt-0.5 block text-[10px] text-[#909090]">{formatDate(recent.observedAt)}</span>
+                <button key={plant.id} type="button" onClick={() => onSelect(plant)} className="recent-plant w-36 shrink-0">
+                  <span className="mb-2 block truncate text-[10px] text-[#8B929B]">{plant.category}</span>
+                  <span className="block truncate text-xs font-semibold">{plant.name}</span>
+                  <span className="mt-2 block text-[10px] text-[#909090]">{formatDate(recent.observedAt)}</span>
                 </button>
               );
             })}
@@ -93,19 +95,18 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
       </div>
 
       {!showAllPlants && featured ? (
-        <div className="relative min-h-[245px] overflow-hidden rounded-[30px] bg-[#DCE7D5]">
-          <button type="button" onClick={() => onSelect(featured.plant, true)} aria-label="최근 사진 보기" className="absolute inset-0">{featuredPhotoUrl ? <Image src={featuredPhotoUrl} alt={featured.plant.name} fill priority sizes="(max-width: 390px) 100vw, 390px" className="object-cover object-center" unoptimized /> : <span className="absolute inset-0 grid place-items-center text-[#284F2A]"><Sprout size={72} strokeWidth={1} aria-hidden="true" /></span>}</button>
-          <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/5 to-transparent" />
-          <button type="button" onClick={() => setIsFavorite((current) => !current)} className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-[#151515] text-white" aria-label={isFavorite ? "즐겨찾기 해제" : "즐겨찾기"}>
-            <Heart size={17} fill={isFavorite ? "currentColor" : "none"} aria-hidden="true" />
-          </button>
-          <button type="button" onClick={() => onSelect(featured.plant)} className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-4 text-left text-white">
+        <div>
+          <div className="detail-photo">
+            <button type="button" onClick={() => onSelect(featured.plant, true)} aria-label="최근 사진 보기" className="absolute inset-0">{featuredPhotoUrl ? <Image src={featuredPhotoUrl} alt={featured.plant.name} fill priority sizes="(max-width: 440px) 100vw, 440px" className="object-cover object-center" unoptimized /> : <span className="absolute inset-0 grid place-items-center text-[#A7B4A6]"><Sprout size={56} strokeWidth={1} aria-hidden="true" /></span>}</button>
+            <button type="button" onClick={() => setIsFavorite((current) => !current)} className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-white/95 text-[#191F28]" title={isFavorite ? "즐겨찾기 해제" : "즐겨찾기"} aria-label={isFavorite ? "즐겨찾기 해제" : "즐겨찾기"}><Heart size={17} fill={isFavorite ? "currentColor" : "none"} aria-hidden="true" /></button>
+          </div>
+          <button type="button" onClick={() => onSelect(featured.plant)} className="flex w-full items-center justify-between gap-4 py-4 text-left">
             <span className="min-w-0">
-              <span className="block truncate text-xl font-black">{featured.plant.name}</span>
-              <span className="mt-0.5 block truncate text-xs font-semibold text-white/75">{featured.plant.scientificName ?? featured.plant.category}</span>
-              <span className="mt-2 block line-clamp-1 text-[11px] text-white/85">{featured.plant.description ?? "최근 관찰 기록과 관리 정보를 확인해보세요."}</span>
+              <span className="mb-1 block truncate text-[11px] text-[#8B929B]">{featured.plant.scientificName ?? featured.plant.category}</span>
+              <span className="block break-words text-xl font-bold">{featured.plant.name}</span>
+              {featured.plant.description ? <span className="mt-2 block line-clamp-2 text-xs leading-5 text-[#8B929B]">{featured.plant.description}</span> : null}
             </span>
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-[#151515]"><ArrowRight size={17} aria-hidden="true" /></span>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-[#ECEEF1] text-[#191F28]"><ArrowRight size={18} aria-hidden="true" /></span>
           </button>
         </div>
       ) : null}

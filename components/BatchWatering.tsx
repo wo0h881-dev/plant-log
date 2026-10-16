@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { AlertCircle, ArrowRight, CalendarDays, Check, ChevronDown, Sprout, X } from "lucide-react";
+import { AlertCircle, CalendarDays, Check, ChevronDown, Sprout, X } from "lucide-react";
 import { matchesPlantSearch } from "@/lib/plant-search";
 import { canShowInWateringList, isWateredToday, seoulDate, type WateredPlant } from "@/lib/watering";
 import { cacheWateringHeroPhoto, clearCachedWateringHeroPhoto, readCachedWateringHeroPhoto } from "@/lib/watering-hero-cache";
@@ -242,22 +242,18 @@ export function BatchWatering({
         role="checkbox"
         aria-checked={isSelected}
         onClick={() => togglePlant(plant.id)}
-        className={`flex min-h-[60px] w-full items-center justify-between gap-3 rounded-[22px] bg-white px-4 py-2.5 text-left transition ${
-          isSelected
-            ? "ring-2 ring-[#284F2A]"
-            : due ? "ring-1 ring-[#E5DFC4]" : ""
-        }`}
+        className="water-row transition-colors"
       >
         <PlantCoverThumbnail key={plant.coverPhotoUrl ?? "no-cover"} src={plant.coverPhotoUrl} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-bold text-stone-900">{plant.name}</span>
+          <span className="block truncate text-sm font-semibold text-[#191F28]">{plant.name}</span>
           <span className="mt-1 block truncate text-[11px] text-[#909090]">
             {due && typeof plant.wateringCycleDays === "number"
               ? `주기 ${plant.wateringCycleDays}일 · ${daysText}`
               : daysText}
           </span>
         </span>
-        <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border transition ${isSelected ? "border-[#5C9A3C] bg-[#5C9A3C] text-white" : "border-[#B7BAB4] bg-white text-transparent"}`}>
+        <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-md border transition ${isSelected ? "border-[#284F2A] bg-[#284F2A] text-white" : "border-[#D6DAE0] bg-white text-transparent"}`}>
           <Check size={16} strokeWidth={3} aria-hidden="true" />
         </span>
       </button>
@@ -265,31 +261,30 @@ export function BatchWatering({
   }
 
   return (
-    <div className="space-y-5">
-      <section className="overflow-hidden rounded-[30px] bg-[#284F2A] text-white">
-        <button type="button" onClick={() => setIsDueOpen((current) => !current)} disabled={isListLoading} className={`relative flex w-full items-end justify-between overflow-hidden text-left transition-[height,padding] duration-300 ease-out ${isDueOpen ? "h-[145px] p-4" : "h-[255px] p-5"}`} aria-expanded={isDueOpen}>
-          {displayedHeroPhoto ? <Image src={displayedHeroPhoto} alt="" fill priority sizes="(max-width: 390px) 100vw, 390px" className="object-cover object-center" unoptimized onError={handleDisplayedHeroPhotoError} /> : <span className="absolute inset-0 grid place-items-center bg-[#DCE7D5] text-[#284F2A]">{isLoading ? null : <Sprout size={74} strokeWidth={1} aria-hidden="true" />}</span>}
-          <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-          <span className="relative pb-0.5">
-            <span className={`block font-extrabold transition-[font-size] duration-300 ${isDueOpen ? "text-base" : "text-lg"}`}>물줄 때 된 식물</span>
-            {isListLoading ? <span className="mt-2 block text-sm font-bold leading-5" aria-live="polite">물줄 식물을<br />확인하고 있어요</span> : duePlants.length ? <span className={`mt-1 block font-black leading-none transition-[font-size] duration-300 ${isDueOpen ? "text-[34px]" : "text-[46px]"}`}>{duePlants.length}<span className="ml-1 text-base">개</span></span> : <span className="mt-2 block text-sm font-bold leading-5" aria-live="polite">오늘은 물줄 식물이<br />없어요</span>}
+    <div className="space-y-6">
+      <section>
+        <button type="button" onClick={() => setIsDueOpen((current) => !current)} disabled={isListLoading} className={`relative flex w-full items-center justify-between gap-4 overflow-hidden rounded-lg bg-[#F5F6F8] p-5 text-left transition-[height] duration-200 ${isDueOpen ? "h-[116px]" : "h-[172px]"}`} aria-expanded={isDueOpen}>
+          <span className="relative z-10 min-w-0 flex-1">
+            <span className="block text-[13px] font-semibold text-[#626B76]">물줄 때 된 식물</span>
+            {isListLoading ? <span className="mt-3 block text-sm leading-5 text-[#8B929B]" aria-live="polite">물줄 식물을<br />확인하고 있어요</span> : duePlants.length ? <span className={`mt-2 block font-bold leading-none text-[#4869D8] ${isDueOpen ? "text-[30px]" : "text-[40px]"}`}>{duePlants.length}<span className="ml-1.5 text-base font-medium text-[#626B76]">개</span></span> : <span className="mt-3 block text-sm leading-5 text-[#626B76]" aria-live="polite">오늘은 물줄 식물이<br />없어요</span>}
+            <span className="mt-3 flex items-center gap-1 text-[11px] font-medium text-[#626B76]">{isDueOpen ? "목록 접기" : "목록 확인"}<ChevronDown size={14} className={isDueOpen ? "rotate-180" : ""} aria-hidden="true" /></span>
           </span>
-          <span className={`relative grid shrink-0 place-items-center rounded-full bg-[#151515] text-white transition-[width,height] duration-300 ${isDueOpen ? "h-10 w-10" : "h-11 w-11"}`}>
-            {isDueOpen ? <ChevronDown size={21} className="rotate-180" aria-hidden="true" /> : <ArrowRight size={20} aria-hidden="true" />}
+          <span className={`relative w-[42%] shrink-0 overflow-hidden rounded-lg bg-[#E9EEEA] transition-[height] duration-200 ${isDueOpen ? "h-[76px]" : "h-[132px]"}`}>
+            {displayedHeroPhoto ? <Image src={displayedHeroPhoto} alt="" fill priority sizes="160px" className="object-cover object-center" unoptimized onError={handleDisplayedHeroPhotoError} /> : <span className="absolute inset-0 grid place-items-center text-[#8DA68C]">{isLoading ? null : <Sprout size={42} strokeWidth={1.2} aria-hidden="true" />}</span>}
           </span>
         </button>
         {isDueOpen ? (
-          <div className="bg-[#F2F4EF] p-3 text-[#151515]">
+          <div className="pt-3 text-[#191F28]">
             {duePlants.length ? <>
-              <button type="button" onClick={toggleAllDuePlants} className="mb-2.5 min-h-10 w-full rounded-2xl bg-white text-sm font-extrabold text-[#284F2A]">{areAllDueSelected ? "전체해제" : "전체선택"}</button>
-              <div className="max-h-80 space-y-2 overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-[#ECEEF1] pb-2"><span className="text-xs text-[#8B929B]">{dueSelectedCount ? `${dueSelectedCount}개 선택` : "물 준 식물 선택"}</span><button type="button" onClick={toggleAllDuePlants} className="min-h-10 px-2 text-xs font-semibold text-[#284F2A]">{areAllDueSelected ? "전체해제" : "전체선택"}</button></div>
+              <div className="max-h-80 overflow-y-auto">
                 {dueMaturePlants.map((plant) => renderPlantRow(plant, true))}
                 {duePups.length ? <section className="border-t border-[#DDE3D7] pt-2">
                   <button type="button" onClick={() => setIsPupsOpen((current) => !current)} aria-expanded={isPupsOpen} aria-controls="due-pups" className="flex min-h-12 w-full items-center justify-between gap-2 px-2 text-left">
                     <span className="flex items-center gap-2 text-sm font-extrabold"><Sprout size={17} aria-hidden="true" />자구 <span className="text-xs font-semibold text-[#777B74]">{duePups.length}개{selectedPupCount ? ` · 선택 ${selectedPupCount}` : ""}</span></span>
                     <ChevronDown size={18} className={isPupsOpen ? "rotate-180" : ""} aria-hidden="true" />
                   </button>
-                  {isPupsOpen ? <div id="due-pups" className="space-y-2">{duePups.map((plant) => renderPlantRow(plant, true))}</div> : null}
+                  {isPupsOpen ? <div id="due-pups">{duePups.map((plant) => renderPlantRow(plant, true))}</div> : null}
                 </section> : null}
               </div>
             </> : <div className="flex items-center gap-2 rounded-2xl bg-white px-4 py-4 text-sm text-[#777B74]"><Check size={18} className="text-[#284F2A]" aria-hidden="true" />오늘 확인할 물주기 알림이 없습니다.</div>}
@@ -297,37 +292,37 @@ export function BatchWatering({
         ) : null}
       </section>
 
-      <label className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3">
-        <span className="flex items-center gap-2 text-sm font-bold text-[#151515]"><CalendarDays size={17} className="text-[#284F2A]" aria-hidden="true" />물 준 날짜</span>
-        <input type="date" value={wateredDate} onChange={(event) => setWateredDate(event.target.value)} className="h-8 min-w-32 rounded-xl border-0 bg-[#F0F1EE] px-2 text-xs font-bold outline-none focus:ring-1 focus:ring-[#284F2A]/30" />
+      <label className="flex items-center justify-between gap-3 border-b border-[#ECEEF1] pb-5">
+        <span className="flex items-center gap-2 text-xs font-medium text-[#626B76]"><CalendarDays size={16} aria-hidden="true" />물 준 날짜</span>
+        <input type="date" value={wateredDate} onChange={(event) => setWateredDate(event.target.value)} className="h-9 min-w-32 rounded-lg bg-[#F5F6F8] px-2 text-xs outline-none" />
       </label>
 
       <section>
         <button type="button" onClick={() => setIsOtherOpen((current) => !current)} className="mb-3 flex w-full items-center justify-between text-left" aria-expanded={isOtherOpen}>
-          <span className="text-lg font-black text-[#151515]">다른 식물 물주기</span>
+          <span className="section-title">다른 식물 물주기</span>
           <span className="flex items-center gap-1.5 text-sm font-semibold text-[#909090]">{isListLoading ? "확인 중" : `${wateringPlants.length}개`} <ChevronDown size={17} className={`transition ${isOtherOpen ? "rotate-180" : ""}`} aria-hidden="true" /></span>
         </button>
         {isOtherOpen ? (
           <div>
             <div className="relative mb-3">
-              <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름 또는 초성으로 검색" className="h-10 w-full rounded-full border-0 bg-[#EDEEEA] px-4 pr-10 text-sm outline-none placeholder:text-[#909090] focus:ring-1 focus:ring-[#284F2A]/30" />
+              <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름 또는 초성으로 검색" aria-label="물주기 식물 검색" className="field pr-10" />
               {query ? <button type="button" onClick={() => setQuery("")} aria-label="검색어 지우기" className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center text-[#777B74]"><X size={16} aria-hidden="true" /></button> : null}
             </div>
-            <div className="max-h-[25rem] space-y-2 overflow-y-auto">{isListLoading ? <p className="py-5 text-center text-sm text-[#909090]">오늘 물준 기록을 확인하고 있어요.</p> : otherPlants.length ? otherPlants.map((plant) => renderPlantRow(plant)) : <p className="py-5 text-center text-sm text-[#909090]">검색 결과가 없습니다.</p>}</div>
+            <div className="max-h-[25rem] overflow-y-auto">{isListLoading ? <p className="py-5 text-center text-sm text-[#909090]">오늘 물준 기록을 확인하고 있어요.</p> : otherPlants.length ? otherPlants.map((plant) => renderPlantRow(plant)) : <p className="py-5 text-center text-sm text-[#909090]">검색 결과가 없습니다.</p>}</div>
           </div>
         ) : null}
       </section>
 
-      <section>
-        <div className="mb-2 flex items-center justify-between"><h2 className="text-[15px] font-extrabold text-[#151515]">오늘 물 준 식물</h2><span className="text-xs font-bold text-[#284F2A]">{todayWateredPlants.length}개</span></div>
+      <section className="section-divider">
+        <div className="mb-3 flex items-center justify-between"><h2 className="section-title">오늘 물 준 식물</h2><span className="text-xs font-medium text-[#8B929B]">{todayWateredPlants.length}개</span></div>
         {isTodayLoading ? <div className="h-14 animate-pulse rounded-2xl bg-white" /> : todayWateringError ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-center text-xs text-red-700">오늘 기록을 불러오지 못했어요.</div> : todayWateredPlants.length ? (
-          <div className="flex gap-2 overflow-x-auto pb-1">{todayWateredPlants.map((plant) => <div key={plant.id || plant.name} className="flex w-32 shrink-0 items-center gap-2 rounded-2xl bg-white p-2"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#E7EDE3] text-[#284F2A]"><Check size={16} aria-hidden="true" /></span><span className="min-w-0"><span className="block truncate text-xs font-bold">{plant.name}</span><span className="text-[10px] text-[#909090]">오늘 완료</span></span></div>)}</div>
+          <div className="flex gap-2 overflow-x-auto pb-1">{todayWateredPlants.map((plant) => <div key={plant.id || plant.name} className="flex w-36 shrink-0 items-center gap-2 rounded-lg border border-[#ECEEF1] p-3"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#EDF4EE] text-[#284F2A]"><Check size={14} aria-hidden="true" /></span><span className="min-w-0"><span className="block truncate text-xs font-semibold">{plant.name}</span><span className="text-[10px] text-[#909090]">오늘 완료</span></span></div>)}</div>
         ) : <div className="rounded-2xl bg-white px-4 py-3 text-center text-xs text-[#909090]">아직 오늘 물 준 식물이 없어요.</div>}
       </section>
 
       {message ? <div className={`rounded-2xl px-4 py-3 text-sm ${saveState === "error" ? "bg-red-50 text-red-700" : "bg-[#E7EFE3] text-[#284F2A]"}`}><div className="flex items-start gap-2">{saveState === "error" ? <AlertCircle size={17} className="mt-0.5 shrink-0" aria-hidden="true" /> : <Check size={17} className="mt-0.5 shrink-0" aria-hidden="true" />}<div><p className="font-semibold">{message}</p>{successfulResults.length ? <p className="mt-1">성공: {successfulResults.map((result) => result.plantName).join(", ")}</p> : null}{failedResults.length ? <p className="mt-1">실패: {failedResults.map((result) => result.plantName).join(", ")}</p> : null}</div></div></div> : null}
 
-      {selectedIds.length ? <div className="pointer-events-none fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-40 mx-auto w-full max-w-[390px] px-5 py-2"><button type="button" onClick={saveWateringLogs} disabled={saveState === "saving"} className="pointer-events-auto min-h-12 w-full rounded-2xl bg-[#284F2A] px-5 text-sm font-black text-white transition active:scale-[0.99] disabled:bg-[#C9CBC6]">{saveState === "saving" ? "저장 중..." : failedResults.length ? `실패한 ${selectedIds.length}개 다시 저장` : `${selectedIds.length}개 물주기 저장`}</button></div> : null}
+      {selectedIds.length ? <div className="save-dock"><button type="button" onClick={saveWateringLogs} disabled={saveState === "saving"} className="primary-button">{saveState === "saving" ? "저장 중..." : failedResults.length ? `실패한 ${selectedIds.length}개 다시 저장` : `${selectedIds.length}개 물주기 저장`}</button></div> : null}
     </div>
   );
 }

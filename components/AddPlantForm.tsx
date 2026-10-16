@@ -18,7 +18,7 @@ export function AddPlantForm({ categories, purchaseSources, onClose, onCreated }
   const [error, setError] = useState("");
   const submitting = useRef(false);
   const hasContent = photos.length > 0 || Object.values(values).some((value) => value.trim());
-  const fieldClass = "h-12 w-full rounded-2xl border-0 bg-[#F0F1EE] px-3 text-sm outline-none focus:ring-1 focus:ring-[#284F2A]/30";
+  const fieldClass = "field";
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -43,11 +43,11 @@ export function AddPlantForm({ categories, purchaseSources, onClose, onCreated }
 
   return (
     <form onSubmit={save} className="space-y-4">
-      <header className="flex items-center gap-3"><button type="button" onClick={onClose} disabled={saving} aria-label="식물 등록 닫기" className="grid h-10 w-10 place-items-center rounded-full bg-white"><ArrowLeft size={20} /></button><h1 className="text-2xl font-black">새 식물</h1></header>
+      <header className="screen-header"><h1 className="screen-title">새 식물</h1><button type="button" onClick={onClose} disabled={saving} aria-label="식물 등록 닫기" title="식물 등록 닫기" className="icon-button"><ArrowLeft size={20} /></button></header>
       <fieldset disabled={saving} className="space-y-4 disabled:opacity-60">
         <PlantPhotoUploader files={photos} onChange={setPhotos} onCaptureDateChange={() => undefined} onBusyChange={setIsCompressing} title="새 식물 사진" />
         {photos.length ? <p className="text-xs text-[#777B74]">첫 번째 사진이 커버사진이 됩니다.</p> : null}
-        <section className="space-y-4 rounded-[24px] bg-white p-4">
+        <section className="space-y-5">
           {([
             ["name", "식물명", "text", undefined],
             ["purchaseSource", "구매처", "text", "purchase-sources"],
@@ -61,7 +61,7 @@ export function AddPlantForm({ categories, purchaseSources, onClose, onCreated }
         </section>
       </fieldset>
       {error ? <p role="alert" className="rounded-2xl bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
-      <button type="submit" disabled={!hasContent || saving || isCompressing} className="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#284F2A] text-sm font-black text-white disabled:bg-[#C9CBC6]">{saving ? "등록 중..." : isCompressing ? "사진 처리 중..." : <><Plus size={18} />식물 등록</>}</button>
+      <button type="submit" disabled={!hasContent || saving || isCompressing} className="primary-button">{saving ? "등록 중..." : isCompressing ? "사진 처리 중..." : <><Plus size={18} />식물 등록</>}</button>
     </form>
   );
 }

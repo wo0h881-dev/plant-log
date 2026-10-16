@@ -99,9 +99,8 @@ export function ManagementCalendar({ plants, onSelectPlant }: ManagementCalendar
 
   return (
     <>
-      <header className="mb-5">
-        <h1 className="text-[32px] font-black leading-tight">관리 캘린더</h1>
-        <p className="mt-1 text-[13px] font-medium text-[#777B74]">물주기와 관찰 기록을 날짜별로 확인해요.</p>
+      <header className="screen-header">
+        <div><h1 className="screen-title">관리 캘린더</h1><p className="screen-description">차곡차곡 쌓인 돌봄의 기록.</p></div>
       </header>
 
       <div className="mb-5">
@@ -110,11 +109,11 @@ export function ManagementCalendar({ plants, onSelectPlant }: ManagementCalendar
           onSelect={(plant) => { setPlantId(plant.id); setQuery(plant.name); }} />
       </div>
 
-      <section className="rounded-[26px] bg-white p-4">
+      <section className="border-y border-[#ECEEF1] py-4">
         <div className="flex items-center justify-between">
-          <button type="button" onClick={() => changeMonth(-1)} aria-label="이전 달" className="grid h-10 w-10 place-items-center rounded-full bg-[#F0F1EE] text-[#444842]"><ChevronLeft size={19} aria-hidden="true" /></button>
-          <div className="flex items-center gap-2 text-[17px] font-black"><CalendarDays size={18} className="text-[#284F2A]" aria-hidden="true" />{year}년 {monthNumber}월</div>
-          <button type="button" onClick={() => changeMonth(1)} aria-label="다음 달" className="grid h-10 w-10 place-items-center rounded-full bg-[#F0F1EE] text-[#444842]"><ChevronRight size={19} aria-hidden="true" /></button>
+          <button type="button" onClick={() => changeMonth(-1)} aria-label="이전 달" title="이전 달" className="icon-button"><ChevronLeft size={19} aria-hidden="true" /></button>
+          <div className="flex items-center gap-2 text-base font-semibold"><CalendarDays size={17} className="text-[#8B929B]" aria-hidden="true" />{year}년 {monthNumber}월</div>
+          <button type="button" onClick={() => changeMonth(1)} aria-label="다음 달" title="다음 달" className="icon-button"><ChevronRight size={19} aria-hidden="true" /></button>
         </div>
 
         <div className="mt-5 grid grid-cols-7 text-center text-[10px] font-bold text-[#9A9D97]">
@@ -130,7 +129,7 @@ export function ManagementCalendar({ plants, onSelectPlant }: ManagementCalendar
             const hasRepotting = dayEvents.some((event) => event.type === "repotting");
             const isSelected = selectedDate === date;
             return (
-              <button key={date} type="button" onClick={() => setSelectedDate(date)} className={`relative mx-auto grid aspect-square w-10 place-items-center rounded-full text-xs font-bold transition ${isSelected ? "bg-[#284F2A] text-white" : date === today ? "bg-[#E7EFE3] text-[#284F2A]" : "text-[#444842]"}`}>
+              <button key={date} type="button" onClick={() => setSelectedDate(date)} className={`relative mx-auto grid aspect-square w-full max-w-10 place-items-center rounded-lg text-xs font-medium transition ${isSelected ? "bg-[#284F2A] text-white" : date === today ? "bg-[#EDF4EE] text-[#284F2A]" : "text-[#626B76]"}`}>
                 <span>{day}</span>
                 {(hasWatering || hasObservation || hasRepotting) ? <span className="absolute bottom-1.5 flex gap-0.5">{hasWatering ? <span className={`h-1 w-1 rounded-full ${isSelected ? "bg-[#BDE3EF]" : "bg-[#4F9DB6]"}`} /> : null}{hasObservation ? <span className={`h-1 w-1 rounded-full ${isSelected ? "bg-white" : "bg-[#568455]"}`} /> : null}{hasRepotting ? <span className={`h-1 w-1 rounded-full ${isSelected ? "bg-[#F3D7A2]" : "bg-[#B28748]"}`} /> : null}</span> : null}
               </button>
@@ -142,8 +141,8 @@ export function ManagementCalendar({ plants, onSelectPlant }: ManagementCalendar
 
       {selectedPlant ? <PlantCareSummary key={selectedPlant.id} plant={selectedPlant} /> : null}
 
-      <section className="mt-5">
-        <div className="mb-3 flex items-center justify-between"><h2 className="text-[17px] font-black">{formatSelectedDate(selectedDate)}</h2><span className="text-xs font-semibold text-[#909090]">{selectedEvents.length}개</span></div>
+      <section className="section-divider">
+        <div className="mb-3 flex items-center justify-between"><h2 className="section-title">{formatSelectedDate(selectedDate)}</h2><span className="text-xs text-[#909090]">{selectedEvents.length}개</span></div>
         {isLoading ? <div className="rounded-[22px] bg-white px-4 py-7 text-center text-sm text-[#909090]">기록을 불러오는 중...</div> : null}
         {!isLoading && error ? <div className="rounded-[22px] bg-red-50 px-4 py-4 text-sm text-red-700">{error}</div> : null}
         {!isLoading && !error && !selectedEvents.length ? <div className="rounded-[22px] bg-white px-4 py-7 text-center text-sm text-[#909090]">이날의 관리 기록이 없어요.</div> : null}
@@ -153,7 +152,7 @@ export function ManagementCalendar({ plants, onSelectPlant }: ManagementCalendar
           const isRepotting = event.type === "repotting";
           const eventLabel = isWatering ? "물주기" : isRepotting ? "분갈이" : event.tags?.join(" · ") || "관찰일지";
           const iconStyle = isWatering ? "bg-[#E3F1F5] text-[#377E96]" : isRepotting ? "bg-[#F3EBDD] text-[#8B6937]" : "bg-[#E7EFE3] text-[#284F2A]";
-          return <button key={event.id} type="button" disabled={!plant} onClick={() => { if (plant) onSelectPlant(plant); }} className="flex w-full items-center gap-3 rounded-[22px] bg-white p-3 text-left transition enabled:active:scale-[0.99]"><span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${iconStyle}`}>{isWatering ? <Droplets size={19} aria-hidden="true" /> : isRepotting ? <RefreshCcw size={18} aria-hidden="true" /> : <NotebookPen size={18} aria-hidden="true" />}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-extrabold">{plant?.name ?? event.plantName}</span><span className="mt-0.5 block truncate text-[11px] text-[#909090]">{eventLabel}{event.note ? ` · ${event.note}` : ""}</span></span><ChevronRight size={16} className="shrink-0 text-[#A3A5A0]" aria-hidden="true" /></button>;
+          return <button key={event.id} type="button" disabled={!plant} onClick={() => { if (plant) onSelectPlant(plant); }} className="flex min-h-[76px] w-full items-center gap-3 border-b border-[#ECEEF1] py-3 text-left"><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${iconStyle}`}>{isWatering ? <Droplets size={18} aria-hidden="true" /> : isRepotting ? <RefreshCcw size={18} aria-hidden="true" /> : <NotebookPen size={18} aria-hidden="true" />}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{plant?.name ?? event.plantName}</span><span className="mt-1 block truncate text-[11px] text-[#909090]">{eventLabel}{event.note ? ` · ${event.note}` : ""}</span></span><ChevronRight size={16} className="shrink-0 text-[#A3A5A0]" aria-hidden="true" /></button>;
         })}</div> : null}
       </section>
     </>

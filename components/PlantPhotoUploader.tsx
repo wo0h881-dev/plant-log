@@ -28,7 +28,7 @@ async function readCaptureDate(file: File) {
   return date && !Number.isNaN(date.getTime()) ? formatLocalDate(date) : null;
 }
 
-export function PlantPhotoUploader({ files, onChange, onCaptureDateChange, onBusyChange, title = "오늘의 식물을 보여주세요" }: PlantPhotoUploaderProps) {
+export function PlantPhotoUploader({ files, onChange, onCaptureDateChange, onBusyChange, title = "사진 추가" }: PlantPhotoUploaderProps) {
   const inputId = useId();
   const [isCompressing, setIsCompressing] = useState(false);
   const [error, setError] = useState("");
@@ -74,15 +74,15 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange, onBus
   }
 
   return (
-    <section className="overflow-hidden rounded-[30px] bg-[#DCE7D5]">
+    <section className="overflow-hidden rounded-lg bg-[#F5F6F8]">
       <label
         htmlFor={inputId}
-        className="relative flex min-h-[258px] cursor-pointer flex-col items-center justify-center text-center transition active:opacity-90"
+        className="relative flex min-h-[190px] cursor-pointer flex-col items-center justify-center text-center transition active:opacity-90"
       >
         {previews.length ? (
-          <div className="grid min-h-[258px] w-full grid-cols-2 gap-1">
+          <div className="grid min-h-[224px] w-full grid-cols-2 gap-1">
             {previews.slice(0, 4).map((preview, index) => (
-              <div key={preview.url} className={`relative overflow-hidden bg-white ${previews.length === 1 ? "col-span-2 min-h-[258px]" : "min-h-32"}`}>
+              <div key={preview.url} className={`relative overflow-hidden bg-white ${previews.length === 1 ? "col-span-2 min-h-[224px]" : "min-h-28"}`}>
                 <Image
                   src={preview.url}
                   alt={preview.name}
@@ -101,14 +101,14 @@ export function PlantPhotoUploader({ files, onChange, onCaptureDateChange, onBus
           </div>
         ) : (
           <>
-            <ImagePlus size={58} strokeWidth={1} className="text-[#284F2A]/25" aria-hidden="true" />
-            <div className="mt-4">
-              <span className="block text-lg font-black text-[#284F2A]">{isCompressing ? "사진 압축 중..." : title}</span>
-              <span className="mt-1 block text-sm font-medium text-[#687565]">여러 장을 한 번에 선택할 수 있어요</span>
+            <ImagePlus size={29} strokeWidth={1.5} className="text-[#A7AFB8]" aria-hidden="true" />
+            <div className="mt-3">
+              <span className="block text-sm font-semibold text-[#626B76]">{isCompressing ? "사진 압축 중..." : title}</span>
+              <span className="mt-1 block text-xs text-[#9AA1AA]">{files.length ? `${files.length}장` : "오늘의 식물 모습"}</span>
             </div>
           </>
         )}
-        <span className="absolute bottom-4 right-4 grid h-11 w-11 place-items-center rounded-full bg-[#151515] text-white shadow-lg shadow-black/20">
+        <span className="absolute bottom-3 right-3 grid h-9 w-9 place-items-center rounded-lg bg-[#191F28] text-white">
           <Camera size={19} aria-hidden="true" />
         </span>
         {previews.length ? (

@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, ArrowLeft, Bell, Check, Leaf, MoreHorizontal, MoreVertical, NotebookPen, Plus, RefreshCcw, Sprout } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, Droplets, Leaf, MoreHorizontal, NotebookPen, Plus, RefreshCcw, Sprout } from "lucide-react";
 import { AddPlantForm } from "@/components/AddPlantForm";
 import { ObservationTagPicker } from "@/components/ObservationTagPicker";
 import { canShowInWateringList, isWateredToday, type WateredPlant } from "@/lib/watering";
@@ -240,20 +240,21 @@ export function PlantLogForm() {
   }
 
   const tabs = [
-    { id: "water" as const, label: "물주기", icon: Leaf, badge: isTodayWateredLoaded && !isPlantsLoading ? dueCount : 0 },
+    { id: "water" as const, label: "물주기", icon: Droplets, badge: isTodayWateredLoaded && !isPlantsLoading ? dueCount : 0 },
     { id: "observation" as const, label: "관찰일지", icon: NotebookPen },
     { id: "profile" as const, label: "내 식물", icon: Sprout },
     { id: "more" as const, label: "더보기", icon: MoreHorizontal },
   ];
 
   return (
-    <main className="min-h-dvh bg-[#F7F8F5] text-[#151515]">
-      <div className="mx-auto min-h-dvh w-full max-w-[390px] px-5 pb-24 pt-[max(1.1rem,env(safe-area-inset-top))]">
+    <main className="app-shell text-[#191F28]">
+      <div className="app-content">
+        <div className="app-brand"><span className="app-wordmark"><Leaf size={19} className="text-[#284F2A]" aria-hidden="true" />plant log<span className="text-[#284F2A]">.</span></span><time className="app-date" dateTime={getTodayValue()}>{new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", weekday: "short" }).format(new Date())}</time></div>
         {activeTab === "water" ? (
           <>
-            <header className="mb-5 flex items-center justify-between gap-4">
-              <div><h1 className="text-[32px] font-black leading-tight">물주기</h1><p className="mt-1 text-[13px] font-medium text-[#777B74]">건강한 오늘이, 더 푸른 내일을 만들어요.</p></div>
-              <span className="grid h-10 w-10 place-items-center text-[#151515]"><Bell size={23} strokeWidth={1.7} aria-hidden="true" /></span>
+            <header className="screen-header">
+              <div><h1 className="screen-title">물주기</h1><p className="screen-description">오늘 돌볼 식물들을 확인해요.</p></div>
+              <span className="grid h-11 w-11 place-items-center rounded-lg bg-[#EFF3FC] text-[#4869D8]"><Droplets size={24} strokeWidth={1.6} aria-hidden="true" /></span>
             </header>
             <BatchWatering
               plants={plants}
@@ -268,26 +269,25 @@ export function PlantLogForm() {
 
         {activeTab === "observation" ? (
           <>
-            <header className="relative mb-4 flex h-10 items-center justify-between">
-              <button type="button" onClick={() => setActiveTab("water")} aria-label="물주기로 돌아가기" className="-ml-2 grid h-10 w-10 place-items-center"><ArrowLeft size={23} aria-hidden="true" /></button>
-              <h1 className="absolute inset-x-12 text-center text-xl font-black">관찰일지</h1>
-              <span className="-mr-2 grid h-10 w-10 place-items-center"><MoreVertical size={21} aria-hidden="true" /></span>
+            <header className="screen-header">
+              <div><h1 className="screen-title">관찰일지</h1><p className="screen-description">작은 변화도 오래 기억할 수 있게.</p></div>
+              <button type="button" onClick={() => setActiveTab("water")} aria-label="물주기로 돌아가기" title="물주기로 돌아가기" className="icon-button"><ArrowLeft size={22} aria-hidden="true" /></button>
             </header>
-            <form onSubmit={saveObservation} className="space-y-3">
+            <form onSubmit={saveObservation} className="space-y-6">
               <PlantPhotoUploader files={photos} onChange={setPhotos} onCaptureDateChange={(date) => setObservedDate(date ?? getTodayValue())} onBusyChange={setIsCompressing} />
-              <section className="space-y-5 rounded-[30px] bg-white p-4">
+              <section className="space-y-6">
                 <PlantSelect plants={plants} value={selectedPlantLabel} query={query} recentPlants={recentPlants} onQueryChange={(value) => { setQuery(value); if (value !== selectedPlant?.name) setSelectedPlantId(""); }} onSelect={selectPlant} variant="row" showPhotos={false} />
-                <label className="flex items-center justify-between gap-4"><span className="text-[15px] font-extrabold">관찰 날짜</span><input type="date" value={observedDate} onChange={(event) => setObservedDate(event.target.value)} className="h-9 min-w-32 rounded-xl border-0 bg-[#F0F1EE] px-2 text-xs font-bold outline-none focus:ring-1 focus:ring-[#284F2A]/30" /></label>
+                <label className="flex items-center justify-between gap-4 border-b border-[#ECEEF1] pb-5"><span className="text-sm font-semibold">관찰 날짜</span><input type="date" value={observedDate} onChange={(event) => setObservedDate(event.target.value)} className="h-10 min-w-32 rounded-lg bg-[#F5F6F8] px-3 text-xs outline-none" /></label>
                 <section>
-                  <div className="mb-3 flex items-center justify-between"><h2 className="text-[15px] font-extrabold">관찰태그</h2><span className="text-[11px] text-[#909090]">여러 개를 선택할 수 있어요.</span></div>
+                  <div className="mb-3 flex items-center justify-between"><h2 className="section-title">관찰태그</h2><span className="text-[11px] text-[#909090]">{selectedTags.length ? `${selectedTags.length}개 선택` : ""}</span></div>
                   <ObservationTagPicker tags={observationTags} selected={selectedTags} onToggle={toggleTag} />
                 </section>
-                {isEnvironment ? <section className="space-y-3 rounded-3xl bg-[#F2F4EF] p-4"><h2 className="text-sm font-extrabold">온습도</h2>{([
+                {isEnvironment ? <section className="space-y-3 border-l-2 border-[#D9E6DB] pl-4"><h2 className="text-sm font-semibold">온습도</h2>{([
                   ["온도 (°C)", temperature, setTemperature, temperatureAbove, setTemperatureAbove, -50, 80],
                   ["습도 (%)", humidity, setHumidity, humidityAbove, setHumidityAbove, 0, 100],
-                ] as const).map(([label, value, setter, above, setAbove, min, max]) => <div key={label} className="flex items-end gap-3"><label className="min-w-0 flex-1"><span className="mb-2 block text-xs font-bold text-[#777B74]">{label}</span><input type="number" step="any" min={min} max={max} value={value} onChange={(event) => setter(event.target.value)} className="h-11 w-full rounded-2xl bg-white px-3 text-sm outline-none focus:ring-1 focus:ring-[#284F2A]/30" /></label><label className="flex h-11 shrink-0 items-center gap-2 text-sm"><input type="checkbox" checked={above} onChange={(event) => setAbove(event.target.checked)} className="h-5 w-5 accent-[#284F2A]" />이상</label></div>)}</section> : null}
+                ] as const).map(([label, value, setter, above, setAbove, min, max]) => <div key={label} className="flex items-end gap-3"><label className="min-w-0 flex-1"><span className="mb-2 block text-xs font-medium text-[#777B74]">{label}</span><input type="number" step="any" min={min} max={max} value={value} onChange={(event) => setter(event.target.value)} className="field" /></label><label className="flex h-12 shrink-0 items-center gap-2 text-sm"><input type="checkbox" checked={above} onChange={(event) => setAbove(event.target.checked)} className="h-5 w-5 accent-[#284F2A]" />이상</label></div>)}</section> : null}
                 {isRepotting ? (
-                  <section className="space-y-4 rounded-3xl bg-[#F2F4EF] p-4">
+                  <section className="space-y-4 border-l-2 border-[#D9E6DB] pl-4">
                     <div className="flex items-center justify-between gap-3">
                       <h2 className="flex items-center gap-2 text-[15px] font-extrabold"><RefreshCcw size={17} aria-hidden="true" />분갈이 기록</h2>
                       <span className="text-[11px] font-semibold text-[#777B74]">{observedDate}</span>
@@ -311,16 +311,16 @@ export function PlantLogForm() {
                     </div>
                     <label className="block">
                       <span className="mb-2 block text-xs font-bold text-[#777B74]">분갈이 이유</span>
-                      <input value={repotReason} onChange={(event) => setRepotReason(event.target.value)} maxLength={100} placeholder="예: 뿌리무름" className="h-11 w-full rounded-2xl border-0 bg-white px-3 text-sm outline-none placeholder:text-[#A3A5A0] focus:ring-1 focus:ring-[#284F2A]/30" />
+                      <input value={repotReason} onChange={(event) => setRepotReason(event.target.value)} maxLength={100} placeholder="예: 뿌리무름" className="field" />
                     </label>
                   </section>
                 ) : null}
                 <label className="block">
-                  <span className="mb-2 block text-[15px] font-extrabold">메모</span>
-                  <span className="relative block"><textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={300} placeholder="오늘의 변화를 기록해보세요." rows={4} className="w-full resize-none rounded-2xl border-0 bg-[#F0F1EE] p-3 pb-7 text-sm leading-6 outline-none placeholder:text-[#A3A5A0] focus:ring-1 focus:ring-[#284F2A]/30" /><span className="pointer-events-none absolute bottom-2.5 right-3 text-[10px] text-[#909090]">{note.length}/300</span></span>
+                  <span className="section-title mb-3 block">메모</span>
+                  <span className="relative block"><textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={300} placeholder="오늘의 변화를 기록해보세요." rows={4} className="field resize-none pb-8 leading-6" /><span className="pointer-events-none absolute bottom-3 right-3 text-[10px] text-[#909090]">{note.length}/300</span></span>
                 </label>
                 <StatusMessage state={observationSaveState} message={observationMessage} />
-                <button type="submit" disabled={!canSaveObservation} className="min-h-14 w-full rounded-2xl bg-[#284F2A] px-5 text-sm font-black text-white transition active:scale-[0.99] disabled:bg-[#C9CBC6] disabled:text-[#777B74]">{observationSaveState === "saving" ? "저장 중..." : "관찰일지 저장"}</button>
+                <button type="submit" disabled={!canSaveObservation} className="primary-button">{observationSaveState === "saving" ? "저장 중..." : "관찰일지 저장"}</button>
               </section>
             </form>
           </>
@@ -329,7 +329,7 @@ export function PlantLogForm() {
         {activeTab === "profile" && isAddingPlant ? <AddPlantForm categories={[...new Set([...categoryOptions, ...plants.map((plant) => plant.category)])]} purchaseSources={purchaseSourceOptions} onClose={() => setIsAddingPlant(false)} onCreated={(plant) => { setPlants((current) => [...current.filter((item) => item.id !== plant.id), plant]); selectProfilePlant(plant); setIsAddingPlant(false); refreshPlants(); }} /> : null}
         {activeTab === "profile" && !isAddingPlant ? (
           <>
-            <header className="mb-4 flex items-center justify-between"><h1 className="text-[32px] font-black leading-tight">내 식물</h1><button type="button" onClick={() => setIsAddingPlant(true)} aria-label="새 식물 등록" className="grid h-10 w-10 place-items-center rounded-full bg-[#151515] text-white"><Plus size={21} aria-hidden="true" /></button></header>
+            <header className="screen-header"><div><h1 className="screen-title">내 식물</h1><p className="screen-description">{isPlantsLoading ? "식물을 불러오고 있어요." : `${plants.length}개의 식물과 함께하고 있어요.`}</p></div><button type="button" onClick={() => setIsAddingPlant(true)} aria-label="새 식물 등록" title="새 식물 등록" className="grid h-10 w-10 place-items-center rounded-lg bg-[#191F28] text-white"><Plus size={21} aria-hidden="true" /></button></header>
             <div className="space-y-5">
               <PlantSelect plants={plants} value={profilePlant ? formatPlantName(profilePlant) : ""} query={profileQuery} recentPlants={[]} onQueryChange={(value) => { setProfileQuery(value); if (!value || value !== profilePlant?.name) setProfilePlantId(""); }} onSelect={selectProfilePlant} variant="search" showPhotos={false} />
               {profilePlant ? <PlantOverview key={profilePlant.id} plant={profilePlant} onPlantRenamed={handlePlantRenamed} initialGalleryOpen={profileOpenPhotos} /> : <RecentObservedPlants plants={plants} recentPlants={recentObservedPlants} onSelect={selectProfilePlant} />}
@@ -340,11 +340,11 @@ export function PlantLogForm() {
         {activeTab === "more" ? <ManagementCalendar plants={plants} onSelectPlant={openPlantFromCalendar} /> : null}
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-[390px] border-t border-[#ECEDE9] bg-white px-6 pb-[max(0.45rem,env(safe-area-inset-bottom))] pt-1.5" aria-label="주요 화면">
-        <div className="grid grid-cols-4 gap-3">
+      <nav className="bottom-nav" aria-label="주요 화면">
+        <div className="grid grid-cols-4 gap-2">
           {tabs.map(({ id, label, icon: Icon, badge }) => {
             const isActive = activeTab === id;
-            return <button key={id} type="button" onClick={() => setActiveTab(id)} className={`relative flex min-h-12 flex-col items-center justify-center gap-0.5 text-[10px] font-bold transition ${isActive ? "text-[#284F2A]" : "text-[#A1A39E]"}`} aria-current={isActive ? "page" : undefined}><Icon size={19} strokeWidth={isActive ? 2.5 : 1.7} aria-hidden="true" /><span>{label}</span>{badge ? <span className="absolute right-1 top-0 grid min-h-4 min-w-4 place-items-center rounded-full bg-[#284F2A] px-1 text-[9px] text-white">{badge}</span> : null}</button>;
+            return <button key={id} type="button" onClick={() => setActiveTab(id)} className={`relative flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition ${isActive ? "text-[#284F2A]" : "text-[#A0A6AE]"}`} aria-current={isActive ? "page" : undefined}><span className="relative"><Icon size={21} strokeWidth={isActive ? 2.1 : 1.7} aria-hidden="true" />{badge ? <span className="absolute -right-3 -top-1 grid min-h-3.5 min-w-3.5 place-items-center rounded-full bg-[#4869D8] px-1 text-[8px] text-white">{badge}</span> : null}</span><span>{label}</span></button>;
           })}
         </div>
       </nav>
