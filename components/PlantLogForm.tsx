@@ -359,7 +359,7 @@ export function PlantLogForm() {
         <div className="grid grid-cols-4 gap-1">
           {tabs.map(({ id, label, icon: Icon }) => {
             const isActive = activeTab === id;
-            return <button key={id} type="button" onClick={() => changeTab(id)} aria-label={label} title={label} className="nav-tab" aria-current={isActive ? "page" : undefined}><span className="nav-icon"><Icon size={22} strokeWidth={isActive ? 2 : 1.6} aria-hidden="true" /></span><span className="nav-label" aria-hidden={!isActive}>{label}</span></button>;
+            return <button key={id} type="button" onClick={() => changeTab(id)} aria-label={label} title={label} className="nav-tab" aria-current={isActive ? "page" : undefined}><span className="nav-icon"><Icon size={22} strokeWidth={isActive ? 2 : 1.6} aria-hidden="true" /></span><span className="nav-label">{label}</span></button>;
           })}
         </div>
       </nav>

@@ -47,8 +47,9 @@ async function main() {
     assert.ok(await nav.getByRole("button", { name: "관찰일지", exact: true }).isEnabled());
     assert.ok(imageRequests.size <= 2, "Carousel downloaded all photos on first open");
     assert.equal(await nav.locator('[aria-current="page"]').evaluate((element) => getComputedStyle(element).color), "rgb(66, 99, 235)");
-    assert.equal(await nav.locator('.nav-label[aria-hidden="false"]').count(), 1);
-    assert.equal(await nav.locator('.nav-label[aria-hidden="false"]').innerText(), "내 식물");
+    assert.equal(await nav.locator('.nav-label').count(), 4);
+    assert.equal(await nav.locator('[aria-current="page"] .nav-label').innerText(), "내 식물");
+    assert.ok(await nav.locator('.nav-label').evaluateAll((labels) => labels.every((label) => getComputedStyle(label).opacity === "1" && label.getAttribute("aria-hidden") !== "true")));
     const out = process.env.QA_OUTPUT || path.join(__dirname, "../.next/qa-blue"); await fs.mkdir(out, { recursive: true });
     await page.screenshot({ path: path.join(out, "blue-photo-loading.png") });
     releaseImages();
