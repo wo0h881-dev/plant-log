@@ -14,7 +14,7 @@ export function PlantPhotoGallery({ plantId, plantName, photos, onClose }: {
   const [index, setIndex] = useState(0);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const items = [...new Map([...photos, ...bodyPhotos].map((photo) => [photo.url.split("?")[0], photo])).values()];
+  const items = [...new Map([...photos, ...bodyPhotos].map((photo) => [photo.url.split("?")[0], photo])).values()].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   const photo = items[index];
   const move = (amount: number) => setIndex((current) => Math.max(0, Math.min(items.length - 1, current + amount)));
 

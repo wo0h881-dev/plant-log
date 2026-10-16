@@ -8,7 +8,7 @@ import type { Plant, RecentObservedPlant } from "@/types/plant";
 type RecentObservedPlantsProps = {
   plants: Plant[];
   recentPlants: RecentObservedPlant[];
-  onSelect: (plant: Plant) => void;
+  onSelect: (plant: Plant, openPhotos?: boolean) => void;
 };
 
 function formatDate(dateValue?: string) {
@@ -28,7 +28,7 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
     return plant ? [{ recent, plant }] : [];
   });
   const featured = items[0];
-  const featuredPhotoUrl = featured?.recent.photoUrl ?? featured?.plant.coverPhotoUrl;
+  const featuredPhotoUrl = featured?.plant.coverPhotoUrl;
   const previewItems = items.slice(0, 8);
 
   function toggleAllPlants() {
@@ -94,8 +94,8 @@ export function RecentObservedPlants({ plants, recentPlants, onSelect }: RecentO
 
       {!showAllPlants && featured ? (
         <div className="relative min-h-[245px] overflow-hidden rounded-[30px] bg-[#DCE7D5]">
-          {featuredPhotoUrl ? <Image src={featuredPhotoUrl} alt={featured.plant.name} fill priority sizes="(max-width: 390px) 100vw, 390px" className="object-cover object-center" unoptimized /> : <span className="absolute inset-0 grid place-items-center text-[#284F2A]"><Sprout size={72} strokeWidth={1} aria-hidden="true" /></span>}
-          <span className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/5 to-transparent" />
+          <button type="button" onClick={() => onSelect(featured.plant, true)} aria-label="최근 사진 보기" className="absolute inset-0">{featuredPhotoUrl ? <Image src={featuredPhotoUrl} alt={featured.plant.name} fill priority sizes="(max-width: 390px) 100vw, 390px" className="object-cover object-center" unoptimized /> : <span className="absolute inset-0 grid place-items-center text-[#284F2A]"><Sprout size={72} strokeWidth={1} aria-hidden="true" /></span>}</button>
+          <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/5 to-transparent" />
           <button type="button" onClick={() => setIsFavorite((current) => !current)} className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-[#151515] text-white" aria-label={isFavorite ? "즐겨찾기 해제" : "즐겨찾기"}>
             <Heart size={17} fill={isFavorite ? "currentColor" : "none"} aria-hidden="true" />
           </button>

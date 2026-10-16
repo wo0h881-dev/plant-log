@@ -47,6 +47,7 @@ export function PlantLogForm() {
   const [query, setQuery] = useState("");
   const [profileQuery, setProfileQuery] = useState("");
   const [profilePlantId, setProfilePlantId] = useState("");
+  const [profileOpenPhotos, setProfileOpenPhotos] = useState(false);
   const [isAddingPlant, setIsAddingPlant] = useState(false);
   const [todayWatered, setTodayWatered] = useState<WateredPlant[]>([]);
   const [isTodayWateredLoaded, setIsTodayWateredLoaded] = useState(false);
@@ -139,9 +140,10 @@ export function PlantLogForm() {
     setObservationMessage("");
   }
 
-  function selectProfilePlant(plant: Plant) {
+  function selectProfilePlant(plant: Plant, openPhotos = false) {
     setProfilePlantId(plant.id);
     setProfileQuery(plant.name);
+    setProfileOpenPhotos(openPhotos);
   }
 
   function handlePlantRenamed(updated: Plant) {
@@ -330,7 +332,7 @@ export function PlantLogForm() {
             <header className="mb-4 flex items-center justify-between"><h1 className="text-[32px] font-black leading-tight">내 식물</h1><button type="button" onClick={() => setIsAddingPlant(true)} aria-label="새 식물 등록" className="grid h-10 w-10 place-items-center rounded-full bg-[#151515] text-white"><Plus size={21} aria-hidden="true" /></button></header>
             <div className="space-y-5">
               <PlantSelect plants={plants} value={profilePlant ? formatPlantName(profilePlant) : ""} query={profileQuery} recentPlants={[]} onQueryChange={(value) => { setProfileQuery(value); if (!value || value !== profilePlant?.name) setProfilePlantId(""); }} onSelect={selectProfilePlant} variant="search" showPhotos={false} />
-              {profilePlant ? <PlantOverview key={profilePlant.id} plant={profilePlant} onPlantRenamed={handlePlantRenamed} /> : <RecentObservedPlants plants={plants} recentPlants={recentObservedPlants} onSelect={selectProfilePlant} />}
+              {profilePlant ? <PlantOverview key={profilePlant.id} plant={profilePlant} onPlantRenamed={handlePlantRenamed} initialGalleryOpen={profileOpenPhotos} /> : <RecentObservedPlants plants={plants} recentPlants={recentObservedPlants} onSelect={selectProfilePlant} />}
             </div>
           </>
         ) : null}

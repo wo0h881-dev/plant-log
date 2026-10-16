@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createNotionHeaders, createPlantPage, hasNotionPageId, readNotionJson, resolveDataSourceId, uploadFileToNotion } from "@/lib/notion";
 import { fallbackPlants, parseNotionPlantPage } from "@/lib/plants";
 import { normalizeDay, seoulDate } from "@/lib/watering";
+import { readEditablePlant, PlantRequestError, type EditablePlantPage } from "@/lib/notion-plant-page";
 
 const NOTION_API_BASE = "https://api.notion.com/v1";
 
@@ -116,25 +117,26 @@ export async function PATCH(request: Request) {
   const payload = await request.json().catch(() => null);
   const plantId = typeof payload?.plantId === "string" ? payload.plantId.trim() : "";
   const name = typeof payload?.name === "string" ? payload.name.trim() : "";
-  if (!hasNotionPageId(plantId) || !name || name.length > 100) return NextResponse.json({ message: "식물을 선택하고 새 이름을 1~100자로 입력하세요." }, { status: 400 });
+  const hasName = payload != null && Object.hasOwn(payload, "name");
+  const hasCycle = payload != null && Object.hasOwn(payload, "wateringCycleDays");
+  const cycle = payload?.wateringCycleDays;
+  if (!hasNotionPageId(plantId) || (!hasName && !hasCycle) || (hasName && (!name || name.length > 100))) return NextResponse.json({ message: "식물과 변경할 값을 확인하세요. 이름은 1~100자로 입력하세요." }, { status: 400 });
+  if (hasCycle && cycle !== null && (typeof cycle !== "number" || !Number.isFinite(cycle) || cycle < 1)) return NextResponse.json({ message: "관수 주기는 1일 이상의 숫자로 입력하세요." }, { status: 400 });
   try {
-    const source = configuredSource || await resolveDataSourceId(token, database!);
-    type Page = Parameters<typeof parseNotionPlantPage>[0] & {
-      parent?: { data_source_id?: string; database_id?: string };
-      archived?: boolean; in_trash?: boolean;
-    };
-    const page = await readNotionJson<Page>(await fetch(`${NOTION_API_BASE}/pages/${plantId}`, { headers: createNotionHeaders(token), cache: "no-store" }));
-    const sameId = (a?: string, b?: string) => Boolean(a && b && a.replaceAll("-", "").toLowerCase() === b.replaceAll("-", "").toLowerCase());
-    const belongsToPlants = page.parent?.data_source_id ? sameId(page.parent.data_source_id, source) : sameId(page.parent?.database_id, database);
-    if (!belongsToPlants || page.archived || page.in_trash) return NextResponse.json({ message: "식물 분류 DB의 식물을 선택하세요." }, { status: 404 });
-    const title = Object.entries(page.properties).find(([, property]) => property.type === "title")?.[0];
-    if (!title) throw new Error("식물명 속성을 찾을 수 없습니다.");
-    const updated = await readNotionJson<Page>(await fetch(`${NOTION_API_BASE}/pages/${plantId}`, {
+    const page = await readEditablePlant(token, plantId);
+    const properties: Record<string, unknown> = {};
+    if (hasName) {
+      const title = Object.entries(page.properties).find(([, property]) => property.type === "title")?.[0];
+      if (!title) throw new Error("식물명 속성을 찾을 수 없습니다.");
+      properties[title] = { title: [{ text: { content: name } }] };
+    }
+    if (hasCycle) properties["관수 주기"] = { number: cycle };
+    const updated = await readNotionJson<EditablePlantPage>(await fetch(`${NOTION_API_BASE}/pages/${plantId}`, {
       method: "PATCH", headers: createNotionHeaders(token),
-      body: JSON.stringify({ properties: { [title]: { title: [{ text: { content: name } }] } } }),
+      body: JSON.stringify({ properties }),
     }));
     return NextResponse.json({ plant: parseNotionPlantPage(updated) }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return NextResponse.json({ message: error instanceof Error ? error.message : "이름 변경에 실패했습니다." }, { status: 500 });
+    return NextResponse.json({ message: error instanceof Error ? error.message : "식물 정보 변경에 실패했습니다." }, { status: error instanceof PlantRequestError ? error.status : 500 });
   }
 }

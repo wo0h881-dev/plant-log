@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { memo, useEffect, useRef, useState } from "react";
 import { Sprout } from "lucide-react";
-import { canOptimizePlantCover } from "@/lib/plant-cover";
+import { canOptimizePlantCover, coverIconLoader } from "@/lib/plant-cover";
 
 const visibilityCallbacks = new WeakMap<Element, () => void>();
 let visibilityObserver: IntersectionObserver | undefined;
@@ -40,6 +40,7 @@ export const PlantCoverThumbnail = memo(function PlantCoverThumbnail({ src }: { 
     {!loaded ? <Sprout size={19} strokeWidth={1.5} /> : null}
     {src && visible && !failed ? <Image
       src={src} alt="" width={44} height={44} sizes="44px" loading="lazy" decoding="async" fetchPriority="low"
+      loader={coverIconLoader}
       unoptimized={!canOptimizePlantCover(src)}
       onLoad={() => setLoaded(true)} onError={() => { setFailed(true); setLoaded(false); }}
       className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-150 ${loaded ? "opacity-100" : "opacity-0"}`}

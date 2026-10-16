@@ -2,11 +2,13 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { ArrowRight, ExternalLink, Heart, History, Sprout } from "lucide-react";
+import { ArrowRight, Camera, ExternalLink, Heart, History, Sprout } from "lucide-react";
 import type { Plant, PlantObservationSummary, PlantPhotoSummary } from "@/types/plant";
 import { PlantPhotoGallery } from "@/components/PlantPhotoGallery";
 import { PlantNameEditor } from "@/components/PlantNameEditor";
 import { PlantCareSummary } from "@/components/PlantCareSummary";
+import { PlantCoverEditor } from "@/components/PlantCoverEditor";
+import { PlantWateringCycleEditor } from "@/components/PlantWateringCycleEditor";
 
 type DetailsResponse = {
   observations?: PlantObservationSummary[];
@@ -19,13 +21,14 @@ function formatDate(dateValue?: string, short = false) {
   return new Intl.DateTimeFormat("ko-KR", short ? { month: "numeric", day: "numeric" } : { year: "numeric", month: "long", day: "numeric" }).format(new Date(`${dateValue.slice(0, 10)}T12:00:00`));
 }
 
-export function PlantOverview({ plant, onPlantRenamed }: { plant: Plant; onPlantRenamed: (plant: Plant) => void }) {
+export function PlantOverview({ plant, onPlantRenamed, initialGalleryOpen = false }: { plant: Plant; onPlantRenamed: (plant: Plant) => void; initialGalleryOpen?: boolean }) {
   const [observations, setObservations] = useState<PlantObservationSummary[]>([]);
   const [photos, setPhotos] = useState<PlantPhotoSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
   const [error, setError] = useState("");
-  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(initialGalleryOpen);
+  const [coverEditorOpen, setCoverEditorOpen] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -45,15 +48,14 @@ export function PlantOverview({ plant, onPlantRenamed }: { plant: Plant; onPlant
     return () => controller.abort();
   }, [plant.id, plant.name]);
 
-  const heroPhotos = photos.length ? photos : plant.coverPhotoUrl ? [{ id: `${plant.id}-cover`, name: plant.name, url: plant.coverPhotoUrl }] : [];
-
   return (
     <div className="space-y-5">
       <section className="relative min-h-[265px] overflow-hidden rounded-[30px] bg-[#DCE7D5]">
-        {heroPhotos.length ? (
-          <Image src={heroPhotos[0].url} alt={plant.name} fill sizes="(max-width: 390px) 100vw, 390px" className="object-cover object-center" unoptimized />
-        ) : <span className="absolute inset-0 grid place-items-center text-[#284F2A]"><Sprout size={72} strokeWidth={1} aria-hidden="true" /></span>}
+        <button type="button" onClick={() => setGalleryOpen(true)} aria-label="최근 사진 보기" className="absolute inset-0">
+          {plant.coverPhotoUrl ? <Image src={plant.coverPhotoUrl} alt={plant.name} fill sizes="(max-width: 390px) 100vw, 390px" className="object-cover object-center" unoptimized /> : <span className="absolute inset-0 grid place-items-center text-[#284F2A]"><Sprout size={72} strokeWidth={1} aria-hidden="true" /></span>}
+        </button>
         <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/5 to-transparent" />
+        <button type="button" onClick={() => setCoverEditorOpen(true)} aria-label="커버사진 변경" title="커버사진 변경" className="absolute left-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-[#151515] text-white"><Camera size={17} /></button>
         <button type="button" onClick={() => setIsFavorite((current) => !current)} className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-[#151515] text-white" aria-label={isFavorite ? "즐겨찾기 해제" : "즐겨찾기"}><Heart size={17} fill={isFavorite ? "currentColor" : "none"} aria-hidden="true" /></button>
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-4 text-white">
           <div className="min-w-0">
@@ -68,6 +70,7 @@ export function PlantOverview({ plant, onPlantRenamed }: { plant: Plant; onPlant
       <PlantCareSummary key={plant.id} plant={plant} />
 
       <PlantNameEditor plant={plant} onSaved={onPlantRenamed} />
+      <PlantWateringCycleEditor plant={plant} onSaved={onPlantRenamed} />
 
       <section className="rounded-[22px] bg-white p-4">
         <div className="flex items-center gap-2"><History size={17} className="text-[#284F2A]" aria-hidden="true" /><h2 className="text-[15px] font-black text-[#151515]">최근 관찰</h2></div>
@@ -76,7 +79,8 @@ export function PlantOverview({ plant, onPlantRenamed }: { plant: Plant; onPlant
         {!isLoading && !error && !observations.length ? <p className="py-6 text-center text-sm text-[#909090]">아직 관찰 기록이 없어요.</p> : null}
         {observations.length ? <div className="mt-3 divide-y divide-[#EEEFEA]">{observations.map((observation) => <article key={observation.id} className="py-3 first:pt-0 last:pb-0"><div className="flex items-center justify-between gap-3"><time className="text-xs font-semibold text-[#909090]">{formatDate(observation.date)}</time>{observation.url ? <a href={observation.url} target="_blank" rel="noreferrer" aria-label="Notion에서 관찰 기록 열기" className="grid h-8 w-8 place-items-center text-[#909090]"><ExternalLink size={14} aria-hidden="true" /></a> : null}</div>{observation.tags.length ? <div className="mt-2 flex flex-wrap gap-1.5">{observation.tags.map((tag) => <span key={tag} className="rounded-full bg-[#EEF3EB] px-2 py-1 text-[11px] font-semibold text-[#284F2A]">{tag}</span>)}</div> : null}{observation.note ? <p className="mt-2 line-clamp-2 text-sm leading-6 text-[#555954]">{observation.note}</p> : null}</article>)}</div> : null}
       </section>
-      {galleryOpen ? <PlantPhotoGallery plantId={plant.id} plantName={plant.name} photos={heroPhotos} onClose={() => setGalleryOpen(false)} /> : null}
+      {galleryOpen ? <PlantPhotoGallery plantId={plant.id} plantName={plant.name} photos={photos} onClose={() => setGalleryOpen(false)} /> : null}
+      {coverEditorOpen ? <PlantCoverEditor plant={plant} onSaved={onPlantRenamed} onClose={() => setCoverEditorOpen(false)} /> : null}
     </div>
   );
 }

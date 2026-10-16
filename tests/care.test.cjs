@@ -23,6 +23,7 @@ const { calculateWateringStats, canShowInWateringList, isWateredToday, normalize
 const { readEnvironmentNote } = require("../lib/observation-environment.ts");
 const { canOptimizePlantCover, NOTION_COVER_HOST } = require("../lib/plant-cover.ts");
 const plantsApi = require("../app/api/plants/route.ts");
+const coverApi = require("../app/api/plant-cover/route.ts");
 const observationApi = require("../app/api/plant-logs/route.ts");
 const wateringApi = require("../app/api/watering-logs/route.ts");
 const statsApi = require("../app/api/watering-stats/route.ts");
@@ -188,4 +189,76 @@ test("rename reports a Notion write failure", async () => {
     ? Response.json({ message: "write failed" }, { status: 500 })
     : json({ ...returnedPage({ 식물명: { title: [] } }), parent: { data_source_id: plantId } });
   assert.equal((await plantsApi.PATCH(renameRequest({ plantId, name: "새 이름" }))).status, 500);
+});
+
+test("watering cycle edit changes only its number and supports clearing", async () => {
+  const original = { ...returnedPage({ 식물명: { title: [{ text: { content: "밤비노" } }] }, 대분류: { select: { name: "알로카시아" } } }), parent: { data_source_id: plantId } };
+  for (const cycle of [2, null]) {
+    let saved;
+    global.fetch = async (_url, options) => {
+      if (options.method !== "PATCH") return json(original);
+      saved = JSON.parse(options.body);
+      return json({ ...original, properties: { ...original.properties, ...returnedPage(saved.properties).properties } });
+    };
+    const response = await plantsApi.PATCH(renameRequest({ plantId, wateringCycleDays: cycle }));
+    assert.equal(response.status, 200);
+    assert.deepEqual(saved, { properties: { "관수 주기": { number: cycle } } });
+    assert.equal((await response.json()).plant.name, "밤비노");
+  }
+  for (const cycle of [0, -1, "2", "bad"]) assert.equal((await plantsApi.PATCH(renameRequest({ plantId, wateringCycleDays: cycle }))).status, 400);
+});
+
+test("new cover uploads a permanent Notion file and appends a body image", async () => {
+  const writes = [];
+  const original = { ...returnedPage({ 식물명: { title: [{ text: { content: "밤비노" } }] }, 대분류: { select: { name: "알로카시아" } } }), parent: { data_source_id: plantId } };
+  global.fetch = async (url, options) => {
+    if (url.endsWith("/file_uploads")) return json({ id: "new-upload", status: "pending" });
+    if (url.endsWith("/send")) return json({ id: "new-upload", status: "uploaded" });
+    if (options.method === "PATCH") { const body = JSON.parse(options.body); writes.push(body); return json({ ...original, cover: { type: "file", file: { url: `https://${NOTION_COVER_HOST}/new-cover.jpg` } } }); }
+    return json(original);
+  };
+  const form = createForm({ plantId });
+  form.set("photo", new File(["image"], "cover.jpg", { type: "image/jpeg" }));
+  const response = await coverApi.POST(request(form, "/api/plant-cover"));
+  assert.equal(response.status, 200);
+  assert.deepEqual(writes[0], { cover: { type: "file_upload", file_upload: { id: "new-upload" } } });
+  assert.equal(writes[1].children[0].image.file_upload.id, "new-upload");
+  assert.ok((await response.json()).plant.coverPhotoUrl.includes("new-cover"));
+});
+
+test("existing cover selection is limited to this plant and never stores an expiring external link", async () => {
+  const original = { ...returnedPage({ 식물명: { title: [{ text: { content: "밤비노" } }] }, 대분류: { select: { name: "알로카시아" } } }), parent: { data_source_id: plantId } };
+  const writes = [];
+  global.fetch = async (url, options) => {
+    url = String(url);
+    if (url.startsWith(`https://${NOTION_COVER_HOST}/`)) return new Response("image", { headers: { "Content-Type": "image/jpeg" } });
+    if (url.includes("/children?")) return json({ results: [{ id: "body-photo", type: "image", image: { file: { url: `https://${NOTION_COVER_HOST}/old.jpg?X-Amz-Signature=old` } } }], has_more: false });
+    if (url.endsWith("/query")) return json({ results: [], has_more: false });
+    if (url.endsWith("/file_uploads")) return json({ id: "copied-upload", status: "pending" });
+    if (url.endsWith("/send")) return json({ id: "copied-upload", status: "uploaded" });
+    if (options.method === "PATCH") { writes.push(JSON.parse(options.body)); return json(original); }
+    return json(original);
+  };
+  assert.equal((await coverApi.POST(request(createForm({ plantId, photoId: "body-photo" })))).status, 200);
+  assert.deepEqual(writes, [{ cover: { type: "file_upload", file_upload: { id: "copied-upload" } } }]);
+  writes.length = 0;
+  assert.equal((await coverApi.POST(request(createForm({ plantId, photoId: "another-plant-photo" })))).status, 400);
+  assert.equal(writes.length, 0);
+});
+
+test("cover upload validates input and reports a partial body-image failure", async () => {
+  assert.equal((await coverApi.POST(request(createForm({ plantId })))).status, 400);
+  const invalid = createForm({ plantId }); invalid.set("photo", new File(["bad"], "bad.txt", { type: "text/plain" }));
+  assert.equal((await coverApi.POST(request(invalid))).status, 400);
+  const original = { ...returnedPage({ 식물명: { title: [{ text: { content: "밤비노" } }] }, 대분류: { select: { name: "알로카시아" } } }), parent: { data_source_id: plantId } };
+  global.fetch = async (url) => {
+    if (url.endsWith("/file_uploads")) return json({ id: "upload", status: "pending" });
+    if (url.endsWith("/send")) return json({ id: "upload", status: "uploaded" });
+    if (url.endsWith("/children")) return Response.json({ message: "append failed" }, { status: 500 });
+    return json(original);
+  };
+  const form = createForm({ plantId }); form.set("photo", new File(["image"], "cover.jpg", { type: "image/jpeg" }));
+  const response = await coverApi.POST(request(form));
+  assert.equal(response.status, 200);
+  assert.ok((await response.json()).warning.includes("본문"));
 });
