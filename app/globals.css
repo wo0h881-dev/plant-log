@@ -69,11 +69,13 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
 .primary-button:disabled { background: #e4e7e9; color: #a2a8af; }
 .icon-button { display: grid; width: 40px; height: 40px; flex-shrink: 0; place-items: center; border-radius: 8px; color: #49515b; }
 .icon-button:hover { background: #f5f6f8; }
-.bottom-nav { position: fixed; inset: auto 0 0; z-index: 50; margin: auto; width: 100%; max-width: 440px; border-top: 1px solid #f0f2f6; background: #fff; padding: 8px 16px max(8px, env(safe-area-inset-bottom)); }
-.bottom-nav button { min-height: 52px; }
-.nav-icon { position: relative; display: grid; width: 52px; height: 28px; place-items: center; border-radius: 14px; }
-[aria-current="page"] .nav-icon { background: #eef2ff; }
-.save-dock { position: fixed; inset: auto 0 calc(74px + env(safe-area-inset-bottom)); z-index: 40; margin: auto; width: 100%; max-width: 440px; padding: 10px 24px; background: linear-gradient(transparent, #ffffff 28%); }
+.bottom-nav { position: fixed; inset: auto 0 max(12px, env(safe-area-inset-bottom)); z-index: 50; margin: auto; width: calc(100% - 32px); max-width: 408px; border: 1px solid #f0f2f6; border-radius: 26px; background: #fff; padding: 6px 10px; box-shadow: 0 6px 26px #202a4310; }
+.nav-tab { display: grid; min-width: 0; height: 52px; grid-template-rows: 26px 14px; align-content: center; justify-items: center; gap: 2px; border-radius: 18px; color: #9199a6; }
+.nav-tab[aria-current="page"] { color: #4263eb; }
+.nav-icon { display: grid; width: 36px; height: 26px; place-items: center; }
+.nav-label { font-size: 10px; font-weight: 600; line-height: 14px; opacity: 0; transition: opacity 160ms ease; }
+.nav-tab[aria-current="page"] .nav-label { opacity: 1; }
+.save-dock { position: fixed; inset: auto 0 calc(82px + env(safe-area-inset-bottom)); z-index: 40; margin: auto; width: 100%; max-width: 440px; padding: 10px 24px; background: linear-gradient(transparent, #ffffff 28%); }
 .tag-button { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; border: 1px solid #eceef1; border-radius: 8px; padding: 6px; font-size: 12px; font-weight: 500; color: #626b76; }
 .tag-button[aria-pressed="true"] { background: #eef2ff; border-color: #4263eb; color: #4263eb; font-weight: 700; }
 .water-row { display: flex; min-height: 76px; width: 100%; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 4px; border-bottom: 1px solid #f0f1f3; text-align: left; }

@@ -1,10 +1,9 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AlertCircle, ArrowLeft, CalendarDays, Check, Droplets, NotebookPen, Plus, RefreshCcw, Sprout } from "lucide-react";
 import { AddPlantForm } from "@/components/AddPlantForm";
 import { ObservationTagPicker } from "@/components/ObservationTagPicker";
-import { canShowInWateringList, isWateredToday, type WateredPlant } from "@/lib/watering";
 import { BatchWatering } from "@/components/BatchWatering";
 import { ManagementCalendar } from "@/components/ManagementCalendar";
 import { PlantPhotoUploader } from "@/components/PlantPhotoUploader";
@@ -53,8 +52,6 @@ export function PlantLogForm() {
   const [profileOpenPhotos, setProfileOpenPhotos] = useState(false);
   const [profilePhotoId, setProfilePhotoId] = useState<string>();
   const [isAddingPlant, setIsAddingPlant] = useState(false);
-  const [todayWatered, setTodayWatered] = useState<WateredPlant[]>([]);
-  const [isTodayWateredLoaded, setIsTodayWateredLoaded] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
   const [purchaseSourceOptions, setPurchaseSourceOptions] = useState<string[]>([]);
   const [temperature, setTemperature] = useState("");
@@ -130,11 +127,9 @@ export function PlantLogForm() {
   useEffect(() => { refreshPlants(); }, [refreshPlants]);
   useEffect(() => { refreshRecentPlants(); }, [refreshRecentPlants]);
   useEffect(() => { refreshOptions(); }, [refreshOptions]);
-  const handleTodayWateredChange = useCallback((items: WateredPlant[]) => { setTodayWatered(items); setIsTodayWateredLoaded(true); }, []);
   const selectedPlant = plants.find((plant) => plant.id === selectedPlantId);
   const selectedPlantLabel = selectedPlant ? formatPlantName(selectedPlant) : "";
   const profilePlant = plants.find((plant) => plant.id === profilePlantId);
-  const dueCount = useMemo(() => plants.filter((plant) => plant.isWateringDue && canShowInWateringList(plant) && !isWateredToday(plant, todayWatered)).length, [plants, todayWatered]);
   const isRepotting = selectedTags.includes("분갈이");
   const isEnvironment = selectedTags.includes("온습도");
   const canSaveObservation = Boolean(
@@ -258,7 +253,7 @@ export function PlantLogForm() {
   }
 
   const tabs = [
-    { id: "water" as const, label: "물주기", icon: Droplets, badge: isTodayWateredLoaded && !isPlantsLoading ? dueCount : 0 },
+    { id: "water" as const, label: "물주기", icon: Droplets },
     { id: "observation" as const, label: "관찰일지", icon: NotebookPen },
     { id: "profile" as const, label: "내 식물", icon: Sprout },
     { id: "more" as const, label: "캘린더", icon: CalendarDays },
@@ -279,7 +274,6 @@ export function PlantLogForm() {
               isLoading={isPlantsLoading}
               isPhotoLoading={isPlantsLoading || isRecentPlantsLoading}
               onWateringSaved={refreshPlants}
-              onTodayWateredChange={handleTodayWateredChange}
             />
           </section>
         ) : null}
@@ -362,10 +356,10 @@ export function PlantLogForm() {
       </div>
 
       <nav className="bottom-nav" aria-label="주요 화면">
-        <div className="grid grid-cols-4 gap-2">
-          {tabs.map(({ id, label, icon: Icon, badge }) => {
+        <div className="grid grid-cols-4 gap-1">
+          {tabs.map(({ id, label, icon: Icon }) => {
             const isActive = activeTab === id;
-            return <button key={id} type="button" onClick={() => changeTab(id)} className={`relative flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition ${isActive ? "text-[#4263EB]" : "text-[#A0A6AE]"}`} aria-current={isActive ? "page" : undefined}><span className="nav-icon"><Icon size={20} strokeWidth={isActive ? 2.1 : 1.7} aria-hidden="true" />{badge ? <span className="absolute right-0 -top-1 grid min-h-3.5 min-w-3.5 place-items-center rounded-full bg-[#4263EB] px-1 text-[8px] text-white">{badge}</span> : null}</span><span>{label}</span></button>;
+            return <button key={id} type="button" onClick={() => changeTab(id)} aria-label={label} title={label} className="nav-tab" aria-current={isActive ? "page" : undefined}><span className="nav-icon"><Icon size={22} strokeWidth={isActive ? 2 : 1.6} aria-hidden="true" /></span><span className="nav-label" aria-hidden={!isActive}>{label}</span></button>;
           })}
         </div>
       </nav>

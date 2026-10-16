@@ -75,6 +75,13 @@ async function main() {
       for (const width of [320, 390, 430, 768]) {
         await page.setViewportSize({ width, height: 844 });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${label} overflows at ${width}`);
+        const dock = await nav.boundingBox();
+        assert.ok(dock.x >= 16 && dock.width <= 408, "Navigation must float inside the screen");
+        assert.equal(await nav.locator('.nav-label[aria-hidden="false"]').count(), 1);
+        assert.equal(await nav.locator('.nav-label[aria-hidden="false"]').innerText(), label);
+        const tabs = await nav.getByRole("button").evaluateAll((buttons) => buttons.map((button) => ({ label: button.getAttribute("aria-label"), height: button.getBoundingClientRect().height, iconTop: button.querySelector("svg").getBoundingClientRect().top })));
+        assert.deepEqual(tabs.map((tab) => tab.label), ["물주기", "관찰일지", "내 식물", "캘린더"]);
+        assert.ok(tabs.every((tab) => tab.height >= 44 && Math.abs(tab.iconTop - tabs[0].iconTop) < 1), "Touch targets or icon alignment changed");
         const input = page.locator("[data-screen]:not([hidden])").getByPlaceholder("식물 검색");
         if (await input.count()) assert.ok(await input.evaluate((element) => parseFloat(getComputedStyle(element).paddingLeft) >= 40));
       }
