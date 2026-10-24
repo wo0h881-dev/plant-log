@@ -29,6 +29,7 @@ const observationApi = require("../app/api/plant-logs/route.ts");
 const wateringApi = require("../app/api/watering-logs/route.ts");
 const statsApi = require("../app/api/watering-stats/route.ts");
 const { isRecentObservation } = require("../lib/notion-observation.ts");
+const { parseNotionPlantPage, parseNotionPlantPages } = require("../lib/plants.ts");
 const plantId = "11111111-1111-4111-8111-111111111111";
 const originalFetch = global.fetch;
 const envKeys = ["NOTION_TOKEN", "NOTION_PLANTS_DATA_SOURCE_ID", "NOTION_DATA_SOURCE_ID", "NOTION_DATABASE_ID", "NOTION_WATERING_DATA_SOURCE_ID"];
@@ -47,6 +48,92 @@ const createForm = (values) => { const form = new FormData(); Object.entries(val
 function returnedPage(properties) {
   return { id: plantId, properties: Object.fromEntries(Object.entries(properties).map(([key, value]) => [key, { type: Object.keys(value)[0], ...value, ...(value.title ? { title: value.title.map((item) => ({ plain_text: item.text.content })) } : {}) }])) };
 }
+
+function wateringPage(lastWateredAt, cycle = 2) {
+  return returnedPage({
+    식물명: { title: [{ text: { content: "밤비노 핑크" } }] },
+    대분류: { select: { name: "알로카시아" } },
+    "관수 주기": { number: cycle },
+    "최근 물준날": { date: lastWateredAt ? { start: lastWateredAt } : null },
+  });
+}
+
+test("plant list keeps cycle-day alerts and missing-date behavior", () => {
+  const plants = parseNotionPlantPages([
+    wateringPage("2026-10-21"), wateringPage("2026-10-22"),
+    wateringPage("2026-10-23"), wateringPage(undefined),
+    wateringPage("2026-10-21", null), wateringPage("2026-10-25"),
+  ], new Date("2026-10-24T03:00:00Z"));
+  assert.deepEqual(plants.map((plant) => [plant.daysSinceWatered, plant.isWateringDue]), [
+    [3, true], [2, true], [1, false], [undefined, true], [3, false], [0, false],
+  ]);
+});
+
+test("plant list refreshes its reference day across Korean midnight and year end", () => {
+  for (const [lastWateredAt, beforeMidnight] of [
+    ["2026-10-23", "2026-10-24T14:59:59Z"],
+    ["2026-12-30", "2026-12-31T14:59:59Z"],
+    ["2028-02-28", "2028-02-29T14:59:59Z"],
+  ]) {
+    const page = wateringPage(lastWateredAt);
+    const before = parseNotionPlantPages([page], new Date(beforeMidnight))[0];
+    const after = parseNotionPlantPages([page], new Date(Date.parse(beforeMidnight) + 1000))[0];
+    assert.equal(before.daysSinceWatered, 1);
+    assert.equal(before.isWateringDue, false);
+    assert.equal(after.daysSinceWatered, 2);
+    assert.equal(after.isWateringDue, true);
+  }
+});
+
+test("single-page parsing remains identical to batch parsing", () => {
+  const pages = [wateringPage("2026-10-22"), wateringPage(undefined), returnedPage({})];
+  assert.deepEqual(parseNotionPlantPages(pages), pages.map((page) => parseNotionPlantPage(page)).filter(Boolean));
+  assert.deepEqual(parseNotionPlantPages([]), []);
+});
+
+test("plant date parsing preserves rollup, formula and invalid-date handling", () => {
+  const rollup = wateringPage(undefined);
+  rollup.properties["최근 물준날"] = { type: "rollup", rollup: { type: "array", array: [
+    { type: "date", date: { start: "2026-10-20" } },
+    { type: "date", date: { start: "2026-10-22" } },
+  ] } };
+  const formula = wateringPage(undefined);
+  formula.properties["최근 물준날"] = { type: "formula", formula: { type: "date", date: { start: "2026-10-23" } } };
+  const plants = parseNotionPlantPages([rollup, formula, wateringPage("invalid")], new Date("2026-10-24T03:00:00Z"));
+  assert.deepEqual(plants.map((plant) => plant.daysSinceWatered), [2, 1, undefined]);
+});
+
+test("paginated plant list formats today once per request for 194 plants", async (t) => {
+  const originalFormat = Intl.DateTimeFormat.prototype.formatToParts;
+  let formats = 0;
+  t.mock.method(Intl.DateTimeFormat.prototype, "formatToParts", function (...args) {
+    formats++;
+    return originalFormat.apply(this, args);
+  });
+  let queries = 0;
+  global.fetch = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    queries++;
+    assert.equal(body.page_size, 100);
+    return json({
+      results: Array.from({ length: body.start_cursor ? 94 : 100 }, (_, index) => ({
+        ...wateringPage("2026-10-22"), id: `plant-${body.start_cursor ? 100 + index : index}`,
+      })),
+      has_more: !body.start_cursor,
+      next_cursor: body.start_cursor ? null : "page-two",
+    });
+  };
+  for (let requestIndex = 1; requestIndex <= 2; requestIndex++) {
+    const response = await plantsApi.GET();
+    const payload = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("Cache-Control"), "no-store");
+    assert.equal(payload.source, "notion");
+    assert.equal(payload.plants.length, 194);
+    assert.equal(formats, requestIndex);
+    assert.equal(queries, requestIndex * 2);
+  }
+});
 
 test("watering hides dead plants and only moss-containing pups", () => {
   const plant = { id: plantId, name: "자구", category: "자구" };

@@ -137,13 +137,15 @@ function dateKeyToUtcTime(dateKey: string) {
   return Date.UTC(year, month - 1, day);
 }
 
-function getSeoulDateKey(date = new Date()) {
-  const parts = new Intl.DateTimeFormat("en", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
+const seoulDateFormatter = new Intl.DateTimeFormat("en", {
+  timeZone: "Asia/Seoul",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function getSeoulDateKey(date: Date) {
+  const parts = seoulDateFormatter.formatToParts(date);
   const year = parts.find((part) => part.type === "year")?.value;
   const month = parts.find((part) => part.type === "month")?.value;
   const day = parts.find((part) => part.type === "day")?.value;
@@ -151,9 +153,8 @@ function getSeoulDateKey(date = new Date()) {
   return year && month && day ? `${year}-${month}-${day}` : undefined;
 }
 
-function calculateDaysSince(dateValue: string | undefined) {
+function calculateDaysSince(dateValue: string | undefined, todayTime: number | undefined) {
   const lastWateredTime = dateValue ? dateKeyToUtcTime(dateValue.slice(0, 10)) : undefined;
-  const todayTime = dateKeyToUtcTime(getSeoulDateKey() ?? "");
 
   if (
     typeof lastWateredTime !== "number" ||
@@ -168,6 +169,18 @@ function calculateDaysSince(dateValue: string | undefined) {
 }
 
 export function parseNotionPlantPage(page: NotionPlantPage): Plant | null {
+  return parsePlantPage(page, dateKeyToUtcTime(getSeoulDateKey(new Date()) ?? ""));
+}
+
+export function parseNotionPlantPages(pages: NotionPlantPage[], now = new Date()): Plant[] {
+  // Share one reference day within a response, but recalculate it for every request.
+  const todayTime = dateKeyToUtcTime(getSeoulDateKey(now) ?? "");
+  return pages
+    .map((page) => parsePlantPage(page, todayTime))
+    .filter((plant): plant is Plant => plant !== null);
+}
+
+function parsePlantPage(page: NotionPlantPage, todayTime: number | undefined): Plant | null {
   const category =
     readTextProperty(page.properties["대분류"]) ||
     readTextProperty(page.properties["분류"]) ||
@@ -185,7 +198,7 @@ export function parseNotionPlantPage(page: NotionPlantPage): Plant | null {
     readDateProperty(page.properties["마지막 물준 날"]) ||
     readDateProperty(page.properties["최근 물준날"]);
   const wateringAlert = readFormulaTextProperty(page.properties["알림"]);
-  const daysSinceWatered = calculateDaysSince(lastWateredAt);
+  const daysSinceWatered = calculateDaysSince(lastWateredAt, todayTime);
   const isWateringDue =
     typeof wateringCycleDays === "number" &&
     (typeof daysSinceWatered === "number" ? daysSinceWatered >= wateringCycleDays : true);

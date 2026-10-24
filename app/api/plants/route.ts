@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createNotionHeaders, createPlantPage, hasNotionPageId, readNotionJson, resolveDataSourceId, uploadFileToNotion } from "@/lib/notion";
-import { fallbackPlants, parseNotionPlantPage } from "@/lib/plants";
+import { fallbackPlants, parseNotionPlantPage, parseNotionPlantPages } from "@/lib/plants";
 import { normalizeDay, seoulDate } from "@/lib/watering";
 import { readEditablePlant, PlantRequestError, type EditablePlantPage } from "@/lib/notion-plant-page";
 
@@ -48,9 +48,7 @@ export async function GET() {
       startCursor = payload.has_more ? payload.next_cursor : null;
     } while (startCursor);
 
-    const plants = pages
-      .map((page) => parseNotionPlantPage(page))
-      .filter((plant) => plant !== null)
+    const plants = parseNotionPlantPages(pages)
       .sort((a, b) => `${a.category} ${a.name}`.localeCompare(`${b.category} ${b.name}`, "ko"));
 
     return NextResponse.json(
