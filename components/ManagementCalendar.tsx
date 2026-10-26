@@ -159,8 +159,8 @@ export function ManagementCalendar({ plants, onSelectPlant, filter, onFilterChan
           const plant = plants.find((item) => item.id === event.plantId) ?? plants.find((item) => item.name === event.plantName);
           const isWatering = event.type === "watering";
           const isRepotting = event.type === "repotting";
-          const eventLabel = isWatering ? "물주기" : isRepotting ? "분갈이" : event.tags?.join(" · ") || "관찰일지";
-          return <button key={event.id} type="button" disabled={!plant} onClick={() => { if (plant) onSelectPlant(plant); }} className="plant-icon-tile calendar-event-tile" data-event-type={event.type} aria-label={`${plant?.name ?? event.plantName} ${isWatering ? "물주기" : isRepotting ? "분갈이" : "관찰일지"} 기록`}><PlantCoverThumbnail key={plant?.coverPhotoUrl ?? "no-cover"} src={plant?.coverPhotoUrl} /><span className="tile-name">{plant?.name ?? event.plantName}</span><span className={`tile-detail ${isWatering ? "text-[#3569D4]" : isRepotting ? "text-[#B76415]" : "text-[#247956]"}`}>{eventLabel}</span>{event.note ? <span className="tile-detail tile-note">{event.note}</span> : null}</button>;
+          const detail = event.note?.trim() || (isWatering ? "물줌" : "");
+          return <button key={event.id} type="button" disabled={!plant} onClick={() => { if (plant) onSelectPlant(plant); }} className="plant-icon-tile calendar-event-tile" data-event-type={event.type} aria-label={`${plant?.name ?? event.plantName} ${isWatering ? "물주기" : isRepotting ? "분갈이" : "관찰일지"} 기록`}><PlantCoverThumbnail key={plant?.coverPhotoUrl ?? "no-cover"} src={plant?.coverPhotoUrl} /><span className="tile-name">{plant?.name ?? event.plantName}</span>{detail ? <span className="tile-detail tile-note">{detail}</span> : null}</button>;
         })}</div> : null}
         </div>
       </section>

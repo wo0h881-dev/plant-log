@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
-export function PlantDialog({ title, onClose, children, sheet = false, closeDisabled = false }: { title: string; onClose: () => void; children: ReactNode; sheet?: boolean; closeDisabled?: boolean }) {
+export function PlantDialog({ title, onClose, children, sheet = false, closeDisabled = false, hideHeader = false }: { title: string; onClose: () => void; children: ReactNode; sheet?: boolean; closeDisabled?: boolean; hideHeader?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   useEffect(() => {
@@ -19,8 +19,8 @@ export function PlantDialog({ title, onClose, children, sheet = false, closeDisa
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus({ preventScroll: true });
     };
   }, []);
-  return createPortal(<dialog ref={ref} aria-labelledby={titleId} className={`plant-dialog${sheet ? " plant-sheet" : ""}`} onCancel={(event) => { event.preventDefault(); onClose(); }} onClick={(event) => { if (event.target === event.currentTarget) { const box = event.currentTarget.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) onClose(); } }}>
-    <header className="dialog-header"><h2 id={titleId}>{title}</h2><button type="button" onClick={onClose} disabled={closeDisabled} aria-label={`${title} 닫기`} title="닫기" className="icon-button"><X size={20} /></button></header>
+  return createPortal(<dialog ref={ref} aria-label={hideHeader ? title : undefined} aria-labelledby={hideHeader ? undefined : titleId} className={`plant-dialog${sheet ? " plant-sheet" : ""}`} onCancel={(event) => { event.preventDefault(); onClose(); }} onClick={(event) => { if (event.target === event.currentTarget) { const box = event.currentTarget.getBoundingClientRect(); if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) onClose(); } }}>
+    {!hideHeader ? <header className="dialog-header"><h2 id={titleId}>{title}</h2><button type="button" onClick={onClose} disabled={closeDisabled} aria-label={`${title} 닫기`} title="닫기" className="icon-button"><X size={20} /></button></header> : null}
     <div className="dialog-content">{children}</div>
   </dialog>, document.body);
 }

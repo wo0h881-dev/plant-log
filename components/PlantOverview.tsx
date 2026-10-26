@@ -52,6 +52,7 @@ export function PlantOverview({ plant, categories, onOpenCalendar, onPlantRename
 
   return (
     <div className="plant-editorial space-y-5">
+      <section className="plant-profile-panel" aria-label={`${plant.name} 프로필`}>
       <section className="editorial-cover">
         <div className="editorial-kicker"><span>나의 식물 기록</span><span>{plant.category}</span></div>
         <PlantPhotoCarousel key={plant.coverPhotoUrl ?? plant.id} photos={plantCarouselPhotos(plant.id, plant.name, plant.coverPhotoUrl, photos)} loading={isLoading} onOpen={(photo) => { setGalleryPhotoId(photo.id === `${plant.id}-cover` ? undefined : photo.id); setGalleryOpen(true); }} controls={<>
@@ -72,7 +73,8 @@ export function PlantOverview({ plant, categories, onOpenCalendar, onPlantRename
         </div>
       </section>
 
-      <PlantCareSummary key={plant.id} plant={plant} onOpenCalendar={onOpenCalendar} />
+      <PlantCareSummary key={plant.id} plant={plant} onOpenCalendar={onOpenCalendar} vertical />
+      </section>
 
       {editingField ? <PlantProfileEditor plant={plant} field={editingField} categories={categories} onSaved={onPlantRenamed} onClose={() => setEditingField(null)} /> : null}
 
@@ -85,11 +87,11 @@ export function PlantOverview({ plant, categories, onOpenCalendar, onPlantRename
           <li key={observation.id} className="editorial-entry">
             <span className="editorial-entry-number" aria-hidden="true" />
             <div className="min-w-0">
+              <time className="mb-2 block text-xs text-[#909090]">{formatDate(observation.date)}</time>
               <div className="flex items-center justify-between gap-3">
                 <h3 className="text-sm font-semibold leading-6">{observation.tags.join(" · ") || "관찰 기록"}</h3>
                 {observation.url ? <a href={observation.url} target="_blank" rel="noreferrer" aria-label="Notion에서 관찰 기록 열기" className="grid h-8 w-8 shrink-0 place-items-center text-[#909090]"><ExternalLink size={14} aria-hidden="true" /></a> : null}
               </div>
-              <time className="mt-1 block text-xs text-[#909090]">{formatDate(observation.date)}</time>
               {observation.note ? <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-[#555954]">{observation.note}</p> : null}
             </div>
           </li>

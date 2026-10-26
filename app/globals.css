@@ -57,7 +57,10 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
 .app-content { margin: auto; width: 100%; max-width: 440px; padding: 16px 24px calc(160px + env(safe-area-inset-bottom)); }
 .app-header { position: sticky; top: 0; z-index: 45; display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: calc(64px + env(safe-area-inset-top)); padding: env(safe-area-inset-top) 18px 0; background: #fffffffa; border-bottom: 1px solid #f0f1f3; }
 .app-header h1 { flex-shrink: 0; text-align: left; font-size: 17px; line-height: 26px; font-weight: 750; }
-.header-date { min-width: 0; width: 124px; height: 36px; padding: 0 10px; border-radius: 20px; font-size: 11px; text-align: right; color: #4263eb; background: #eef2ff; border: 0; }
+.header-date-pill { position: relative; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; height: 36px; min-width: 106px; padding: 0 12px; border-radius: 20px; font-size: 11px; color: #4263eb; background: #eef2ff; white-space: nowrap; }
+.header-date { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; font-size: 16px; border: 0; background: #eef2ff; cursor: pointer; }
+.header-date-pill:focus-within { outline: 2px solid #4263eb; outline-offset: 2px; }
+.header-date-pill:has(input:disabled) { opacity: .5; }
 .app-date { color: #8b929b; font-size: 11px; font-weight: 500; }
 .screen-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 56px; margin-bottom: 20px; }
 .screen-title { font-size: 24px; font-weight: 750; line-height: 1.3; }
@@ -73,7 +76,7 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
 .icon-button { display: grid; width: 40px; height: 40px; flex-shrink: 0; place-items: center; border-radius: 8px; color: #49515b; }
 .icon-button:hover { background: #f5f6f8; }
 .bottom-nav { position: fixed; inset: auto 0 max(12px, env(safe-area-inset-bottom)); z-index: 50; margin: auto; width: calc(100% - 32px); max-width: 408px; border: 1px solid #f0f2f6; border-radius: 36px; background: #fffffff5; padding: 6px 8px; box-shadow: 0 8px 30px #202a4314; backdrop-filter: blur(16px); }
-.nav-add { display: grid; place-items: center; height: 52px; width: 100%; border-radius: 50%; color: #191f28; }
+.nav-add { display: grid; place-items: center; height: 52px; width: 100%; border-radius: 50%; color: #9199a6; }
 .nav-add:active { color: #4263eb; }
 .nav-tab { display: grid; min-width: 0; height: 52px; place-items: center; border-radius: 18px; color: #9199a6; }
 .nav-tab[aria-current="page"] .nav-icon { color: #4263eb; }
@@ -141,7 +144,7 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
 .quick-actions button { display: flex; justify-content: center; align-items: center; min-height: 56px; border: 1px solid #e8ebf2; border-radius: 20px; padding: 12px; font-size: 14px; font-weight: 600; }
 .quick-actions button:hover { background: #eef2ff; }
 .header-search { flex: 1; min-width: 0; }
-.header-search .field { min-height: 36px; height: 36px; font-size: 12px; padding-left: 34px; padding-right: 32px; border-radius: 24px; background: #fff; border: 1px solid #e4e8f0; }
+.header-search .field { min-height: 36px; height: 36px; font-size: 16px; padding-left: 34px; padding-right: 32px; border-radius: 24px; background: #fff; border: 1px solid #e4e8f0; }
 .header-search svg { width: 15px; }
 .header-search input + button { right: 2px; }
 .app-header:has(.header-search) { gap: 8px; }
@@ -150,14 +153,14 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
 .header-cycle-button { display: inline-flex; align-items: center; justify-content: center; height: 36px; flex-shrink: 0; margin-left: auto; padding: 8px 10px; border-radius: 18px; background: #eef2ff; color: #4263eb; font-size: 11px; font-weight: 600; }
 .watering-header { gap: 8px; padding-inline: 18px; }
 .watering-header h1 { font-size: 17px; flex-shrink: 0; }
-.watering-header .header-date { width: 124px; flex-shrink: 0; font-size: 11px; }
+.watering-header .header-date-pill { min-width: 106px; }
 .watering-due-panel { overflow: hidden; border-radius: 24px; background: #f5f6f8; }
 .due-panel-list { padding: 8px 12px 12px; margin: 0 12px 12px; border-radius: 18px; background: #fff; }
 .due-panel-list .water-row[data-selected="true"] { background: #f6f8ff; }
 .plant-icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); align-items: start; gap: 20px 10px; }
 .plant-icon-tile { display: flex; flex-direction: column; align-items: center; width: 68px; min-width: 0; flex-shrink: 0; gap: 7px; text-align: center; justify-self: center; }
 .plant-icon-tile > span:first-child { width: 48px; height: 48px; border-radius: 18px; }
-.tile-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; font-size: 11px; line-height: 1.5; }
+.tile-name { display: block; width: 100%; word-break: keep-all; overflow-wrap: anywhere; font-size: 11px; line-height: 1.5; }
 .tile-detail { display: block; font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; color: #909090; }
 .tile-note { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .calendar-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 22px; }
@@ -186,6 +189,23 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
 .app-shell .field, .plant-dialog .field, .app-shell .primary-button, .plant-dialog .primary-button { border-radius: 18px; }
 .app-shell .header-search .field { border-radius: 24px; background: #fff; }
 .profile-popover button { border-radius: 14px; }
+.plant-profile-panel { border: 1px solid #e8ebf2; border-radius: 26px; padding: 14px; background: #fff; }
+.plant-profile-panel .editorial-cover { align-items: stretch; }
+.plant-profile-panel .editorial-cover:has(> section > div:not(.detail-photo)) { padding-bottom: 40px; }
+.plant-profile-panel .editorial-cover > section { position: relative; min-height: 200px; }
+.plant-profile-panel .editorial-cover > section > div:not(.detail-photo) { position: absolute; top: 100%; left: 0; right: 0; margin-top: 2px; }
+.plant-profile-panel .detail-photo { height: 100%; min-height: 200px; aspect-ratio: auto; border-radius: 20px; }
+.plant-profile-panel .profile-card { min-height: 200px; border: 0; border-radius: 0; padding: 42px 4px 12px; }
+.profile-card .editorial-title { word-break: keep-all; overflow-wrap: anywhere; }
+.profile-care { margin-top: 22px; padding-top: 20px; border-top: 1px solid #edf0f5; }
+.profile-care .section-title { font-size: 15px; }
+.profile-care .metric-grid { grid-template-columns: minmax(0, 1fr); gap: 0; padding-block: 10px; }
+.profile-care .metric-grid > button, .profile-care .metric-grid > div { display: flex; align-items: center; gap: 10px; padding-block: 12px; }
+.profile-care .metric-grid svg { flex-shrink: 0; }
+.profile-care .metric-grid span { margin: 0; }
+.profile-care .metric-grid span:last-child { min-width: 0; flex: 1; text-align: right; overflow-wrap: anywhere; }
+.profile-care > div:last-child { padding-bottom: 0; }
+.profile-care dd { min-width: 0; text-align: right; overflow-wrap: anywhere; }
 .app-shell dialog:not(.w-screen):not(.plant-sheet) { border-radius: 26px; }
 @supports (top: anchor(bottom)) {
   .profile-popover { position-anchor: --profile-menu; inset: auto; top: anchor(bottom); left: clamp(16px, anchor(left), calc(100vw - 222px)); margin: 4px 0 0; }
@@ -199,7 +219,7 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
 @media (max-width: 359px) {
   .app-content { padding-left: 18px; padding-right: 18px; }
   .header-cycle-button { padding-inline: 8px; font-size: 10px; }
-  .watering-header .header-date { width: 118px; padding-inline: 6px; }
+  .header-date-pill { min-width: 100px; padding-inline: 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }

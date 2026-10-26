@@ -18,7 +18,7 @@ async function main() {
       await page.getByLabel("물 준 날짜", { exact: true }).waitFor({ state: "visible" });
       await page.waitForFunction(() => !document.querySelector(".header-date").disabled);
       const nav = page.getByRole("navigation", { name: "주요 화면" });
-      const tabs = [["물주기", "droplet"], ["관찰일지", "pen"], ["내 식물", "pen"], ["캘린더", "calendar-search"]];
+      const tabs = [["물주기", "droplet"], ["관찰일지", "pen"], ["내 식물", "heart5"], ["캘린더", "calendar-search"]];
       for (const [label, asset] of tabs) {
         await nav.getByRole("button", { name: label, exact: true }).click();
         for (const [otherLabel, otherAsset] of tabs) {
@@ -31,7 +31,7 @@ async function main() {
         }
         await nav.screenshot({ path: path.join(out, `${asset}-${label}-${width}.png`) });
       }
-      const files = ["droplet-outline", "droplet-filled", "pen-outline", "pen-filled", "calendar-search-outline", "calendar-search-filled", "plus-outline"];
+      const files = ["droplet-outline", "droplet-filled", "pen-outline", "pen-filled", "heart5-outline", "heart5-filled", "calendar-search-outline", "calendar-search-filled", "plus-outline"];
       for (const file of files) {
         const shape = await page.evaluate(async (name) => {
           const img = new Image(); img.src = `/navigation/${name}-48x48.png`; await img.decode();

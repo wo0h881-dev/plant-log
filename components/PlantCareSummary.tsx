@@ -10,7 +10,7 @@ function formatDate(value?: string) {
   return new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric" }).format(new Date(`${value.slice(0, 10)}T12:00:00`));
 }
 
-export function PlantCareSummary({ plant, onOpenCalendar }: { plant: Plant; onOpenCalendar?: (plant: Plant) => void }) {
+export function PlantCareSummary({ plant, onOpenCalendar, vertical = false }: { plant: Plant; onOpenCalendar?: (plant: Plant) => void; vertical?: boolean }) {
   const [stats, setStats] = useState<WateringStats | null>(null);
   const [error, setError] = useState("");
 
@@ -26,8 +26,8 @@ export function PlantCareSummary({ plant, onOpenCalendar }: { plant: Plant; onOp
     return () => controller.abort();
   }, [plant.id]);
 
-  return <section className="mt-6" aria-label={`${plant.name} 관리 정보`}>
-    <h2 className="section-title">{plant.name} 관리 정보</h2>
+  return <section className={vertical ? "profile-care" : "mt-6"} aria-label={`${plant.name} 관리 정보`}>
+    <h2 className="section-title">{vertical ? "관리 정보" : `${plant.name} 관리 정보`}</h2>
     <div className="metric-grid">
       {([
         ["최근 물", Droplets, stats ? formatDate(stats.lastWateredAt) : error ? "조회 실패" : "확인 중"],

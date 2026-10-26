@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } 
 import dynamic from "next/dynamic";
 import { AlertCircle, ArrowLeft, Check, House, RefreshCcw } from "lucide-react";
 import { PlantDialog } from "@/components/PlantDialog";
+import { HeaderDatePicker } from "@/components/HeaderDatePicker";
 import { BulkWateringCycleEditor } from "@/components/BulkWateringCycleEditor";
 import { AddPlantForm } from "@/components/AddPlantForm";
 import { ObservationTagPicker } from "@/components/ObservationTagPicker";
@@ -63,6 +64,7 @@ export function PlantLogForm() {
   const [quickAction, setQuickAction] = useState<"" | "menu">("");
   const [waterSelection, setWaterSelection] = useState<string[]>([]);
   const [cycleEditorOpen, setCycleEditorOpen] = useState(false);
+  const [spaceOrigin, setSpaceOrigin] = useState<"profile" | "more">("profile");
   const [wateredDate, setWateredDate] = useState(getTodayValue);
   const [isWaterSaving, setIsWaterSaving] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
@@ -320,7 +322,7 @@ export function PlantLogForm() {
   const tabs = [
     { id: "water" as const, label: "물주기", icon: "droplet" },
     { id: "observation" as const, label: "관찰일지", icon: "pen" },
-    { id: "profile" as const, label: "내 식물", icon: "pen" },
+    { id: "profile" as const, label: "내 식물", icon: "heart5" },
     { id: "more" as const, label: "캘린더", icon: "calendar-search" },
   ];
 
@@ -330,10 +332,10 @@ export function PlantLogForm() {
         <h1>{activeTab === "spaces" ? "식물방" : tabs.find((tab) => tab.id === activeTab)?.label}</h1>
         {activeTab === "profile" && !isAddingPlant ? <div className="header-search"><PlantSelect key="profile" plants={plants} value={profilePlant ? formatPlantName(profilePlant) : ""} query={profileQuery} recentPlants={[]} onQueryChange={(value) => { setProfileQuery(value); if (value !== profilePlant?.name) setProfilePlantId(""); }} onSelect={selectProfilePlant} variant="search" /></div> : null}
         {activeTab === "more" ? <div className="header-search"><PlantSelect key="calendar" plants={plants} value={calendarPlant ? formatPlantName(calendarPlant) : ""} query={calendarFilter.query} recentPlants={[]} onQueryChange={(value) => setCalendarFilter({ query: value, plantId: "" })} onSelect={(plant) => setCalendarFilter({ plantId: plant.id, query: plant.name })} variant="search" /></div> : null}
-        {activeTab === "profile" ? <button type="button" onClick={() => changeTab("spaces")} aria-label="식물방 열기" title="식물방" className="icon-button"><House size={22} /></button> : null}
-        {activeTab === "spaces" ? <button type="button" onClick={() => changeTab("profile")} aria-label="내 식물로 돌아가기" title="내 식물로 돌아가기" className="icon-button"><ArrowLeft size={22} /></button> : null}
+        {activeTab === "profile" || activeTab === "more" ? <button type="button" onClick={() => { setSpaceOrigin(activeTab === "more" ? "more" : "profile"); changeTab("spaces"); }} aria-label="식물방 열기" title="식물방" className="icon-button"><House size={22} /></button> : null}
+        {activeTab === "spaces" ? <button type="button" onClick={() => changeTab(spaceOrigin)} aria-label={spaceOrigin === "more" ? "캘린더로 돌아가기" : "내 식물로 돌아가기"} title="돌아가기" className="icon-button"><ArrowLeft size={22} /></button> : null}
         {activeTab === "water" ? <button type="button" className="header-cycle-button" disabled={isWaterSaving || isPlantsLoading} onClick={() => setCycleEditorOpen(true)}>관수주기 편집</button> : null}
-        {activeTab === "water" || activeTab === "observation" ? <input type="date" aria-label={activeTab === "water" ? "물 준 날짜" : "관찰 날짜"} value={activeTab === "water" ? wateredDate : observedDate} disabled={isPlantsLoading || (activeTab === "water" ? isWaterSaving : observationSaveState === "saving" || Boolean(recentObservationChoice))} onChange={(event) => { if (event.target.value) { if (activeTab === "water") setWateredDate(event.target.value); else setObservedDate(event.target.value); } }} className="header-date" /> : null}
+        {activeTab === "water" || activeTab === "observation" ? <HeaderDatePicker label={activeTab === "water" ? "물 준 날짜" : "관찰 날짜"} value={activeTab === "water" ? wateredDate : observedDate} disabled={isPlantsLoading || (activeTab === "water" ? isWaterSaving : observationSaveState === "saving" || Boolean(recentObservationChoice))} onChange={activeTab === "water" ? setWateredDate : setObservedDate} /> : null}
       </header>
       <div className="app-content">
         {visitedTabs.includes("water") ? (
@@ -429,7 +431,7 @@ export function PlantLogForm() {
 
       {recentObservationChoice && selectedPlant ? <ObservationSaveChoice recent={recentObservationChoice} plantName={selectedPlant.name} busy={observationSaveState === "saving"} error={observationSaveState === "error" ? observationMessage : ""} onChoose={(append) => { void persistObservation(append ? recentObservationChoice.id : undefined); }} onClose={() => { setRecentObservationChoice(null); setObservationSaveState("idle"); setObservationMessage(""); }} /> : null}
 
-      {quickAction === "menu" ? <PlantDialog title="추가" onClose={() => setQuickAction("")}><div className="quick-actions">
+      {quickAction === "menu" ? <PlantDialog title="추가" hideHeader onClose={() => setQuickAction("")}><div className="quick-actions">
         <button type="button" onClick={() => { setQuickAction(""); setIsAddingPlant(true); scrollPositions.current.profile = 0; changeTab("profile"); window.scrollTo(0, 0); }}>새 식물 추가</button>
         <button type="button" onClick={() => { setQuickAction(""); if (profilePlant && !selectedPlant) selectPlant(profilePlant); scrollPositions.current.observation = 0; changeTab("observation"); window.scrollTo(0, 0); }}>관찰일지 추가</button>
       </div></PlantDialog> : null}
@@ -437,7 +439,7 @@ export function PlantLogForm() {
       <nav className="bottom-nav" aria-label="주요 화면">
         <div className="grid grid-cols-5 gap-1">
           {tabs.flatMap(({ id, label, icon }, index) => {
-            const isActive = activeTab === id || (id === "profile" && activeTab === "spaces");
+            const isActive = activeTab === id || (id === spaceOrigin && activeTab === "spaces");
             const source = `url("/navigation/${icon}-${isActive ? "filled" : "outline"}-48x48.png")`;
             const button = <button key={id} type="button" onClick={() => changeTab(id)} aria-label={label} title={label} className="nav-tab" aria-current={isActive ? "page" : undefined}><span className="nav-icon"><span className="nav-asset" style={{ maskImage: source, WebkitMaskImage: source }} aria-hidden="true" /></span></button>;
             return index === 2 ? [<button key="add" type="button" className="nav-add" onClick={() => setQuickAction("menu")} aria-label="빠른 작업" aria-haspopup="dialog" title="빠른 작업"><span className="nav-asset nav-asset-plus" aria-hidden="true" /></button>, button] : [button];
