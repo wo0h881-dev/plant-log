@@ -332,7 +332,7 @@ export function PlantLogForm() {
         {activeTab === "more" ? <div className="header-search"><PlantSelect key="calendar" plants={plants} value={calendarPlant ? formatPlantName(calendarPlant) : ""} query={calendarFilter.query} recentPlants={[]} onQueryChange={(value) => setCalendarFilter({ query: value, plantId: "" })} onSelect={(plant) => setCalendarFilter({ plantId: plant.id, query: plant.name })} variant="search" /></div> : null}
         {activeTab === "profile" ? <button type="button" onClick={() => changeTab("spaces")} aria-label="식물방 열기" title="식물방" className="icon-button"><House size={22} /></button> : null}
         {activeTab === "spaces" ? <button type="button" onClick={() => changeTab("profile")} aria-label="내 식물로 돌아가기" title="내 식물로 돌아가기" className="icon-button"><ArrowLeft size={22} /></button> : null}
-        {activeTab === "water" ? <button type="button" className="header-cycle-button" disabled={isWaterSaving || isPlantsLoading} onClick={() => setCycleEditorOpen(true)}>관수주기 편집{waterSelection.length ? ` ${waterSelection.length}` : ""}</button> : null}
+        {activeTab === "water" ? <button type="button" className="header-cycle-button" disabled={isWaterSaving || isPlantsLoading} onClick={() => setCycleEditorOpen(true)}>관수주기 편집</button> : null}
         {activeTab === "water" || activeTab === "observation" ? <input type="date" aria-label={activeTab === "water" ? "물 준 날짜" : "관찰 날짜"} value={activeTab === "water" ? wateredDate : observedDate} disabled={isPlantsLoading || (activeTab === "water" ? isWaterSaving : observationSaveState === "saving" || Boolean(recentObservationChoice))} onChange={(event) => { if (event.target.value) { if (activeTab === "water") setWateredDate(event.target.value); else setObservedDate(event.target.value); } }} className="header-date" /> : null}
       </header>
       <div className="app-content">
@@ -439,7 +439,7 @@ export function PlantLogForm() {
           {tabs.flatMap(({ id, label, icon }, index) => {
             const isActive = activeTab === id || (id === "profile" && activeTab === "spaces");
             const source = `url("/navigation/${icon}-${isActive ? "filled" : "outline"}-48x48.png")`;
-            const button = <button key={id} type="button" onClick={() => changeTab(id)} aria-label={label} title={label} className="nav-tab" aria-current={isActive ? "page" : undefined}><span className="nav-icon"><span className="nav-asset" style={{ maskImage: source, WebkitMaskImage: source }} aria-hidden="true" /></span><span className="nav-label">{label}</span></button>;
+            const button = <button key={id} type="button" onClick={() => changeTab(id)} aria-label={label} title={label} className="nav-tab" aria-current={isActive ? "page" : undefined}><span className="nav-icon"><span className="nav-asset" style={{ maskImage: source, WebkitMaskImage: source }} aria-hidden="true" /></span></button>;
             return index === 2 ? [<button key="add" type="button" className="nav-add" onClick={() => setQuickAction("menu")} aria-label="빠른 작업" aria-haspopup="dialog" title="빠른 작업"><span className="nav-asset nav-asset-plus" aria-hidden="true" /></button>, button] : [button];
           })}
         </div>

@@ -5,6 +5,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Droplets, NotebookPen, Refresh
 import type { Plant, PlantCalendarEvent } from "@/types/plant";
 import { PlantSelect } from "@/components/PlantSelect";
 import { PlantCareSummary } from "@/components/PlantCareSummary";
+import { PlantCoverThumbnail } from "@/components/PlantCoverThumbnail";
 import { matchesPlantSearch } from "@/lib/plant-search";
 
 type ManagementCalendarProps = {
@@ -52,6 +53,7 @@ export function ManagementCalendar({ plants, onSelectPlant, filter, onFilterChan
   const [events, setEvents] = useState<PlantCalendarEvent[]>([]);
   const [loadedMonth, setLoadedMonth] = useState("");
   const [error, setError] = useState("");
+  const [eventFilter, setEventFilter] = useState<"all" | PlantCalendarEvent["type"]>("all");
   const { query, plantId } = filter;
   const selectedPlant = plants.find((plant) => plant.id === plantId);
 
@@ -89,6 +91,7 @@ export function ManagementCalendar({ plants, onSelectPlant, filter, onFilterChan
     return map;
   }, [events, plants, plantId, query, selectedPlant?.name]);
   const selectedEvents = eventsByDate.get(selectedDate) ?? [];
+  const filteredEvents = selectedEvents.filter((event) => eventFilter === "all" || event.type === eventFilter);
   const isLoading = loadedMonth !== month;
   const days = buildMonthDays(month);
   const [year, monthNumber] = month.split("-").map(Number);
@@ -107,7 +110,7 @@ export function ManagementCalendar({ plants, onSelectPlant, filter, onFilterChan
           onSelect={(plant) => onFilterChange({ plantId: plant.id, query: plant.name })} />
       </div> : null}
 
-      <section className="border-y border-[#ECEEF1] py-4">
+      <section className="py-4">
         <div className="flex items-center justify-between">
           <button type="button" onClick={() => changeMonth(-1)} aria-label="이전 달" title="이전 달" className="icon-button"><ChevronLeft size={19} aria-hidden="true" /></button>
           <div className="flex items-center gap-2 text-base font-semibold"><CalendarDays size={17} className="text-[#8B929B]" aria-hidden="true" />{year}년 {monthNumber}월</div>
@@ -140,18 +143,26 @@ export function ManagementCalendar({ plants, onSelectPlant, filter, onFilterChan
       {selectedPlant ? <PlantCareSummary key={selectedPlant.id} plant={selectedPlant} /> : null}
 
       <section className="section-divider">
-        <div className="mb-3 flex items-center justify-between"><h2 className="section-title">{formatSelectedDate(selectedDate)}</h2><span className="text-xs text-[#909090]">{selectedEvents.length}개</span></div>
+        <div className="mb-3 flex items-center justify-between"><h2 className="section-title">{formatSelectedDate(selectedDate)}</h2><span className="text-xs text-[#909090]">{filteredEvents.length}개</span></div>
+        <div className="calendar-filters" role="tablist" aria-label="관리 기록 종류">
+          {([["all", "전체"], ["watering", "물주기"], ["observation", "관찰일지"], ["repotting", "분갈이"]] as const).map(([type, label], index) => <button key={type} id={`calendar-filter-${type}`} type="button" role="tab" aria-selected={eventFilter === type} aria-controls="calendar-records" tabIndex={eventFilter === type ? 0 : -1} onClick={() => setEventFilter(type)} onKeyDown={(event) => {
+            const types = ["all", "watering", "observation", "repotting"] as const;
+            const next = event.key === "ArrowRight" ? (index + 1) % 4 : event.key === "ArrowLeft" ? (index + 3) % 4 : event.key === "Home" ? 0 : event.key === "End" ? 3 : -1;
+            if (next >= 0) { event.preventDefault(); setEventFilter(types[next]); document.getElementById(`calendar-filter-${types[next]}`)?.focus(); }
+          }}>{label}</button>)}
+        </div>
+        <div id="calendar-records" role="tabpanel" aria-labelledby={`calendar-filter-${eventFilter}`}>
         {isLoading ? <div className="rounded-[22px] bg-white px-4 py-7 text-center text-sm text-[#909090]">기록을 불러오는 중...</div> : null}
         {!isLoading && error ? <div className="rounded-[22px] bg-red-50 px-4 py-4 text-sm text-red-700">{error}</div> : null}
-        {!isLoading && !error && !selectedEvents.length ? <div className="rounded-[22px] bg-white px-4 py-7 text-center text-sm text-[#909090]">이날의 관리 기록이 없어요.</div> : null}
-        {selectedEvents.length ? <div className="space-y-2.5">{selectedEvents.map((event) => {
+        {!isLoading && !error && !filteredEvents.length ? <div className="rounded-[22px] bg-white px-4 py-7 text-center text-sm text-[#909090]">{eventFilter === "all" ? "이날의 관리 기록이 없어요." : "선택한 종류의 기록이 없어요."}</div> : null}
+        {!isLoading && !error && filteredEvents.length ? <div className="plant-icon-grid">{filteredEvents.map((event) => {
           const plant = plants.find((item) => item.id === event.plantId) ?? plants.find((item) => item.name === event.plantName);
           const isWatering = event.type === "watering";
           const isRepotting = event.type === "repotting";
           const eventLabel = isWatering ? "물주기" : isRepotting ? "분갈이" : event.tags?.join(" · ") || "관찰일지";
-          const iconStyle = isWatering ? "bg-[#EDF3FF] text-[#3569D4]" : isRepotting ? "bg-[#FFF3E5] text-[#B76415]" : "bg-[#EAF6F0] text-[#247956]";
-          return <button key={event.id} type="button" disabled={!plant} onClick={() => { if (plant) onSelectPlant(plant); }} className="flex min-h-[76px] w-full items-center gap-3 border-b border-[#ECEEF1] py-3 text-left"><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${iconStyle}`}>{isWatering ? <Droplets size={18} aria-hidden="true" /> : isRepotting ? <RefreshCcw size={18} aria-hidden="true" /> : <NotebookPen size={18} aria-hidden="true" />}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{plant?.name ?? event.plantName}</span><span className="mt-1 block truncate text-[11px] text-[#909090]">{eventLabel}{event.note ? ` · ${event.note}` : ""}</span></span><ChevronRight size={16} className="shrink-0 text-[#A3A5A0]" aria-hidden="true" /></button>;
+          return <button key={event.id} type="button" disabled={!plant} onClick={() => { if (plant) onSelectPlant(plant); }} className="plant-icon-tile calendar-event-tile" data-event-type={event.type} aria-label={`${plant?.name ?? event.plantName} ${isWatering ? "물주기" : isRepotting ? "분갈이" : "관찰일지"} 기록`}><PlantCoverThumbnail key={plant?.coverPhotoUrl ?? "no-cover"} src={plant?.coverPhotoUrl} /><span className="tile-name">{plant?.name ?? event.plantName}</span><span className={`tile-detail ${isWatering ? "text-[#3569D4]" : isRepotting ? "text-[#B76415]" : "text-[#247956]"}`}>{eventLabel}</span>{event.note ? <span className="tile-detail tile-note">{event.note}</span> : null}</button>;
         })}</div> : null}
+        </div>
       </section>
     </>
   );

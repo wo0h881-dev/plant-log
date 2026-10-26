@@ -31,7 +31,7 @@ async function main() {
       });
       await page.goto(base, { waitUntil: "domcontentloaded" });
       const nav = page.getByRole("navigation", { name: "주요 화면" });
-      assert.deepEqual(await nav.locator("button").allTextContents(), ["물주기", "관찰일지", "", "내 식물", "캘린더"]);
+      assert.deepEqual(await nav.locator("button").allTextContents(), ["", "", "", "", ""]);
       const water = page.locator('[data-screen="water"]');
       await water.getByRole("button", { name: `${plant.name} 캘린더 보기`, exact: true }).click();
       await page.locator('.app-header input[type="search"]').waitFor();

@@ -26,6 +26,7 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const pointerWasOpen = useRef(false);
   const inputId = useId();
   const normalizedQuery = query.trim().toLowerCase();
   const filteredPlants = plants.filter((plant) => matchesPlantSearch(plant, normalizedQuery));
@@ -69,10 +70,13 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
         type="search"
         value={query}
         onFocus={() => setIsOpen(true)}
-        onClick={() => setIsOpen(true)}
+        onPointerDown={() => { pointerWasOpen.current = isOpen; }}
+        onClick={() => { if (pointerWasOpen.current) { setIsOpen(false); inputRef.current?.blur(); } else setIsOpen(true); }}
         onChange={(event) => { onQueryChange(event.target.value); setIsOpen(true); }}
         placeholder="식물 검색"
         aria-label="식물 검색"
+        data-expanded={isOpen}
+        aria-controls={`${inputId}-results`}
         onKeyDown={(event) => { if (event.key === "Escape") { inputRef.current?.blur(); setIsOpen(false); } }}
         className="field pl-11 pr-11"
       />
@@ -102,7 +106,7 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
       ) : searchField}
 
       {isOpen ? (
-        <div className="absolute inset-x-0 z-40 mt-2 rounded-lg border border-[#ECEEF1] bg-white p-2 shadow-lg shadow-black/5">
+        <div id={`${inputId}-results`} className="absolute inset-x-0 z-40 mt-2 rounded-lg border border-[#ECEEF1] bg-white p-2 shadow-lg shadow-black/5">
           {!normalizedQuery && recentPlants.length ? (
             <div className="mb-2 flex gap-2 overflow-x-auto px-1 pb-1">
               {recentPlants.map((plantName) => {

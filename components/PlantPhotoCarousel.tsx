@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 import { PlantPhoto } from "@/components/PlantPhoto";
 import type { PlantPhotoSummary } from "@/types/plant";
 
-export function PlantPhotoCarousel({ photos, loading = false, onOpen, controls }: { photos: PlantPhotoSummary[]; loading?: boolean; onOpen: (photo: PlantPhotoSummary) => void; controls?: ReactNode }) {
+export function PlantPhotoCarousel({ photos, loading = false, onOpen, controls, caption }: { photos: PlantPhotoSummary[]; loading?: boolean; onOpen: (photo: PlantPhotoSummary) => void; controls?: ReactNode; caption?: ReactNode }) {
   const track = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
   const current = Math.min(index, Math.max(0, photos.length - 1));
@@ -23,6 +23,7 @@ export function PlantPhotoCarousel({ photos, loading = false, onOpen, controls }
         </div>)}
       </div> : loading ? <span role="status" aria-label="사진 불러오는 중" className="photo-skeleton"><span className="photo-skeleton-shine" /></span> : <span className="absolute inset-0 grid place-content-center justify-items-center gap-2 text-xs text-[#A0A8B3]"><ImageOff size={30} strokeWidth={1.5} aria-hidden="true" />등록된 사진이 없어요</span>}
       {controls}
+      {caption}
       {photos.length ? <span className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-medium text-white" aria-live="polite">{loading ? "사진 확인 중" : `${current + 1} / ${photos.length}`}</span> : null}
     </div>
     {photos.length > 1 ? <div className="mt-2 flex h-9 items-center justify-between">

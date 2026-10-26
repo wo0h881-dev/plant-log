@@ -23,11 +23,11 @@ async function main() {
         await nav.getByRole("button", { name: label, exact: true }).click();
         for (const [otherLabel, otherAsset] of tabs) {
           const button = nav.getByRole("button", { name: otherLabel, exact: true });
-          const style = await button.evaluate((el) => ({ mask: getComputedStyle(el.querySelector(".nav-asset")).maskImage, color: getComputedStyle(el.querySelector(".nav-asset")).backgroundColor, background: getComputedStyle(el).backgroundColor, labelColor: getComputedStyle(el.querySelector(".nav-label")).color }));
+          const style = await button.evaluate((el) => ({ mask: getComputedStyle(el.querySelector(".nav-asset")).maskImage, color: getComputedStyle(el.querySelector(".nav-asset")).backgroundColor, background: getComputedStyle(el).backgroundColor }));
           assert.ok(style.mask.includes(`${otherAsset}-${otherLabel === label ? "filled" : "outline"}-48x48.png`));
           assert.equal(style.color, otherLabel === label ? "rgb(66, 99, 235)" : "rgb(145, 153, 166)");
           assert.equal(style.background, "rgba(0, 0, 0, 0)");
-          assert.equal(style.labelColor, "rgb(145, 153, 166)");
+          assert.equal(await button.innerText(), "");
         }
         await nav.screenshot({ path: path.join(out, `${asset}-${label}-${width}.png`) });
       }
