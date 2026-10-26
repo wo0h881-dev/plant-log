@@ -48,11 +48,13 @@ async function main() {
     await page.getByRole("dialog").locator('img[src$="/fixture/recent.jpg"]').waitFor();
     await page.getByRole("button", { name: "사진 닫기", exact: true }).click();
     assert.equal(new URL(await page.getByRole("button", { name: "최근 사진 보기", exact: true }).locator("img").getAttribute("src"), base).pathname, "/fixture/cover.jpg");
-    await page.getByRole("button", { name: "관수 주기 변경", exact: true }).click();
+    await page.getByRole("button", { name: "프로필 편집 메뉴", exact: true }).click();
+    await page.getByRole("button", { name: "관수 주기 편집", exact: true }).click();
     await page.getByLabel("관수 주기 (일)").fill("5");
     await page.getByRole("button", { name: "관수 주기 저장", exact: true }).click();
     await page.getByText("관수 주기를 변경했습니다.", { exact: true }).waitFor();
     assert.deepEqual(lastCycle, { plantId: plant.id, wateringCycleDays: 5 });
+    await page.getByRole("button", { name: "관수 주기 편집 닫기", exact: true }).click();
     await page.getByRole("button", { name: "커버사진 변경", exact: true }).click();
     await page.getByRole("button", { name: "이전 사진 선택", exact: true }).click();
     for (const failure of ["server", "html", "network"]) {

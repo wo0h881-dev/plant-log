@@ -4,8 +4,8 @@ import { useRef, useState, type FormEvent } from "react";
 import { Check, Pencil, X } from "lucide-react";
 import type { Plant } from "@/types/plant";
 
-export function PlantWateringCycleEditor({ plant, onSaved }: { plant: Plant; onSaved: (plant: Plant) => void }) {
-  const [editing, setEditing] = useState(false);
+export function PlantWateringCycleEditor({ plant, onSaved, initiallyEditing = false }: { plant: Plant; onSaved: (plant: Plant) => void; initiallyEditing?: boolean }) {
+  const [editing, setEditing] = useState(initiallyEditing);
   const [value, setValue] = useState(String(plant.wateringCycleDays ?? ""));
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");

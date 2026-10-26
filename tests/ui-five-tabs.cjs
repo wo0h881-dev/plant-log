@@ -31,7 +31,7 @@ async function main() {
       });
       await page.goto(base, { waitUntil: "domcontentloaded" });
       const nav = page.getByRole("navigation", { name: "주요 화면" });
-      assert.deepEqual(await nav.locator("button").allTextContents(), ["물주기", "관찰일지", "내 식물", "캘린더", "식물방"]);
+      assert.deepEqual(await nav.locator("button").allTextContents(), ["물주기", "관찰일지", "", "내 식물", "캘린더"]);
       const water = page.locator('[data-screen="water"]');
       await water.getByRole("button", { name: `${plant.name} 캘린더 보기`, exact: true }).click();
       await page.locator('[data-screen="more"] input[type="search"]').waitFor();
@@ -54,7 +54,7 @@ async function main() {
       await profile.getByRole("button", { name: new RegExp(plant.name) }).filter({ has: page.locator("img") }).first().click();
       await profile.locator(".editorial-title").waitFor();
       await page.screenshot({ path: path.join(out, `profile-${width}.png`), fullPage: true });
-      await nav.getByRole("button", { name: "식물방", exact: true }).click();
+      await page.getByRole("button", { name: "식물방 열기", exact: true }).click();
       await page.locator(".spaces-embedded .space-isometric canvas").waitFor();
       assert.equal(await page.locator(".app-header h1").textContent(), "식물방");
       assert.equal(await page.locator("h1:visible").count(), 1);
@@ -69,7 +69,7 @@ async function main() {
       assert.deepEqual(errors, []);
       await page.context().close();
     }
-    console.log("PASS: five tabs, sticky unified header, search cover icons, independent watering checkbox/calendar actions, distinct event palette, editorial profile and embedded room at 320/390/1440px");
+    console.log("PASS: four tabs and central add action, sticky header, search cover icons, watering/calendar actions, distinct event palette, profile and header room shortcut at 320/390/1440px");
   } finally { await browser.close(); }
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

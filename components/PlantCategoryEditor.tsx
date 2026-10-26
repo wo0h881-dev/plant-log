@@ -4,8 +4,8 @@ import { useId, useRef, useState, type FormEvent } from "react";
 import { Check, Pencil, X } from "lucide-react";
 import type { Plant } from "@/types/plant";
 
-export function PlantCategoryEditor({ plant, categories, onSaved }: { plant: Plant; categories: string[]; onSaved: (plant: Plant) => void }) {
-  const [editing, setEditing] = useState(false);
+export function PlantCategoryEditor({ plant, categories, onSaved, initiallyEditing = false }: { plant: Plant; categories: string[]; onSaved: (plant: Plant) => void; initiallyEditing?: boolean }) {
+  const [editing, setEditing] = useState(initiallyEditing);
   const [value, setValue] = useState(plant.category);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");

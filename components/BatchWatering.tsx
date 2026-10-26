@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { AlertCircle, CalendarDays, Check, ChevronDown, Sprout, X } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, Sprout, X } from "lucide-react";
 import { matchesPlantSearch } from "@/lib/plant-search";
 import { canShowInWateringList, isWateredToday, seoulDate, type WateredPlant } from "@/lib/watering";
 import { cacheWateringHeroPhoto, clearCachedWateringHeroPhoto, readCachedWateringHeroPhoto } from "@/lib/watering-hero-cache";
@@ -18,6 +18,8 @@ type BatchWateringProps = {
   onTodayWateredChange?: (plants: WateredPlant[]) => void;
   onSelectPlant?: (plant: Plant) => void;
   onOpenCalendar?: (plant: Plant) => void;
+  wateredAt?: string;
+  onSavingChange?: (saving: boolean) => void;
 };
 
 type WateringResult = { plantId: string; plantName: string; ok: boolean; message?: string };
@@ -41,6 +43,8 @@ export function BatchWatering({
   onTodayWateredChange,
   onSelectPlant,
   onOpenCalendar,
+  wateredAt,
+  onSavingChange,
 }: BatchWateringProps) {
   const today = seoulDate();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -49,7 +53,7 @@ export function BatchWatering({
   const [isPupsOpen, setIsPupsOpen] = useState(false);
   const [isOtherOpen, setIsOtherOpen] = useState(true);
   const [query, setQuery] = useState("");
-  const [wateredDate, setWateredDate] = useState(today);
+  const wateredDate = wateredAt ?? today;
   const [todayWateredPlants, setTodayWateredPlants] = useState<WateredPlant[]>([]);
   const [isTodayLoading, setIsTodayLoading] = useState(true);
   const [todayWateringError, setTodayWateringError] = useState(false);
@@ -60,6 +64,7 @@ export function BatchWatering({
   const [results, setResults] = useState<WateringResult[]>([]);
   const submitting = useRef(false);
   const isListLoading = isLoading || isTodayLoading;
+  useEffect(() => { onSavingChange?.(saveState === "saving"); }, [saveState, onSavingChange]);
 
   const refreshTodayWatered = useCallback(() => {
     fetch(`/api/watering-logs?date=${today}`)
@@ -303,11 +308,6 @@ export function BatchWatering({
           </div>
         ) : null}
       </section>
-
-      <label className="flex items-center justify-between gap-3 border-b border-[#ECEEF1] pb-5">
-        <span className="flex items-center gap-2 text-xs font-medium text-[#626B76]"><CalendarDays size={16} aria-hidden="true" />물 준 날짜</span>
-        <input type="date" value={wateredDate} onChange={(event) => setWateredDate(event.target.value)} className="h-9 min-w-32 rounded-lg bg-[#F5F6F8] px-2 text-xs outline-none" />
-      </label>
 
       <section>
         <button type="button" onClick={() => setIsOtherOpen((current) => !current)} className="mb-3 flex w-full items-center justify-between text-left" aria-expanded={isOtherOpen}>
