@@ -167,11 +167,14 @@ export function PlantLogForm() {
   const calendarPlant = plants.find((plant) => plant.id === calendarFilter.plantId);
   const isRepotting = selectedTags.includes("분갈이");
   const isEnvironment = selectedTags.includes("온습도");
+  const isEnvironmentValid = Boolean(temperature.trim() || humidity.trim()) && ([
+    [temperature, -50, 80], [humidity, 0, 100],
+  ] as const).every(([value, min, max]) => !value.trim() || (Number.isFinite(Number(value)) && Number(value) >= min && Number(value) <= max));
   const canSaveObservation = Boolean(
     selectedPlant &&
     (photos.length || selectedTags.length || note.trim()) &&
     (!isRepotting || repotSoils.length) &&
-    (!isEnvironment || temperature.trim() || humidity.trim()) &&
+    (!isEnvironment || isEnvironmentValid) &&
     !isCompressing &&
     observationSaveState !== "saving" && !recentObservationChoice,
   );
@@ -367,11 +370,7 @@ export function PlantLogForm() {
                 <PlantSelect plants={plants} value={selectedPlantLabel} query={query} recentPlants={recentPlants} onQueryChange={(value) => { setQuery(value); if (value !== selectedPlant?.name) setSelectedPlantId(""); }} onSelect={selectPlant} variant="row" />
                 <section className="observation-note">
                   <div className="mb-3 flex items-center justify-between gap-3"><label htmlFor="observation-note" className="section-title">메모</label>
-                  <ObservationTagPicker tags={observationTags} selected={selectedTags} onToggle={toggleTag} />
-                  </div>
-                  <span className="relative block"><textarea id="observation-note" value={note} onChange={(event) => setNote(event.target.value)} maxLength={300} placeholder="오늘의 변화를 기록해보세요." rows={4} className="field resize-none pb-8 leading-6" /><span className="pointer-events-none absolute bottom-3 right-3 text-[10px] text-[#909090]">{note.length}/300</span></span>
-                  {selectedTags.length ? <div className="status-chips mt-3">{selectedTags.map((tag) => <button key={tag} type="button" className="status-chip" aria-pressed="true" onClick={() => toggleTag(tag)} title={`${tag} 선택 해제`}>{tag}</button>)}</div> : null}
-                </section>
+                  <ObservationTagPicker tags={observationTags} selected={selectedTags} onToggle={toggleTag}>
                 {isEnvironment ? <section className="space-y-3 border-l-2 border-[#DCE4FF] pl-4"><h2 className="text-sm font-semibold">온습도</h2>{([
                   ["온도 (°C)", temperature, setTemperature, temperatureAbove, setTemperatureAbove, -50, 80],
                   ["습도 (%)", humidity, setHumidity, humidityAbove, setHumidityAbove, 0, 100],
@@ -405,6 +404,11 @@ export function PlantLogForm() {
                     </label>
                   </section>
                 ) : null}
+                  </ObservationTagPicker>
+                  </div>
+                  <span className="relative block"><textarea id="observation-note" value={note} onChange={(event) => setNote(event.target.value)} maxLength={300} placeholder="오늘의 변화를 기록해보세요." rows={4} className="field resize-none pb-8 leading-6" /><span className="pointer-events-none absolute bottom-3 right-3 text-[10px] text-[#909090]">{note.length}/300</span></span>
+                  {selectedTags.length ? <div className="status-chips mt-3">{selectedTags.map((tag) => <button key={tag} type="button" className="status-chip" aria-pressed="true" onClick={() => toggleTag(tag)} title={`${tag} 선택 해제`}>{tag}</button>)}</div> : null}
+                </section>
                 <StatusMessage state={observationSaveState} message={observationMessage} />
                 {photos.length || selectedTags.length || note.trim() ? <div className={`save-dock ${activeTab !== "observation" ? "hidden" : ""}`}><button type="submit" disabled={!canSaveObservation} className="primary-button">{observationSaveState === "saving" ? "저장 중..." : "관찰일지 저장"}</button></div> : null}
               </section>

@@ -32,7 +32,7 @@ async function main() {
       const date = page.locator(".header-date-pill");
       assert.equal(await date.locator("svg").count(), 1);
       const fit = await date.evaluate((el) => ({ width: el.getBoundingClientRect().width, content: el.querySelector("svg").getBoundingClientRect().width + el.querySelector("span").getBoundingClientRect().width }));
-      assert.ok(fit.width - fit.content < 22, `date padding: ${JSON.stringify(fit)}`);
+      assert.ok(fit.width - fit.content < 28, `date padding: ${JSON.stringify(fit)}`);
       const cycle = page.getByRole("button", { name: "관수주기 편집", exact: true });
       assert.equal(await cycle.innerText(), "관수주기"); assert.equal(await cycle.locator("svg").count(), 1);
       const nav = page.getByRole("navigation", { name: "주요 화면" });
