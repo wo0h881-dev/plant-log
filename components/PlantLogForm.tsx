@@ -2,9 +2,9 @@
 
 import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { AlertCircle, ArrowLeft, Check, Droplets, House, NotebookPen, RefreshCcw, Sprout } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, House, RefreshCcw } from "lucide-react";
 import { PlantDialog } from "@/components/PlantDialog";
-import { PlantWateringCycleEditor } from "@/components/PlantWateringCycleEditor";
+import { BulkWateringCycleEditor } from "@/components/BulkWateringCycleEditor";
 import { AddPlantForm } from "@/components/AddPlantForm";
 import { ObservationTagPicker } from "@/components/ObservationTagPicker";
 import { ObservationSaveChoice, type RecentObservation } from "@/components/ObservationSaveChoice";
@@ -60,9 +60,9 @@ export function PlantLogForm() {
   const [profilePhotoId, setProfilePhotoId] = useState<string>();
   const [calendarFilter, setCalendarFilter] = useState({ plantId: "", query: "" });
   const [isAddingPlant, setIsAddingPlant] = useState(false);
-  const [quickAction, setQuickAction] = useState<"" | "menu" | "cycle">("");
-  const [quickPlantId, setQuickPlantId] = useState("");
-  const [quickQuery, setQuickQuery] = useState("");
+  const [quickAction, setQuickAction] = useState<"" | "menu">("");
+  const [waterSelection, setWaterSelection] = useState<string[]>([]);
+  const [cycleEditorOpen, setCycleEditorOpen] = useState(false);
   const [wateredDate, setWateredDate] = useState(getTodayValue);
   const [isWaterSaving, setIsWaterSaving] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
@@ -162,7 +162,7 @@ export function PlantLogForm() {
   const selectedPlant = plants.find((plant) => plant.id === selectedPlantId);
   const selectedPlantLabel = selectedPlant ? formatPlantName(selectedPlant) : "";
   const profilePlant = plants.find((plant) => plant.id === profilePlantId);
-  const quickPlant = plants.find((plant) => plant.id === quickPlantId);
+  const calendarPlant = plants.find((plant) => plant.id === calendarFilter.plantId);
   const isRepotting = selectedTags.includes("분갈이");
   const isEnvironment = selectedTags.includes("온습도");
   const canSaveObservation = Boolean(
@@ -326,10 +326,13 @@ export function PlantLogForm() {
 
   return (
     <main className="app-shell text-[#191F28]">
-      <header className="app-header">
+      <header className={`app-header${activeTab === "water" ? " watering-header" : ""}`}>
         <h1>{activeTab === "spaces" ? "식물방" : tabs.find((tab) => tab.id === activeTab)?.label}</h1>
+        {activeTab === "profile" && !isAddingPlant ? <div className="header-search"><PlantSelect key="profile" plants={plants} value={profilePlant ? formatPlantName(profilePlant) : ""} query={profileQuery} recentPlants={[]} onQueryChange={(value) => { setProfileQuery(value); if (value !== profilePlant?.name) setProfilePlantId(""); }} onSelect={selectProfilePlant} variant="search" /></div> : null}
+        {activeTab === "more" ? <div className="header-search"><PlantSelect key="calendar" plants={plants} value={calendarPlant ? formatPlantName(calendarPlant) : ""} query={calendarFilter.query} recentPlants={[]} onQueryChange={(value) => setCalendarFilter({ query: value, plantId: "" })} onSelect={(plant) => setCalendarFilter({ plantId: plant.id, query: plant.name })} variant="search" /></div> : null}
         {activeTab === "profile" ? <button type="button" onClick={() => changeTab("spaces")} aria-label="식물방 열기" title="식물방" className="icon-button"><House size={22} /></button> : null}
         {activeTab === "spaces" ? <button type="button" onClick={() => changeTab("profile")} aria-label="내 식물로 돌아가기" title="내 식물로 돌아가기" className="icon-button"><ArrowLeft size={22} /></button> : null}
+        {activeTab === "water" ? <button type="button" className="header-cycle-button" disabled={isWaterSaving || isPlantsLoading} onClick={() => setCycleEditorOpen(true)}>관수주기 편집{waterSelection.length ? ` ${waterSelection.length}` : ""}</button> : null}
         {activeTab === "water" || activeTab === "observation" ? <input type="date" aria-label={activeTab === "water" ? "물 준 날짜" : "관찰 날짜"} value={activeTab === "water" ? wateredDate : observedDate} disabled={isPlantsLoading || (activeTab === "water" ? isWaterSaving : observationSaveState === "saving" || Boolean(recentObservationChoice))} onChange={(event) => { if (event.target.value) { if (activeTab === "water") setWateredDate(event.target.value); else setObservedDate(event.target.value); } }} className="header-date" /> : null}
       </header>
       <div className="app-content">
@@ -348,6 +351,7 @@ export function PlantLogForm() {
               onOpenCalendar={openCalendarForPlant}
               wateredAt={wateredDate}
               onSavingChange={setIsWaterSaving}
+              onSelectionChange={setWaterSelection}
             />
           </section>
         ) : null}
@@ -359,9 +363,12 @@ export function PlantLogForm() {
               <PlantPhotoUploader files={photos} onChange={setPhotos} onCaptureDateChange={(date) => setObservedDate(date ?? getTodayValue())} onBusyChange={setIsCompressing} />
               <section className="space-y-6">
                 <PlantSelect plants={plants} value={selectedPlantLabel} query={query} recentPlants={recentPlants} onQueryChange={(value) => { setQuery(value); if (value !== selectedPlant?.name) setSelectedPlantId(""); }} onSelect={selectPlant} variant="row" />
-                <section>
-                  <div className="mb-3 flex items-center justify-between"><h2 className="section-title">관찰태그</h2><span className="text-[11px] text-[#909090]">{selectedTags.length ? `${selectedTags.length}개 선택` : ""}</span></div>
+                <section className="observation-note">
+                  <div className="mb-3 flex items-center justify-between gap-3"><label htmlFor="observation-note" className="section-title">메모</label>
                   <ObservationTagPicker tags={observationTags} selected={selectedTags} onToggle={toggleTag} />
+                  </div>
+                  <span className="relative block"><textarea id="observation-note" value={note} onChange={(event) => setNote(event.target.value)} maxLength={300} placeholder="오늘의 변화를 기록해보세요." rows={4} className="field resize-none pb-8 leading-6" /><span className="pointer-events-none absolute bottom-3 right-3 text-[10px] text-[#909090]">{note.length}/300</span></span>
+                  {selectedTags.length ? <div className="status-chips mt-3">{selectedTags.map((tag) => <button key={tag} type="button" className="status-chip" aria-pressed="true" onClick={() => toggleTag(tag)} title={`${tag} 선택 해제`}>{tag}</button>)}</div> : null}
                 </section>
                 {isEnvironment ? <section className="space-y-3 border-l-2 border-[#DCE4FF] pl-4"><h2 className="text-sm font-semibold">온습도</h2>{([
                   ["온도 (°C)", temperature, setTemperature, temperatureAbove, setTemperatureAbove, -50, 80],
@@ -396,10 +403,6 @@ export function PlantLogForm() {
                     </label>
                   </section>
                 ) : null}
-                <label className="block">
-                  <span className="section-title mb-3 block">메모</span>
-                  <span className="relative block"><textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={300} placeholder="오늘의 변화를 기록해보세요." rows={4} className="field resize-none pb-8 leading-6" /><span className="pointer-events-none absolute bottom-3 right-3 text-[10px] text-[#909090]">{note.length}/300</span></span>
-                </label>
                 <StatusMessage state={observationSaveState} message={observationMessage} />
                 {photos.length || selectedTags.length || note.trim() ? <div className={`save-dock ${activeTab !== "observation" ? "hidden" : ""}`}><button type="submit" disabled={!canSaveObservation} className="primary-button">{observationSaveState === "saving" ? "저장 중..." : "관찰일지 저장"}</button></div> : null}
               </section>
@@ -414,28 +417,23 @@ export function PlantLogForm() {
           <>
             <p className="mb-5 text-xs text-[#8B929B]">{isPlantsLoading ? "식물을 불러오고 있어요." : `${plants.length}개의 식물과 함께하고 있어요.`}</p>
             <div className="space-y-5">
-              <PlantSelect plants={plants} value={profilePlant ? formatPlantName(profilePlant) : ""} query={profileQuery} recentPlants={[]} onQueryChange={(value) => { setProfileQuery(value); if (!value || value !== profilePlant?.name) setProfilePlantId(""); }} onSelect={selectProfilePlant} variant="search" />
               {profilePlant ? <PlantOverview key={profilePlant.id} plant={profilePlant} categories={[...new Set([...categoryOptions, ...plants.map((item) => item.category)])]} onOpenCalendar={openCalendarForPlant} onPlantRenamed={handlePlantRenamed} initialGalleryOpen={profileOpenPhotos} initialGalleryPhotoId={profilePhotoId} /> : <RecentObservedPlants plants={plants} recentPlants={recentObservedPlants} onSelect={selectProfilePlant} />}
             </div>
           </>
         ) : null}
         </section> : null}
 
-        {visitedTabs.includes("more") ? <section data-screen="more" hidden={activeTab !== "more"}><ManagementCalendar plants={plants} onSelectPlant={openPlantFromCalendar} filter={calendarFilter} onFilterChange={setCalendarFilter} /></section> : null}
+        {visitedTabs.includes("more") ? <section data-screen="more" hidden={activeTab !== "more"}><ManagementCalendar plants={plants} onSelectPlant={openPlantFromCalendar} filter={calendarFilter} onFilterChange={setCalendarFilter} hideSearch /></section> : null}
         {visitedTabs.includes("spaces") ? <section data-screen="spaces" hidden={activeTab !== "spaces"}><PlantSpaces embedded /></section> : null}
       </div>
 
       {recentObservationChoice && selectedPlant ? <ObservationSaveChoice recent={recentObservationChoice} plantName={selectedPlant.name} busy={observationSaveState === "saving"} error={observationSaveState === "error" ? observationMessage : ""} onChoose={(append) => { void persistObservation(append ? recentObservationChoice.id : undefined); }} onClose={() => { setRecentObservationChoice(null); setObservationSaveState("idle"); setObservationMessage(""); }} /> : null}
 
-      {quickAction === "menu" ? <PlantDialog title="빠른 작업" sheet onClose={() => setQuickAction("")}><div className="quick-actions">
-        <button type="button" onClick={() => { const plant = profilePlant ?? selectedPlant; setQuickPlantId(plant?.id ?? ""); setQuickQuery(plant?.name ?? ""); setQuickAction("cycle"); }}><Droplets size={20} />관수 주기 편집</button>
-        <button type="button" onClick={() => { setQuickAction(""); setIsAddingPlant(true); scrollPositions.current.profile = 0; changeTab("profile"); window.scrollTo(0, 0); }}><Sprout size={20} />새 식물 추가</button>
-        <button type="button" onClick={() => { setQuickAction(""); if (profilePlant && !selectedPlant) selectPlant(profilePlant); scrollPositions.current.observation = 0; changeTab("observation"); window.scrollTo(0, 0); }}><NotebookPen size={20} />관찰일지 추가</button>
+      {quickAction === "menu" ? <PlantDialog title="추가" onClose={() => setQuickAction("")}><div className="quick-actions">
+        <button type="button" onClick={() => { setQuickAction(""); setIsAddingPlant(true); scrollPositions.current.profile = 0; changeTab("profile"); window.scrollTo(0, 0); }}>새 식물 추가</button>
+        <button type="button" onClick={() => { setQuickAction(""); if (profilePlant && !selectedPlant) selectPlant(profilePlant); scrollPositions.current.observation = 0; changeTab("observation"); window.scrollTo(0, 0); }}>관찰일지 추가</button>
       </div></PlantDialog> : null}
-      {quickAction === "cycle" ? <PlantDialog title="관수 주기 편집" onClose={() => setQuickAction("")}><div className="space-y-6">
-        <PlantSelect plants={plants} value={quickPlant ? formatPlantName(quickPlant) : ""} query={quickQuery} recentPlants={[]} onQueryChange={(value) => { setQuickQuery(value); setQuickPlantId(""); }} onSelect={(plant) => { setQuickPlantId(plant.id); setQuickQuery(plant.name); }} />
-        {quickPlant ? <PlantWateringCycleEditor key={quickPlant.id} plant={quickPlant} initiallyEditing onSaved={handlePlantRenamed} /> : null}
-      </div></PlantDialog> : null}
+      {cycleEditorOpen ? <BulkWateringCycleEditor plants={plants.filter((plant) => waterSelection.includes(plant.id))} onSaved={handlePlantRenamed} onClose={() => setCycleEditorOpen(false)} /> : null}
       <nav className="bottom-nav" aria-label="주요 화면">
         <div className="grid grid-cols-5 gap-1">
           {tabs.flatMap(({ id, label, icon }, index) => {

@@ -12,6 +12,7 @@ type ManagementCalendarProps = {
   onSelectPlant: (plant: Plant) => void;
   filter: { plantId: string; query: string };
   onFilterChange: (filter: { plantId: string; query: string }) => void;
+  hideSearch?: boolean;
 };
 
 function toDateValue(date: Date) {
@@ -44,7 +45,7 @@ function formatSelectedDate(date: string) {
   return new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", weekday: "short" }).format(new Date(`${date}T12:00:00`));
 }
 
-export function ManagementCalendar({ plants, onSelectPlant, filter, onFilterChange }: ManagementCalendarProps) {
+export function ManagementCalendar({ plants, onSelectPlant, filter, onFilterChange, hideSearch = false }: ManagementCalendarProps) {
   const today = toDateValue(new Date());
   const [month, setMonth] = useState(getMonthValue);
   const [selectedDate, setSelectedDate] = useState(today);
@@ -100,11 +101,11 @@ export function ManagementCalendar({ plants, onSelectPlant, filter, onFilterChan
 
   return (
     <>
-      <div className="mb-5">
+      {!hideSearch ? <div className="mb-5">
         <PlantSelect plants={plants} value={selectedPlant ? `${selectedPlant.category} - ${selectedPlant.name}` : ""} query={query} recentPlants={[]} variant="search"
           onQueryChange={(value) => onFilterChange({ query: value, plantId: value === selectedPlant?.name ? plantId : "" })}
           onSelect={(plant) => onFilterChange({ plantId: plant.id, query: plant.name })} />
-      </div>
+      </div> : null}
 
       <section className="border-y border-[#ECEEF1] py-4">
         <div className="flex items-center justify-between">

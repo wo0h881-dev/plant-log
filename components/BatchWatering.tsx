@@ -20,6 +20,7 @@ type BatchWateringProps = {
   onOpenCalendar?: (plant: Plant) => void;
   wateredAt?: string;
   onSavingChange?: (saving: boolean) => void;
+  onSelectionChange?: (ids: string[]) => void;
 };
 
 type WateringResult = { plantId: string; plantName: string; ok: boolean; message?: string };
@@ -45,6 +46,7 @@ export function BatchWatering({
   onOpenCalendar,
   wateredAt,
   onSavingChange,
+  onSelectionChange,
 }: BatchWateringProps) {
   const today = seoulDate();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -102,6 +104,7 @@ export function BatchWatering({
     () => wateringPlants.filter((plant) => matchesPlantSearch(plant, query)),
     [query, wateringPlants],
   );
+  useEffect(() => { onSelectionChange?.(wateringPlants.filter((plant) => selectedIds.includes(plant.id)).map((plant) => plant.id)); }, [selectedIds, wateringPlants, onSelectionChange]);
   const dueSelectedCount = duePlants.filter((plant) => selectedIdSet.has(plant.id)).length;
   const selectedWateringCount = wateringPlants.filter((plant) => selectedIdSet.has(plant.id)).length;
   const dueMaturePlants = duePlants.filter((plant) => plant.category.trim() !== "자구");
@@ -279,7 +282,7 @@ export function BatchWatering({
 
   return (
     <fieldset disabled={saveState === "saving"} aria-busy={saveState === "saving"} className="space-y-6 min-w-0">
-      <section>
+      <section className="watering-due-panel">
         <button type="button" onClick={() => setIsDueOpen((current) => !current)} disabled={isListLoading} className={`relative flex w-full items-center justify-between gap-4 overflow-hidden rounded-lg bg-[#F5F6F8] p-5 text-left transition-[height] duration-200 ${isDueOpen ? "h-[116px]" : "h-[172px]"}`} aria-expanded={isDueOpen}>
           <span className="relative z-10 min-w-0 flex-1">
             <span className="block text-[13px] font-semibold text-[#626B76]">물줄 때 된 식물</span>
@@ -291,7 +294,7 @@ export function BatchWatering({
           </span>
         </button>
         {isDueOpen ? (
-          <div className="pt-3 text-[#191F28]">
+          <div className="due-panel-list text-[#191F28]">
             {duePlants.length ? <>
               <div className="flex items-center justify-between border-b border-[#ECEEF1] pb-2"><span className="text-xs text-[#8B929B]">{dueSelectedCount ? `${dueSelectedCount}개 선택` : "물 준 식물 선택"}</span><button type="button" onClick={toggleAllDuePlants} className="min-h-10 px-2 text-xs font-semibold text-[#4263EB]">{areAllDueSelected ? "전체해제" : "전체선택"}</button></div>
               <div className="max-h-80 overflow-y-auto">
@@ -330,7 +333,7 @@ export function BatchWatering({
         {isTodayLoading ? <div className="h-14 animate-pulse rounded-2xl bg-white" /> : todayWateringError ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-center text-xs text-red-700">오늘 기록을 불러오지 못했어요.</div> : todayWateredPlants.length ? (
           <div className="flex gap-2 overflow-x-auto pb-1">{todayWateredPlants.map((watered) => {
             const plant = watered.id ? plants.find((item) => item.id.replaceAll("-", "").toLowerCase() === watered.id?.replaceAll("-", "").toLowerCase()) : plants.find((item) => item.name === watered.name);
-            return <button key={watered.id || watered.name} type="button" disabled={!plant || !onSelectPlant} onClick={() => { if (plant) onSelectPlant?.(plant); }} aria-label={`${watered.name} 식물 상세 보기`} className="flex w-36 shrink-0 items-center gap-2 rounded-lg border border-[#ECEEF1] p-3 text-left"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#EEF2FF] text-[#4263EB]"><Check size={14} aria-hidden="true" /></span><span className="min-w-0"><span className="block truncate text-xs font-semibold">{watered.name}</span><span className="text-[10px] text-[#909090]">오늘 완료</span></span></button>;
+            return <button key={watered.id || watered.name} type="button" disabled={!plant || !onSelectPlant} onClick={() => { if (plant) onSelectPlant?.(plant); }} aria-label={`${watered.name} 식물 상세 보기`} className="today-watered-plant"><PlantCoverThumbnail key={plant?.coverPhotoUrl ?? "no-cover"} src={plant?.coverPhotoUrl} /><span>{watered.name}</span></button>;
           })}</div>
         ) : <div className="rounded-2xl bg-white px-4 py-3 text-center text-xs text-[#909090]">아직 오늘 물 준 식물이 없어요.</div>}
       </section>

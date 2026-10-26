@@ -65,7 +65,7 @@ export function PlantOverview({ plant, categories, onOpenCalendar, onPlantRename
           <div className="min-w-0">
             {plant.scientificName ? <p className="mb-1.5 text-[11px] text-[#8B929B]">{plant.scientificName}</p> : null}
             <h2 className="editorial-title">{plant.name}</h2>
-            <p className="mt-3 text-xs text-[#626B76]">{plant.category} <span className="mx-2 text-[#CDD2DB]">/</span> 관수 주기 {plant.wateringCycleDays !== undefined ? `${plant.wateringCycleDays}일` : "미설정"}</p>
+            <div className="mt-3 space-y-2 text-xs text-[#626B76]"><p>{plant.category}</p><p>관수 주기 <strong className="font-semibold">{plant.wateringCycleDays !== undefined ? `${plant.wateringCycleDays}일` : "미설정"}</strong></p></div>
             {plant.description ? <p className="mt-2 text-xs leading-5 text-[#8B929B]">{plant.description}</p> : null}
             {plant.isWateringDue ? <span className="mt-3 inline-flex items-center rounded-md bg-[#EEF2FF] px-2 py-1 text-[11px] font-medium text-[#4263EB]">물주기 확인이 필요해요</span> : null}
           </div>
@@ -81,7 +81,19 @@ export function PlantOverview({ plant, categories, onOpenCalendar, onPlantRename
         {isLoading ? <p className="py-6 text-center text-sm text-[#909090]">기록을 불러오는 중...</p> : null}
         {!isLoading && error ? <p className="mt-3 rounded-2xl bg-red-50 px-3 py-3 text-sm text-red-700">{error}</p> : null}
         {!isLoading && !error && !observations.length ? <p className="py-6 text-center text-sm text-[#909090]">아직 관찰 기록이 없어요.</p> : null}
-        {observations.length ? <div className="editorial-journal mt-3">{observations.map((observation, index) => <article key={observation.id} className="editorial-entry"><span className="editorial-entry-number" aria-hidden="true">{String(observations.length - index).padStart(2, "0")}</span><div className="min-w-0"><div className="flex items-center justify-between gap-3"><time className="text-xs font-semibold text-[#909090]">{formatDate(observation.date)}</time>{observation.url ? <a href={observation.url} target="_blank" rel="noreferrer" aria-label="Notion에서 관찰 기록 열기" className="grid h-8 w-8 place-items-center text-[#909090]"><ExternalLink size={14} aria-hidden="true" /></a> : null}</div>{observation.tags.length ? <div className="mt-2 flex flex-wrap gap-1.5">{observation.tags.map((tag) => <span key={tag} className="rounded-full bg-[#EEF2FF] px-2 py-1 text-[11px] font-semibold text-[#4263EB]">{tag}</span>)}</div> : null}{observation.note ? <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-[#555954]">{observation.note}</p> : null}</div></article>)}</div> : null}
+        {observations.length ? <ol className="editorial-journal mt-5">{observations.map((observation) => (
+          <li key={observation.id} className="editorial-entry">
+            <span className="editorial-entry-number" aria-hidden="true" />
+            <div className="min-w-0">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold leading-6">{observation.tags.join(" · ") || "관찰 기록"}</h3>
+                {observation.url ? <a href={observation.url} target="_blank" rel="noreferrer" aria-label="Notion에서 관찰 기록 열기" className="grid h-8 w-8 shrink-0 place-items-center text-[#909090]"><ExternalLink size={14} aria-hidden="true" /></a> : null}
+              </div>
+              <time className="mt-1 block text-xs text-[#909090]">{formatDate(observation.date)}</time>
+              {observation.note ? <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-[#555954]">{observation.note}</p> : null}
+            </div>
+          </li>
+        ))}</ol> : null}
       </section>
       {galleryOpen ? <PlantPhotoGallery plantId={plant.id} plantName={plant.name} photos={photos} photosLoading={isLoading} initialPhotoId={galleryPhotoId} onClose={() => setGalleryOpen(false)} /> : null}
       {coverEditorOpen ? <PlantCoverEditor plant={plant} onSaved={onPlantRenamed} onClose={() => setCoverEditorOpen(false)} /> : null}

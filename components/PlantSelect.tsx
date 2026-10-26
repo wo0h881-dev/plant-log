@@ -91,7 +91,6 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
           <label htmlFor={inputId} className="section-title mb-3 block">식물 선택</label>
           {!isOpen ? (
             <button type="button" onClick={openList} className="flex min-h-14 w-full items-center gap-3 rounded-lg bg-[#F5F6F8] px-4 text-left">
-              {showPhotos ? <PlantCoverThumbnail key={selectedPlant?.coverPhotoUrl ?? "no-cover"} src={selectedPlant?.coverPhotoUrl} /> : null}
               <span className="min-w-0 flex-1">
                 <span className={`block truncate text-sm font-bold ${selectedPlant ? "text-[#151515]" : "text-[#909090]"}`}>{selectedPlant?.name ?? "식물을 선택하세요"}</span>
                 {selectedPlant ? <span className="mt-0.5 block truncate text-[11px] text-[#909090]">{selectedPlant.category}</span> : null}

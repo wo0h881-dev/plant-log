@@ -34,12 +34,12 @@ async function main() {
       assert.deepEqual(await nav.locator("button").allTextContents(), ["물주기", "관찰일지", "", "내 식물", "캘린더"]);
       const water = page.locator('[data-screen="water"]');
       await water.getByRole("button", { name: `${plant.name} 캘린더 보기`, exact: true }).click();
-      await page.locator('[data-screen="more"] input[type="search"]').waitFor();
-      assert.equal(await page.locator('[data-screen="more"] input[type="search"]').inputValue(), plant.name);
+      await page.locator('.app-header input[type="search"]').waitFor();
+      assert.equal(await page.locator('.app-header input[type="search"]').inputValue(), plant.name);
       const palette = await page.locator(".calendar-legend .calendar-dot").evaluateAll((dots) => dots.map((dot) => getComputedStyle(dot).backgroundColor));
       assert.equal(new Set(palette).size, 3);
-      await page.locator('[data-screen="more"] input[type="search"]').click();
-      await page.locator('[data-screen="more"]').getByRole("button", { name: new RegExp(plant.name) }).filter({ has: page.locator("img") }).first().waitFor();
+      await page.locator('.app-header input[type="search"]').click();
+      await page.locator('.app-header').getByRole("button", { name: new RegExp(plant.name) }).filter({ has: page.locator("img") }).first().waitFor();
       await page.screenshot({ path: path.join(out, `calendar-${width}.png`), fullPage: true });
       await nav.getByRole("button", { name: "관찰일지", exact: true }).click();
       await page.getByRole("button", { name: "식물을 선택하세요", exact: true }).click();
@@ -50,8 +50,8 @@ async function main() {
       await page.screenshot({ path: path.join(out, `observation-${width}.png`), fullPage: true });
       await nav.getByRole("button", { name: "내 식물", exact: true }).click();
       const profile = page.locator('[data-screen="profile"]');
-      await profile.getByRole("searchbox").fill(plant.name);
-      await profile.getByRole("button", { name: new RegExp(plant.name) }).filter({ has: page.locator("img") }).first().click();
+      await page.locator('.app-header').getByRole("searchbox").fill(plant.name);
+      await page.locator('.app-header').getByRole("button", { name: new RegExp(plant.name) }).filter({ has: page.locator("img") }).first().click();
       await profile.locator(".editorial-title").waitFor();
       await page.screenshot({ path: path.join(out, `profile-${width}.png`), fullPage: true });
       await page.getByRole("button", { name: "식물방 열기", exact: true }).click();

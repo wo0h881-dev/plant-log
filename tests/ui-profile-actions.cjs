@@ -38,11 +38,8 @@ async function main() {
       const box = await nav.boundingBox(); assert.equal(Math.round(box.y + box.height), 832);
       assert.equal(await nav.locator("button").nth(2).getAttribute("aria-label"), "빠른 작업");
       await page.locator('[data-screen="water"]').getByRole("checkbox").first().waitFor();
-      await page.getByRole("button", { name: "빠른 작업", exact: true }).click();
-      await page.getByRole("button", { name: "관수 주기 편집", exact: true }).click();
-      await page.getByRole("button", { name: "식물을 선택하세요", exact: true }).click();
-      await page.getByRole("dialog").getByRole("button", { name: /밤비노 핑크/ }).click();
-      await page.getByLabel("관수 주기 (일)", { exact: true }).waitFor();
+      await page.getByRole("button", { name: /관수주기 편집/ }).click();
+      await page.getByText("물주기 목록에서 편집할 식물의 체크박스를 먼저 선택해주세요.", { exact: true }).waitFor();
       await page.getByRole("button", { name: "관수 주기 편집 닫기", exact: true }).click();
       await page.getByLabel("물 준 날짜", { exact: true }).fill("2026-10-01");
       await page.locator('[data-screen="water"]').getByRole("checkbox").first().click();
@@ -53,9 +50,9 @@ async function main() {
       await page.getByLabel("관찰 날짜", { exact: true }).fill("2026-10-02");
       await page.getByRole("button", { name: "식물을 선택하세요", exact: true }).click();
       await page.locator('[data-screen="observation"]').getByRole("button", { name: /밤비노 핑크/ }).click();
-      await page.getByRole("button", { name: "관찰태그 선택", exact: true }).click();
+      await page.getByRole("button", { name: "관찰태그", exact: true }).click();
       const sheet = page.getByRole("dialog", { name: "관찰태그", exact: true });
-      assert.equal(Math.round((await sheet.boundingBox()).y + (await sheet.boundingBox()).height), 844);
+      assert.ok((await sheet.boundingBox()).y > 0);
       await sheet.getByRole("button", { name: "신엽", exact: true }).click();
       await page.screenshot({ path: path.join(out, `tags-${width}.png`) });
       await sheet.getByRole("button", { name: /선택 완료/ }).click();
@@ -64,9 +61,8 @@ async function main() {
       assert.ok(observation.includes('name="createdAt"\r\n\r\n2026-10-02'));
       assert.ok(observation.includes("신엽"));
       await nav.getByRole("button", { name: "내 식물", exact: true }).click();
-      const profile = page.locator('[data-screen="profile"]');
-      await profile.getByRole("searchbox").fill(plant.name);
-      await profile.getByRole("button", { name: /밤비노 핑크/ }).click();
+      await page.locator('.app-header').getByRole("searchbox").fill(plant.name);
+      await page.locator('.app-header').getByRole("button", { name: /밤비노 핑크/ }).click();
       await page.getByRole("button", { name: "프로필 편집 메뉴", exact: true }).click();
       await page.getByRole("button", { name: "식물 이름 편집", exact: true }).click();
       await page.getByLabel("새 식물명", { exact: true }).fill("밤비노 핑크 1");
@@ -74,7 +70,7 @@ async function main() {
       await page.getByText("이름을 변경했습니다.", { exact: true }).waitFor();
       assert.equal(edit.name, "밤비노 핑크 1");
       await page.getByRole("button", { name: "식물 이름 편집 닫기", exact: true }).click();
-      await page.getByRole("button", { name: "빠른 작업", exact: true }).click();
+      await page.getByRole("button", { name: "프로필 편집 메뉴", exact: true }).click();
       await page.getByRole("button", { name: "관수 주기 편집", exact: true }).click();
       await page.getByLabel("관수 주기 (일)", { exact: true }).fill("5");
       await page.getByRole("button", { name: "관수 주기 저장", exact: true }).click();

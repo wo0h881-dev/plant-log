@@ -46,7 +46,7 @@ async function main() {
         assert.ok(shape.visible > 20 && shape.transparent > 20, `${file} must have a visible alpha mask`);
       }
       await nav.getByRole("button", { name: "빠른 작업", exact: true }).click();
-      await page.getByRole("dialog", { name: "빠른 작업", exact: true }).waitFor();
+      await page.getByRole("dialog", { name: "추가", exact: true }).waitFor();
       await page.keyboard.press("Escape");
       assert.deepEqual(errors, []);
       await page.context().close();

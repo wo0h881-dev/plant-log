@@ -10,9 +10,8 @@ export function ObservationTagPicker({ tags, selected, onToggle }: { tags: strin
   const statusOrder = ["신엽", "하엽", "과습", "뿌리", "상태이상", "해충"];
   const status = [...new Set([...statusOrder, ...tags])].filter((tag) => !special.includes(tag) && tag !== "분갈이 필요");
   return <>
-    <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" className="tag-select-trigger"><span>{selected.length ? `${selected.length}개 태그 선택` : "관찰태그 선택"}</span><ChevronDown size={17} /></button>
-    {selected.length ? <div className="status-chips mt-3">{selected.map((tag) => <button key={tag} type="button" className="status-chip" aria-pressed="true" onClick={() => setOpen(true)}>{tag}</button>)}</div> : null}
-    {open ? <PlantDialog title="관찰태그" sheet onClose={() => setOpen(false)}><div className="space-y-5">
+    <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" className="tag-select-trigger"><span>관찰태그{selected.length ? ` · ${selected.length}` : ""}</span><ChevronDown size={15} /></button>
+    {open ? <PlantDialog title="관찰태그" onClose={() => setOpen(false)}><div className="space-y-5">
     <div role="group" aria-label="상태" className="status-chips">{status.map((name) => <button key={name} type="button" aria-pressed={selected.includes(name)} onClick={() => onToggle(name)} className="status-chip">{selected.includes(name) ? <Check size={12} aria-hidden="true" /> : null}<span className="break-words">{name}</span></button>)}</div>
     <div>
       <p className="mb-2 text-xs text-[#8B929B]">전체 상태</p>
