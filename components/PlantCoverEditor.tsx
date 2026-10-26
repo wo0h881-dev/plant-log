@@ -45,15 +45,17 @@ export function PlantCoverEditor({ plant, onSaved, onClose }: { plant: Plant; on
   async function save() {
     if ((!file && !selectedId) || busy || submitting.current) return;
     submitting.current = true; setSaving(true); setError("");
+    let failureMessage = "커버사진을 변경하지 못했어요. 잠시 후 다시 시도해주세요.";
     try {
       const form = new FormData(); form.set("plantId", plant.id);
       if (file) form.set("photo", file); else form.set("photoId", selectedId);
       const response = await fetch("/api/plant-cover", { method: "POST", body: form });
-      const payload = await response.json();
-      if (!response.ok || !payload.plant) throw new Error(payload.message ?? "커버 변경에 실패했습니다.");
+      const payload = await response.json().catch(() => null);
+      if (response.status >= 400 && response.status < 500 && typeof payload?.message === "string") failureMessage = payload.message;
+      if (!response.ok || !payload?.plant) throw new Error(failureMessage);
       onSaved(payload.plant as Plant);
       if (payload.warning) setWarning(payload.warning); else onClose();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "커버 변경에 실패했습니다."); }
+    } catch { setError(failureMessage); }
     finally { submitting.current = false; setSaving(false); }
   }
   return <dialog ref={dialog} onCancel={(event) => { if (busy || saving) event.preventDefault(); else onClose(); }} aria-label="커버사진 변경" className="m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-[400px] overflow-y-auto rounded-lg border-0 bg-white p-5 text-[#191F28] backdrop:bg-black/50">

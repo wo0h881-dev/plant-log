@@ -10,7 +10,12 @@ export const runtime = "nodejs";
 async function downloadPhoto(urlValue: string) {
   const url = new URL(urlValue);
   if (url.protocol !== "https:" || url.hostname !== NOTION_COVER_HOST || url.port) throw new PlantRequestError("이 사진은 새 사진으로 직접 올려주세요.");
-  const response = await fetch(url, { redirect: "error", signal: AbortSignal.timeout(15000), cache: "no-store" });
+  const response = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(15000), cache: "no-store" });
+  // Workers does not support redirect:error. Never follow image redirects outside the allowed host.
+  if (response.status >= 300 && response.status < 400) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new PlantRequestError("사진 주소가 변경되어 불러올 수 없어요. 사진 목록을 다시 열거나 새 사진을 올려주세요.");
+  }
   const type = response.headers.get("content-type")?.split(";")[0] ?? "";
   if (!response.ok || !type.startsWith("image/") || !response.body) throw new PlantRequestError("원본 사진을 불러오지 못했습니다. 다시 시도하거나 새 사진을 올려주세요.");
   const reader = response.body.getReader();
@@ -59,6 +64,10 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ plant: parseNotionPlantPage(updated), warning }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return NextResponse.json({ message: error instanceof Error ? error.message : "커버 변경에 실패했습니다." }, { status: error instanceof PlantRequestError ? error.status : 500 });
+    const knownError = error instanceof PlantRequestError && error.status < 500;
+    return NextResponse.json(
+      { message: knownError ? error.message : "커버사진을 변경하지 못했어요. 잠시 후 다시 시도해주세요." },
+      { status: knownError ? error.status : 502 },
+    );
   }
 }

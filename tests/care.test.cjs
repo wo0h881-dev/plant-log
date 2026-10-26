@@ -336,19 +336,91 @@ test("existing cover selection is limited to this plant and never stores an expi
   const writes = [];
   global.fetch = async (url, options) => {
     url = String(url);
-    if (url.startsWith(`https://${NOTION_COVER_HOST}/`)) return new Response("image", { headers: { "Content-Type": "image/jpeg" } });
+    if (url.startsWith(`https://${NOTION_COVER_HOST}/`)) {
+      if (options.redirect === "error") throw new TypeError('Invalid redirect value, must be one of "follow" or "manual"');
+      assert.equal(options.redirect, "manual");
+      return new Response("image", { headers: { "Content-Type": "image/jpeg" } });
+    }
     if (url.includes("/children?")) return json({ results: [{ id: "body-photo", type: "image", image: { file: { url: `https://${NOTION_COVER_HOST}/old.jpg?X-Amz-Signature=old` } } }], has_more: false });
     if (url.endsWith("/query")) return json({ results: [], has_more: false });
     if (url.endsWith("/file_uploads")) return json({ id: "copied-upload", status: "pending" });
     if (url.endsWith("/send")) return json({ id: "copied-upload", status: "uploaded" });
-    if (options.method === "PATCH") { writes.push(JSON.parse(options.body)); return json(original); }
+    if (options.method === "PATCH") { writes.push(JSON.parse(options.body)); return json({ ...original, cover: { type: "file", file: { url: `https://${NOTION_COVER_HOST}/copied-cover.jpg` } } }); }
     return json(original);
   };
-  assert.equal((await coverApi.POST(request(createForm({ plantId, photoId: "body-photo" })))).status, 200);
+  const response = await coverApi.POST(request(createForm({ plantId, photoId: "body-photo" })));
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.plant.coverPhotoUrl, `https://${NOTION_COVER_HOST}/copied-cover.jpg`);
+  assert.equal(result.plant.id, plantId);
+  assert.equal(result.plant.name, "밤비노");
+  assert.equal(response.headers.get("Cache-Control"), "no-store");
   assert.deepEqual(writes, [{ cover: { type: "file_upload", file_upload: { id: "copied-upload" } } }]);
   writes.length = 0;
   assert.equal((await coverApi.POST(request(createForm({ plantId, photoId: "another-plant-photo" })))).status, 400);
   assert.equal(writes.length, 0);
+});
+
+function mockCoverDownload(download) {
+  const original = { ...wateringPage(undefined), cover: { type: "file", file: { url: `https://${NOTION_COVER_HOST}/unchanged.jpg` } }, parent: { data_source_id: plantId } };
+  let downloadCount = 0;
+  global.fetch = async (urlValue, options = {}) => {
+    const url = String(urlValue);
+    if (url.startsWith(`https://${NOTION_COVER_HOST}/`)) {
+      downloadCount++;
+      assert.equal(options.redirect, "manual");
+      return download();
+    }
+    assert.notEqual(url, "https://other.example/photo.jpg");
+    if (url.includes("/children?")) return json({ results: [{ id: "body-photo", type: "image", image: { file: { url: `https://${NOTION_COVER_HOST}/body.jpg` } } }], has_more: false });
+    if (url.endsWith("/query")) return json({ results: [], has_more: false });
+    assert.notEqual(options.method, "PATCH");
+    assert.equal(options.method, undefined);
+    return json(original);
+  };
+  return { original, downloads: () => downloadCount };
+}
+
+test("existing cover rejects every HTTP redirect without uploading, following or changing plant data", async () => {
+  for (const status of [301, 302, 303, 304, 307, 308]) {
+    const fixture = mockCoverDownload(() => new Response(status === 304 ? null : "redirect", { status, headers: { Location: "https://other.example/photo.jpg", "Content-Type": "image/jpeg" } }));
+    const before = JSON.stringify(fixture.original);
+    const response = await coverApi.POST(request(createForm({ plantId, photoId: "body-photo" })));
+    assert.equal(response.status, 400);
+    assert.ok((await response.json()).message.includes("사진 주소가 변경"));
+    assert.equal(fixture.downloads(), 1);
+    assert.equal(JSON.stringify(fixture.original), before);
+  }
+});
+
+test("cover download and upstream errors never expose internal messages or signed URLs", async () => {
+  for (const reason of [new TypeError('Invalid redirect value: private-internal-detail'), new Error(`https://${NOTION_COVER_HOST}/photo.jpg?X-Amz-Signature=private`), new DOMException("private timeout", "TimeoutError")]) {
+    mockCoverDownload(() => { throw reason; });
+    const response = await coverApi.POST(request(createForm({ plantId, photoId: "body-photo" })));
+    assert.equal(response.status, 502);
+    assert.deepEqual(await response.json(), { message: "커버사진을 변경하지 못했어요. 잠시 후 다시 시도해주세요." });
+  }
+  for (const status of [401, 403, 429, 500]) {
+    global.fetch = async () => Response.json({ message: "private upstream detail" }, { status });
+    const form = createForm({ plantId });
+    form.set("photo", new File(["image"], "new.jpg", { type: "image/jpeg" }));
+    const response = await coverApi.POST(request(form));
+    assert.equal(response.status, 502);
+    assert.ok(!(await response.json()).message.includes("private"));
+  }
+});
+
+test("cover download still rejects missing, non-image and oversized originals without changing plant data", async () => {
+  for (const download of [
+    () => new Response("expired", { status: 403 }),
+    () => new Response("not an image", { headers: { "Content-Type": "text/plain" } }),
+    () => new Response(new Uint8Array(4_000_001), { headers: { "Content-Type": "image/jpeg" } }),
+  ]) {
+    const fixture = mockCoverDownload(download);
+    const response = await coverApi.POST(request(createForm({ plantId, photoId: "body-photo" })));
+    assert.equal(response.status, 400);
+    assert.equal(fixture.downloads(), 1);
+  }
 });
 
 test("cover upload validates input and reports a partial body-image failure", async () => {

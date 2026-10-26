@@ -18,6 +18,7 @@ async function main() {
     await page.route("**/_next/image?**", (route) => route.fulfill({ contentType: "image/svg+xml", body: svg }));
     let lastCover;
     let lastCycle;
+    let coverFailure = "";
     await page.route("**/api/**", async (route) => {
       const req = route.request(); const url = new URL(req.url()); let data = {};
       if (url.pathname === "/api/plants") {
@@ -27,10 +28,16 @@ async function main() {
       else if (url.pathname === "/api/plant-photos") data = { photos: url.searchParams.has("all") ? photos : [] };
       else if (url.pathname === "/api/watering-logs") data = { plants: [] };
       else if (url.pathname === "/api/watering-stats") data = { wateringDays: 0, recentIntervals: 0 };
-      else if (url.pathname === "/api/plant-cover") { lastCover = req.postData(); plant.coverPhotoUrl = lastCover.includes('name="photoId"') ? "/fixture/selected-cover.jpg" : "/fixture/uploaded-cover.jpg"; data = { plant }; }
+      else if (url.pathname === "/api/plant-cover") {
+        if (coverFailure === "network") return route.abort();
+        if (coverFailure === "html") return route.fulfill({ status: 502, contentType: "text/html", body: "<h1>private internal detail</h1>" });
+        if (coverFailure) return route.fulfill({ status: 500, json: { message: "Invalid redirect value: private internal detail" } });
+        lastCover = req.postData(); plant.coverPhotoUrl = lastCover.includes('name="photoId"') ? "/fixture/selected-cover.jpg" : "/fixture/uploaded-cover.jpg"; data = { plant };
+      }
       await route.fulfill({ json: data });
     });
-    await page.goto(base, { waitUntil: "domcontentloaded", timeout: 90000 });
+    await page.goto(`${base}/?plant=${plant.id}`, { waitUntil: "domcontentloaded", timeout: 90000 });
+    await page.getByRole("heading", { name: plant.name, exact: true }).waitFor();
     const nav = page.getByRole("navigation");
     await nav.getByRole("button", { name: "내 식물", exact: true }).click();
     const mainPhoto = page.getByRole("button", { name: "최근 사진 보기", exact: true });
@@ -48,6 +55,15 @@ async function main() {
     assert.deepEqual(lastCycle, { plantId: plant.id, wateringCycleDays: 5 });
     await page.getByRole("button", { name: "커버사진 변경", exact: true }).click();
     await page.getByRole("button", { name: "이전 사진 선택", exact: true }).click();
+    for (const failure of ["server", "html", "network"]) {
+      coverFailure = failure;
+      await page.getByRole("button", { name: "커버로 지정", exact: true }).click();
+      await page.getByRole("dialog").getByRole("alert").filter({ hasText: "커버사진을 변경하지 못했어요. 잠시 후 다시 시도해주세요." }).waitFor();
+      assert.equal(plant.coverPhotoUrl, "/fixture/cover.jpg");
+      assert.equal(lastCover, undefined);
+      assert.ok(!(await page.getByRole("dialog").getByRole("alert").innerText()).includes("private"));
+    }
+    coverFailure = "";
     await page.getByRole("button", { name: "커버로 지정", exact: true }).click();
     await page.getByRole("dialog").waitFor({ state: "detached" });
     assert.ok(lastCover.includes('name="photoId"\r\n\r\nold-1'));
@@ -83,7 +99,7 @@ async function main() {
     await cachePage.waitForFunction(async () => (await (await caches.open("plant-log-cover-icons-v1")).keys()).length === 2);
     assert.equal(await cachePage.evaluate(async () => (await (await caches.open("plant-log-cover-icons-v1")).keys()).length), 2);
     await context.close();
-    console.log("PASS: main=cover, tap=recent photos, existing/new cover selection, watering cycle edit, real service-worker cache reuse and changed-cover refetch");
+    console.log("PASS: safe error messages, unchanged cover after failures, immediate existing/new cover refresh, watering cycle edit, real service-worker cache reuse and changed-cover refetch");
   } finally { await browser.close(); }
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });
