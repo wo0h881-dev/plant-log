@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { AlertCircle, ArrowLeft, Check, House, RefreshCcw } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, House, Pencil, RefreshCcw } from "lucide-react";
 import { PlantDialog } from "@/components/PlantDialog";
 import { HeaderDatePicker } from "@/components/HeaderDatePicker";
 import { BulkWateringCycleEditor } from "@/components/BulkWateringCycleEditor";
@@ -334,7 +334,7 @@ export function PlantLogForm() {
         {activeTab === "more" ? <div className="header-search"><PlantSelect key="calendar" plants={plants} value={calendarPlant ? formatPlantName(calendarPlant) : ""} query={calendarFilter.query} recentPlants={[]} onQueryChange={(value) => setCalendarFilter({ query: value, plantId: "" })} onSelect={(plant) => setCalendarFilter({ plantId: plant.id, query: plant.name })} variant="search" /></div> : null}
         {activeTab === "profile" || activeTab === "more" ? <button type="button" onClick={() => { setSpaceOrigin(activeTab === "more" ? "more" : "profile"); changeTab("spaces"); }} aria-label="식물방 열기" title="식물방" className="icon-button"><House size={22} /></button> : null}
         {activeTab === "spaces" ? <button type="button" onClick={() => changeTab(spaceOrigin)} aria-label={spaceOrigin === "more" ? "캘린더로 돌아가기" : "내 식물로 돌아가기"} title="돌아가기" className="icon-button"><ArrowLeft size={22} /></button> : null}
-        {activeTab === "water" ? <button type="button" className="header-cycle-button" disabled={isWaterSaving || isPlantsLoading} onClick={() => setCycleEditorOpen(true)}>관수주기 편집</button> : null}
+        {activeTab === "water" ? <button type="button" className="header-cycle-button" disabled={isWaterSaving || isPlantsLoading} onClick={() => setCycleEditorOpen(true)} aria-label="관수주기 편집"><Pencil size={13} aria-hidden="true" />관수주기</button> : null}
         {activeTab === "water" || activeTab === "observation" ? <HeaderDatePicker label={activeTab === "water" ? "물 준 날짜" : "관찰 날짜"} value={activeTab === "water" ? wateredDate : observedDate} disabled={isPlantsLoading || (activeTab === "water" ? isWaterSaving : observationSaveState === "saving" || Boolean(recentObservationChoice))} onChange={activeTab === "water" ? setWateredDate : setObservedDate} /> : null}
       </header>
       <div className="app-content">

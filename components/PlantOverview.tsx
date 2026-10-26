@@ -55,7 +55,7 @@ export function PlantOverview({ plant, categories, onOpenCalendar, onPlantRename
       <section className="plant-profile-panel" aria-label={`${plant.name} 프로필`}>
       <section className="editorial-cover">
         <div className="editorial-kicker"><span>나의 식물 기록</span><span>{plant.category}</span></div>
-        <PlantPhotoCarousel key={plant.coverPhotoUrl ?? plant.id} photos={plantCarouselPhotos(plant.id, plant.name, plant.coverPhotoUrl, photos)} loading={isLoading} onOpen={(photo) => { setGalleryPhotoId(photo.id === `${plant.id}-cover` ? undefined : photo.id); setGalleryOpen(true); }} controls={<>
+        <PlantPhotoCarousel controlsInside key={plant.coverPhotoUrl ?? plant.id} photos={plantCarouselPhotos(plant.id, plant.name, plant.coverPhotoUrl, photos)} loading={isLoading} onOpen={(photo) => { setGalleryPhotoId(photo.id === `${plant.id}-cover` ? undefined : photo.id); setGalleryOpen(true); }} controls={<>
         <button type="button" onClick={() => setCoverEditorOpen(true)} aria-label="커버사진 변경" title="커버사진 변경" className="absolute left-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-white/95 text-[#191F28]"><Camera size={17} /></button>
         <button type="button" onClick={() => setIsFavorite((current) => !current)} className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-white/95 text-[#191F28]" title={isFavorite ? "즐겨찾기 해제" : "즐겨찾기"} aria-label={isFavorite ? "즐겨찾기 해제" : "즐겨찾기"}><Heart size={17} fill={isFavorite ? "currentColor" : "none"} aria-hidden="true" /></button>
         </>} />
