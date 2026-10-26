@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { AlertCircle, ArrowLeft, CalendarDays, Check, Droplets, House, NotebookPen, Plus, RefreshCcw, Sprout } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, Droplets, House, NotebookPen, RefreshCcw, Sprout } from "lucide-react";
 import { PlantDialog } from "@/components/PlantDialog";
 import { PlantWateringCycleEditor } from "@/components/PlantWateringCycleEditor";
 import { AddPlantForm } from "@/components/AddPlantForm";
@@ -318,17 +318,16 @@ export function PlantLogForm() {
   }
 
   const tabs = [
-    { id: "water" as const, label: "물주기", icon: Droplets },
-    { id: "observation" as const, label: "관찰일지", icon: NotebookPen },
-    { id: "profile" as const, label: "내 식물", icon: Sprout },
-    { id: "more" as const, label: "캘린더", icon: CalendarDays },
-    { id: "spaces" as const, label: "식물방", icon: House },
+    { id: "water" as const, label: "물주기", icon: "droplet" },
+    { id: "observation" as const, label: "관찰일지", icon: "pen" },
+    { id: "profile" as const, label: "내 식물", icon: "pen" },
+    { id: "more" as const, label: "캘린더", icon: "calendar-search" },
   ];
 
   return (
     <main className="app-shell text-[#191F28]">
       <header className="app-header">
-        <h1>{tabs.find((tab) => tab.id === activeTab)?.label}</h1>
+        <h1>{activeTab === "spaces" ? "식물방" : tabs.find((tab) => tab.id === activeTab)?.label}</h1>
         {activeTab === "profile" ? <button type="button" onClick={() => changeTab("spaces")} aria-label="식물방 열기" title="식물방" className="icon-button"><House size={22} /></button> : null}
         {activeTab === "spaces" ? <button type="button" onClick={() => changeTab("profile")} aria-label="내 식물로 돌아가기" title="내 식물로 돌아가기" className="icon-button"><ArrowLeft size={22} /></button> : null}
         {activeTab === "water" || activeTab === "observation" ? <input type="date" aria-label={activeTab === "water" ? "물 준 날짜" : "관찰 날짜"} value={activeTab === "water" ? wateredDate : observedDate} disabled={isPlantsLoading || (activeTab === "water" ? isWaterSaving : observationSaveState === "saving" || Boolean(recentObservationChoice))} onChange={(event) => { if (event.target.value) { if (activeTab === "water") setWateredDate(event.target.value); else setObservedDate(event.target.value); } }} className="header-date" /> : null}
@@ -439,10 +438,11 @@ export function PlantLogForm() {
       </div></PlantDialog> : null}
       <nav className="bottom-nav" aria-label="주요 화면">
         <div className="grid grid-cols-5 gap-1">
-          {tabs.filter((tab) => tab.id !== "spaces").flatMap(({ id, label, icon: Icon }, index) => {
-            const isActive = activeTab === id;
-            const button = <button key={id} type="button" onClick={() => changeTab(id)} aria-label={label} title={label} className="nav-tab" aria-current={isActive || (id === "profile" && activeTab === "spaces") ? "page" : undefined}><span className="nav-icon"><Icon size={22} strokeWidth={isActive ? 2 : 1.6} aria-hidden="true" /></span><span className="nav-label">{label}</span></button>;
-            return index === 2 ? [<button key="add" type="button" className="nav-add" onClick={() => setQuickAction("menu")} aria-label="빠른 작업" aria-haspopup="dialog" title="빠른 작업"><Plus size={30} strokeWidth={1.8} /></button>, button] : [button];
+          {tabs.flatMap(({ id, label, icon }, index) => {
+            const isActive = activeTab === id || (id === "profile" && activeTab === "spaces");
+            const source = `url("/navigation/${icon}-${isActive ? "filled" : "outline"}-48x48.png")`;
+            const button = <button key={id} type="button" onClick={() => changeTab(id)} aria-label={label} title={label} className="nav-tab" aria-current={isActive ? "page" : undefined}><span className="nav-icon"><span className="nav-asset" style={{ maskImage: source, WebkitMaskImage: source }} aria-hidden="true" /></span><span className="nav-label">{label}</span></button>;
+            return index === 2 ? [<button key="add" type="button" className="nav-add" onClick={() => setQuickAction("menu")} aria-label="빠른 작업" aria-haspopup="dialog" title="빠른 작업"><span className="nav-asset nav-asset-plus" aria-hidden="true" /></button>, button] : [button];
           })}
         </div>
       </nav>
