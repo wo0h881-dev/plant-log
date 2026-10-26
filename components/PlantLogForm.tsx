@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { AlertCircle, ArrowLeft, CalendarDays, Check, Droplets, NotebookPen, Plus, RefreshCcw, Sprout } from "lucide-react";
 import { AddPlantForm } from "@/components/AddPlantForm";
 import { ObservationTagPicker } from "@/components/ObservationTagPicker";
@@ -47,6 +48,7 @@ export function PlantLogForm() {
   const [visitedTabs, setVisitedTabs] = useState<RecordTab[]>(["water"]);
   const scrollPositions = useRef<Partial<Record<RecordTab, number>>>({});
   const observationSubmitting = useRef(false);
+  const profileLinkHandled = useRef(false);
   const [query, setQuery] = useState("");
   const [profileQuery, setProfileQuery] = useState("");
   const [profilePlantId, setProfilePlantId] = useState("");
@@ -92,7 +94,14 @@ export function PlantLogForm() {
 
   const refreshPlants = useCallback(() => {
     fetch("/api/plants")
-      .then((response) => response.json() as Promise<PlantsResponse>)
+      .then(async (response) => {
+        const payload = await response.json() as PlantsResponse;
+        if (payload.source === "fallback" && process.env.NODE_ENV === "development" && new URLSearchParams(window.location.search).has("plant")) {
+          const preview = await fetch("/api/space-plants?full=1");
+          if (preview.ok) return await preview.json() as PlantsResponse;
+        }
+        return payload;
+      })
       .then((payload) => {
         const nextPlants = payload.plants.length ? payload.plants : fallbackPlants;
         setPlants(nextPlants);
@@ -128,6 +137,19 @@ export function PlantLogForm() {
   useEffect(() => { refreshPlants(); }, [refreshPlants]);
   useEffect(() => { refreshRecentPlants(); }, [refreshRecentPlants]);
   useEffect(() => { refreshOptions(); }, [refreshOptions]);
+  useEffect(() => {
+    if (isPlantsLoading || profileLinkHandled.current) return;
+    profileLinkHandled.current = true;
+    const id = new URLSearchParams(window.location.search).get("plant");
+    const linkedPlant = plants.find((plant) => plant.id === id);
+    if (!linkedPlant) return;
+    queueMicrotask(() => {
+      setProfilePlantId(linkedPlant.id);
+      setProfileQuery(linkedPlant.name);
+      setVisitedTabs((current) => current.includes("profile") ? current : [...current, "profile"]);
+      setActiveTab("profile");
+    });
+  }, [isPlantsLoading, plants]);
   const selectedPlant = plants.find((plant) => plant.id === selectedPlantId);
   const selectedPlantLabel = selectedPlant ? formatPlantName(selectedPlant) : "";
   const profilePlant = plants.find((plant) => plant.id === profilePlantId);
@@ -386,7 +408,7 @@ export function PlantLogForm() {
         ) : null}
         </section> : null}
 
-        {visitedTabs.includes("more") ? <section data-screen="more" hidden={activeTab !== "more"}><ManagementCalendar plants={plants} onSelectPlant={openPlantFromCalendar} filter={calendarFilter} onFilterChange={setCalendarFilter} /></section> : null}
+        {visitedTabs.includes("more") ? <section data-screen="more" hidden={activeTab !== "more"}><Link href="/spaces" className="mb-6 flex min-h-16 items-center justify-between gap-3 rounded-lg bg-[#EEF2FF] px-4 py-3 text-sm font-semibold text-[#4263EB]"><span>나의 식물방</span><span aria-hidden="true">→</span></Link><ManagementCalendar plants={plants} onSelectPlant={openPlantFromCalendar} filter={calendarFilter} onFilterChange={setCalendarFilter} /></section> : null}
       </div>
 
       {recentObservationChoice && selectedPlant ? <ObservationSaveChoice recent={recentObservationChoice} plantName={selectedPlant.name} busy={observationSaveState === "saving"} error={observationSaveState === "error" ? observationMessage : ""} onChoose={(append) => { void persistObservation(append ? recentObservationChoice.id : undefined); }} onClose={() => { setRecentObservationChoice(null); setObservationSaveState("idle"); setObservationMessage(""); }} /> : null}

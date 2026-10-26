@@ -24,15 +24,19 @@ const { readEnvironmentNote } = require("../lib/observation-environment.ts");
 const { canOptimizePlantCover, NOTION_COVER_HOST } = require("../lib/plant-cover.ts");
 const { plantCarouselPhotos, uniquePlantPhotos } = require("../lib/plant-photos.ts");
 const plantsApi = require("../app/api/plants/route.ts");
+const spacesApi = require("../app/api/space-plants/route.ts");
+const locationsApi = require("../app/api/location-logs/route.ts");
+const { locationStateFromPages } = require("../lib/notion-locations.ts");
 const coverApi = require("../app/api/plant-cover/route.ts");
 const observationApi = require("../app/api/plant-logs/route.ts");
 const wateringApi = require("../app/api/watering-logs/route.ts");
 const statsApi = require("../app/api/watering-stats/route.ts");
 const { isRecentObservation } = require("../lib/notion-observation.ts");
 const { parseNotionPlantPage, parseNotionPlantPages } = require("../lib/plants.ts");
+const { LOCATIONS, LOCATION_GROUPS, emptyLocationState, parseLocationState, recordMovement } = require("../lib/plant-locations.ts");
 const plantId = "11111111-1111-4111-8111-111111111111";
 const originalFetch = global.fetch;
-const envKeys = ["NOTION_TOKEN", "NOTION_PLANTS_DATA_SOURCE_ID", "NOTION_DATA_SOURCE_ID", "NOTION_DATABASE_ID", "NOTION_WATERING_DATA_SOURCE_ID"];
+const envKeys = ["NOTION_TOKEN", "NOTION_PLANTS_DATA_SOURCE_ID", "NOTION_DATA_SOURCE_ID", "NOTION_DATABASE_ID", "NOTION_WATERING_DATA_SOURCE_ID", "NOTION_SETTINGS_DATA_SOURCE_ID", "NOTION_SETTINGS_DATABASE_ID"];
 const originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
 beforeEach(() => {
   envKeys.forEach((key) => { process.env[key] = key === "NOTION_TOKEN" ? "test-only-not-a-token" : plantId; });
@@ -477,4 +481,153 @@ test("observation rejects combined upload limit before external requests", async
   const form = observationForm();
   for (let i = 0; i < 21; i++) form.append("photos", new File(["image"], `${i}.jpg`, { type: "image/jpeg" }));
   assert.equal((await observationApi.POST(request(form))).status, 400);
+});
+
+test("room defines all 14 spaces in bottom-to-top order including every five-tier shelf", () => {
+  assert.equal(LOCATIONS.length, 14);
+  assert.deepEqual(LOCATION_GROUPS.map((group) => group.levels.length), [3, 5, 4, 2]);
+  assert.equal(LOCATIONS.find((location) => location.id === "right-black:1").name, "온실");
+  assert.equal(LOCATIONS.find((location) => location.id === "right-black:2").name, "실습");
+  assert.equal(LOCATIONS.find((location) => location.id === "left-five:1").name, "미니온실 1번");
+});
+
+test("trial plant list returns only names and IDs and never writes to Notion", async () => {
+  let reads = 0;
+  global.fetch = async (_url, options) => {
+    assert.equal(options.method, "POST");
+    assert.ok(String(_url).endsWith("/query"));
+    reads++;
+    return json({ results: [wateringPage("2026-10-22")], has_more: false });
+  };
+  const response = await spacesApi.GET(new Request("http://localhost/api/space-plants"));
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.deepEqual(result, { source: "notion", plants: [{ id: plantId, name: "밤비노 핑크", category: "알로카시아" }] });
+  assert.equal(reads, 1);
+});
+
+const trialPlants = [{ id: "one", name: "밤비노 핑크" }, { id: "two", name: "프라이덱" }];
+const trialNow = new Date("2026-10-24T12:00:00Z");
+test("local placement and movement retain original positions and history without mutating input", () => {
+  const empty = emptyLocationState();
+  const first = recordMovement(empty, trialPlants, "left-five:1", "2026-10-23", "첫 배치", "first", trialNow);
+  assert.deepEqual(empty, emptyLocationState());
+  assert.equal(first.history.length, 2);
+  assert.equal(first.history[0].from, null);
+  const next = recordMovement(first, [trialPlants[0]], "lerberg:3", "2026-10-24", " 빛 조절 ", "second", trialNow);
+  assert.deepEqual(next.positions, { one: "lerberg:3", two: "left-five:1" });
+  assert.equal(next.history[0].from, "left-five:1");
+  assert.equal(next.history[0].reason, "빛 조절");
+  assert.equal(next.history.length, 3);
+  assert.equal(first.positions.one, "left-five:1");
+  assert.deepEqual(parseLocationState(JSON.stringify(next)), next);
+});
+
+test("duplicate selections, retries and same-location saves do not duplicate history", () => {
+  const first = recordMovement(emptyLocationState(), [...trialPlants, trialPlants[0]], "lerberg:1", "2026-10-24", "", "same", trialNow);
+  assert.equal(first.history.length, 2);
+  const retry = recordMovement(first, trialPlants, "lerberg:1", "2026-10-24", "", "same", trialNow);
+  assert.deepEqual(retry, first);
+  assert.deepEqual(recordMovement(first, trialPlants, "lerberg:1", "2026-10-24", "", "new", trialNow), first);
+});
+
+test("movement rejects malformed, future, stale dates and unknown spaces", () => {
+  for (const date of ["2026-02-30", "2026-99-01", "bad", "2026-10-25"]) {
+    assert.throws(() => recordMovement(emptyLocationState(), trialPlants, "lerberg:1", date, "", "op", trialNow));
+  }
+  assert.throws(() => recordMovement(emptyLocationState(), trialPlants, "unknown", "2026-10-24", "", "op", trialNow));
+  assert.throws(() => recordMovement(emptyLocationState(), [], "lerberg:1", "2026-10-24", "", "op", trialNow));
+  const first = recordMovement(emptyLocationState(), trialPlants, "lerberg:1", "2026-10-24", "", "op", trialNow);
+  assert.throws(() => recordMovement(first, trialPlants, "lerberg:2", "2026-10-23", "", "op2", trialNow));
+});
+
+test("corrupt local data is rejected rather than silently overwritten", () => {
+  assert.deepEqual(parseLocationState(null), emptyLocationState());
+  for (const raw of ["broken", "null", "{}", '{"version":2,"positions":{},"history":[]}', '{"version":1,"positions":[],"history":[]}']) assert.throws(() => parseLocationState(raw));
+  assert.deepEqual(parseLocationState('{"version":1,"positions":{"one":"unknown"},"history":[{},null]}'), emptyLocationState());
+});
+
+test("custom shelf names survive reloads and subsequent movements", () => {
+  const renamed = { ...emptyLocationState(), labels: { "left-five:5": "육묘 공간" } };
+  const moved = recordMovement(renamed, trialPlants, "left-five:5", "2026-10-24", "", "op", trialNow);
+  assert.deepEqual(parseLocationState(JSON.stringify(moved)).labels, renamed.labels);
+  assert.equal(moved.history.length, 2);
+  assert.equal(moved.positions.one, "left-five:5");
+});
+
+const secondLocationPlantId = "33333333-3333-4333-8333-333333333333";
+const locationOperation = "44444444-4444-4444-8444-444444444444";
+const locationRequest = (payload, method = "POST") => new Request("http://localhost/api/location-logs", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+const locationPayload = (extra = {}) => ({ plantIds: [plantId], destination: "left-five:5", date: "2026-10-24", note: "빛 조절", operationId: locationOperation, ...extra });
+
+function mockLocationNotion({ failSecond = false } = {}) {
+  const pages = []; const bodies = []; let fail = failSecond;
+  global.fetch = async (url, options = {}) => {
+    if (String(url).endsWith("/query")) return json({ results: pages, has_more: false });
+    if (options.method !== "POST") return json({ ...wateringPage("2026-10-22"), id: String(url).split("/").at(-1), parent: { data_source_id: plantId } });
+    const body = JSON.parse(options.body);
+    if (fail && body.properties.식물?.relation?.[0]?.id === secondLocationPlantId) { fail = false; return Response.json({ message: "temporary failure" }, { status: 503 }); }
+    bodies.push(body);
+    const page = { ...returnedPage(body.properties), id: `history-${pages.length + 1}`, created_time: `2026-10-24T10:00:0${pages.length}Z` };
+    pages.push(page); return json(page);
+  };
+  return { pages, bodies };
+}
+
+test("Notion location writes use the existing settings source and plant relation, and retry is deduplicated", async () => {
+  const mock = mockLocationNotion();
+  for (let i = 0; i < 2; i++) {
+    const response = await locationsApi.POST(locationRequest(locationPayload()));
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).results[0].success, true);
+  }
+  assert.equal(mock.bodies.length, 1);
+  assert.equal(mock.bodies[0].parent.data_source_id, plantId);
+  assert.deepEqual(mock.bodies[0].properties.식물.relation, [{ id: plantId }]);
+  assert.equal(mock.bodies[0].properties.유형.select.name, "위치");
+  assert.equal(mock.bodies[0].properties.위치.rich_text[0].text.content, "5단장 · 5단");
+  assert.equal(mock.bodies[0].properties.식물등, undefined);
+  const response = await locationsApi.GET();
+  const { state } = await response.json();
+  assert.equal(state.positions[plantId], "left-five:5");
+  assert.equal(state.history[0].plantName, "밤비노 핑크");
+  assert.equal(state.history.length, 1);
+});
+
+test("Notion location partial failures retain successes and retries only create missing records", async () => {
+  const mock = mockLocationNotion({ failSecond: true });
+  const payload = locationPayload({ plantIds: [plantId, secondLocationPlantId] });
+  const first = await (await locationsApi.POST(locationRequest(payload))).json();
+  assert.deepEqual(first.results.map((result) => result.success), [true, false]);
+  const retried = await (await locationsApi.POST(locationRequest(payload))).json();
+  assert.deepEqual(retried.results.map((result) => result.success), [true, true]);
+  assert.equal(mock.pages.length, 2);
+});
+
+test("location rename events preserve current positions and past movements", async () => {
+  const mock = mockLocationNotion();
+  await locationsApi.POST(locationRequest(locationPayload()));
+  const renamed = await locationsApi.PATCH(locationRequest({ locationId: "left-five:5", name: "육묘 공간", operationId: locationOperation }, "PATCH"));
+  assert.equal(renamed.status, 200);
+  const state = locationStateFromPages(mock.pages);
+  assert.equal(state.labels["left-five:5"], "육묘 공간");
+  assert.equal(state.positions[plantId], "left-five:5");
+  assert.equal(state.history.length, 1);
+  assert.equal(mock.pages.length, 2);
+  await locationsApi.PATCH(locationRequest({ locationId: "left-five:5", name: "육묘 공간", operationId: locationOperation }, "PATCH"));
+  assert.equal(mock.pages.length, 2);
+});
+
+test("location API rejects invalid input, foreign plants and absent connections without creating a record", async () => {
+  for (const extra of [{ plantIds: [] }, { plantIds: Array(9).fill(plantId) }, { plantIds: ["invalid"] }, { destination: "unknown" }, { date: "2026-02-30" }, { note: "x".repeat(501) }, { operationId: "bad" }]) {
+    assert.equal((await locationsApi.POST(locationRequest(locationPayload(extra)))).status, 400);
+  }
+  global.fetch = async (url, options = {}) => {
+    assert.notEqual(String(url), "https://api.notion.com/v1/pages");
+    return options.method === "POST" ? json({ results: [], has_more: false }) : json({ ...wateringPage(undefined), parent: { data_source_id: secondLocationPlantId } });
+  };
+  const foreign = await (await locationsApi.POST(locationRequest(locationPayload()))).json();
+  assert.equal(foreign.results[0].success, false);
+  delete process.env.NOTION_TOKEN;
+  assert.equal((await locationsApi.GET()).status, 503);
 });

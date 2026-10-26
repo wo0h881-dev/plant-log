@@ -412,13 +412,6 @@ export async function createSettingChangePage({
           유형: {
             select: { name: type },
           },
-          ...(lightName
-            ? {
-                식물등: {
-                  rich_text: [{ text: { content: lightName } }],
-                },
-              }
-            : {}),
           ...(typeof lightWatt === "number"
             ? {
                 와트: {
@@ -441,7 +434,7 @@ export async function createSettingChangePage({
               }
             : {}),
           메모: {
-            rich_text: note ? [{ text: { content: note } }] : [],
+            rich_text: note || lightName ? [{ text: { content: [note, lightName ? `식물등: ${lightName}` : ""].filter(Boolean).join("\n") } }] : [],
           },
         },
       }),
