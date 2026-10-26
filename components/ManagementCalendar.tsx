@@ -100,12 +100,8 @@ export function ManagementCalendar({ plants, onSelectPlant, filter, onFilterChan
 
   return (
     <>
-      <header className="screen-header">
-        <div><h1 className="screen-title">관리 캘린더</h1><p className="screen-description">차곡차곡 쌓인 돌봄의 기록.</p></div>
-      </header>
-
       <div className="mb-5">
-        <PlantSelect plants={plants} value={selectedPlant ? `${selectedPlant.category} - ${selectedPlant.name}` : ""} query={query} recentPlants={[]} variant="search" showPhotos={false}
+        <PlantSelect plants={plants} value={selectedPlant ? `${selectedPlant.category} - ${selectedPlant.name}` : ""} query={query} recentPlants={[]} variant="search"
           onQueryChange={(value) => onFilterChange({ query: value, plantId: value === selectedPlant?.name ? plantId : "" })}
           onSelect={(plant) => onFilterChange({ plantId: plant.id, query: plant.name })} />
       </div>
@@ -132,12 +128,12 @@ export function ManagementCalendar({ plants, onSelectPlant, filter, onFilterChan
             return (
               <button key={date} type="button" onClick={() => setSelectedDate(date)} className={`relative mx-auto grid aspect-square w-full max-w-10 place-items-center rounded-lg text-xs font-medium transition ${isSelected ? "bg-[#4263EB] text-white" : date === today ? "bg-[#EEF2FF] text-[#4263EB]" : "text-[#626B76]"}`}>
                 <span>{day}</span>
-                {(hasWatering || hasObservation || hasRepotting) ? <span className="absolute bottom-1.5 flex gap-0.5">{hasWatering ? <span className={`h-1 w-1 rounded-full ${isSelected ? "bg-[#BDE3EF]" : "bg-[#4263EB]"}`} /> : null}{hasObservation ? <span className={`h-1 w-1 rounded-full ${isSelected ? "bg-white" : "bg-[#8192BE]"}`} /> : null}{hasRepotting ? <span className={`h-1 w-1 rounded-full ${isSelected ? "bg-[#F3D7A2]" : "bg-[#A0AEDD]"}`} /> : null}</span> : null}
+                {(hasWatering || hasObservation || hasRepotting) ? <span className={`calendar-markers absolute bottom-1 flex gap-1 ${isSelected ? "rounded-full bg-white px-1 py-0.5" : ""}`}>{hasWatering ? <span aria-label="물주기 기록" className="calendar-dot calendar-water" /> : null}{hasObservation ? <span aria-label="관찰일지 기록" className="calendar-dot calendar-observation" /> : null}{hasRepotting ? <span aria-label="분갈이 기록" className="calendar-dot calendar-repot" /> : null}</span> : null}
               </button>
             );
           })}
         </div>
-        <div className="mt-4 flex justify-center gap-4 border-t border-[#EEEFEA] pt-3 text-[10px] font-semibold text-[#777B74]"><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#4263EB]" />물주기</span><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#8192BE]" />관찰일지</span><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#A0AEDD]" />분갈이</span></div>
+        <div className="calendar-legend"><span><Droplets size={13} /><i className="calendar-dot calendar-water" />물주기</span><span><NotebookPen size={13} /><i className="calendar-dot calendar-observation" />관찰일지</span><span><RefreshCcw size={13} /><i className="calendar-dot calendar-repot" />분갈이</span></div>
       </section>
 
       {selectedPlant ? <PlantCareSummary key={selectedPlant.id} plant={selectedPlant} /> : null}
@@ -152,7 +148,7 @@ export function ManagementCalendar({ plants, onSelectPlant, filter, onFilterChan
           const isWatering = event.type === "watering";
           const isRepotting = event.type === "repotting";
           const eventLabel = isWatering ? "물주기" : isRepotting ? "분갈이" : event.tags?.join(" · ") || "관찰일지";
-          const iconStyle = isWatering ? "bg-[#EEF2FF] text-[#4263EB]" : isRepotting ? "bg-[#F2F4FA] text-[#8192BE]" : "bg-[#EEF2FF] text-[#4263EB]";
+          const iconStyle = isWatering ? "bg-[#EDF3FF] text-[#3569D4]" : isRepotting ? "bg-[#FFF3E5] text-[#B76415]" : "bg-[#EAF6F0] text-[#247956]";
           return <button key={event.id} type="button" disabled={!plant} onClick={() => { if (plant) onSelectPlant(plant); }} className="flex min-h-[76px] w-full items-center gap-3 border-b border-[#ECEEF1] py-3 text-left"><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${iconStyle}`}>{isWatering ? <Droplets size={18} aria-hidden="true" /> : isRepotting ? <RefreshCcw size={18} aria-hidden="true" /> : <NotebookPen size={18} aria-hidden="true" />}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{plant?.name ?? event.plantName}</span><span className="mt-1 block truncate text-[11px] text-[#909090]">{eventLabel}{event.note ? ` · ${event.note}` : ""}</span></span><ChevronRight size={16} className="shrink-0 text-[#A3A5A0]" aria-hidden="true" /></button>;
         })}</div> : null}
       </section>

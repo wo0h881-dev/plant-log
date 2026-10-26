@@ -1,4 +1,8 @@
 .spaces-page { min-height: 100dvh; max-width: 640px; margin: auto; padding-bottom: 110px; background: #fff; color: #202632; }
+.spaces-embedded { min-height: 0; margin-inline: -24px; padding-bottom: 0; }
+.spaces-embedded .spaces-header { padding: 0 24px 12px; }
+.spaces-embedded .spaces-dock { bottom: calc(82px + env(safe-area-inset-bottom)); max-width: 440px; }
+@media (max-width: 359px) { .spaces-embedded { margin-inline: -18px; } }
 .spaces-header { display: flex; justify-content: space-between; align-items: center; padding: max(12px, env(safe-area-inset-top)) 16px 8px; font-size: 13px; font-weight: 600; }
 .spaces-intro { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px 18px; }
 .spaces-intro h1 { font-size: 26px; font-weight: 750; line-height: 1.5; }

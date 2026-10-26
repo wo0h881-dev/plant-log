@@ -12,7 +12,7 @@ import "./plant-spaces.css";
 
 function today() { return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }).format(new Date()); }
 
-export function PlantSpaces() {
+export function PlantSpaces({ embedded = false }: { embedded?: boolean }) {
   const [plants, setPlants] = useState<Plant[]>([]);
   const [loading, setLoading] = useState(true);
   const [sourceError, setSourceError] = useState("");
@@ -186,9 +186,9 @@ export function PlantSpaces() {
     finally { savingNow.current = false; setSaving(false); }
   }
 
-  return <main className="spaces-page">
-    <header className="spaces-header"><Link href="/" aria-label="식물페이지로 돌아가기" className="icon-button"><ArrowLeft size={21} /></Link><span>나의 식물방</span><button type="button" className="icon-button" onClick={download} title="위치 기록 백업" aria-label="위치 기록 백업"><Download size={19} /></button></header>
-    <div className="spaces-intro"><div><p className="spaces-eyebrow">MY PLANT ROOM</p><h1>초록이들의 자리</h1></div><span className="spaces-trial">{persistence === "notion" ? "나의 공간" : persistence === "local" ? "시험 공간" : "연결 확인"}</span></div>
+  return <div className={`spaces-page${embedded ? " spaces-embedded" : ""}`}>
+    <header className="spaces-header">{!embedded ? <Link href="/" aria-label="식물페이지로 돌아가기" className="icon-button"><ArrowLeft size={21} /></Link> : <span className="text-xs text-[#8B929B]">선반을 눌러 식물을 확인해요.</span>}{!embedded ? <span>식물방</span> : null}<button type="button" className="icon-button" onClick={download} title="위치 기록 백업" aria-label="위치 기록 백업"><Download size={19} /></button></header>
+    {!embedded ? <div className="spaces-intro"><div><p className="spaces-eyebrow">MY PLANT ROOM</p><h1>초록이들의 자리</h1></div><span className="spaces-trial">{persistence === "notion" ? "나의 공간" : persistence === "local" ? "시험 공간" : "연결 확인"}</span></div> : null}
     <PlantRoomIsometric selected={location} onSelect={selectLocation} counts={counts} labels={state.labels} />
     <div className="spaces-note"><span className="spaces-note-dot" />{persistence === "notion" ? "식물 세팅 변경 기록 DB와 연결되어 있어요" : persistence === "local" ? "개발 시험용 · 이 기기에만 저장돼요" : persistence === "error" ? "노션 연결을 확인해주세요" : "노션 위치 기록을 가져오고 있어요"}</div>
     <div className="spaces-body">
@@ -243,5 +243,5 @@ export function PlantSpaces() {
         </fieldset>
       </section>
     </div> : null}
-  </main>;
+  </div>;
 }

@@ -17,6 +17,7 @@ type BatchWateringProps = {
   onWateringSaved?: () => void;
   onTodayWateredChange?: (plants: WateredPlant[]) => void;
   onSelectPlant?: (plant: Plant) => void;
+  onOpenCalendar?: (plant: Plant) => void;
 };
 
 type WateringResult = { plantId: string; plantName: string; ok: boolean; message?: string };
@@ -39,6 +40,7 @@ export function BatchWatering({
   onWateringSaved,
   onTodayWateredChange,
   onSelectPlant,
+  onOpenCalendar,
 }: BatchWateringProps) {
   const today = seoulDate();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -242,15 +244,18 @@ export function BatchWatering({
       : "물준 기록 없음";
 
     return (
-      <button
+      <div key={plant.id} className="water-row transition-colors" data-selected={isSelected}>
+        <button type="button" onClick={() => onOpenCalendar?.(plant)} aria-label={`${plant.name} 캘린더 보기`} title={`${plant.name} 캘린더 보기`} className="shrink-0 rounded-lg">
+          <PlantCoverThumbnail key={plant.coverPhotoUrl ?? "no-cover"} src={plant.coverPhotoUrl} />
+        </button>
+        <button
         key={plant.id}
         type="button"
         role="checkbox"
         aria-checked={isSelected}
         onClick={() => togglePlant(plant.id)}
-        className="water-row transition-colors"
+        className="flex min-h-12 min-w-0 flex-1 items-center gap-3 text-left"
       >
-        <PlantCoverThumbnail key={plant.coverPhotoUrl ?? "no-cover"} src={plant.coverPhotoUrl} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold text-[#191F28]">{plant.name}</span>
           <span className="mt-1 block truncate text-[11px] text-[#909090]">
@@ -263,6 +268,7 @@ export function BatchWatering({
           <Check size={16} strokeWidth={3} aria-hidden="true" />
         </span>
       </button>
+      </div>
     );
   }
 
