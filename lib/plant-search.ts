@@ -8,6 +8,10 @@ function compact(value: string) {
   return value.toLowerCase().replace(/\s+/g, "");
 }
 
+export function canSelectPlant(plant: Pick<Plant, "category">, includeDead = false) {
+  return includeDead || plant.category.trim() !== "사망";
+}
+
 export function getKoreanInitials(value: string) {
   return Array.from(value, (character) => {
     const code = character.charCodeAt(0);

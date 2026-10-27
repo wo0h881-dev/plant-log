@@ -6,7 +6,7 @@ import type { Plant, PlantCalendarEvent } from "@/types/plant";
 import { PlantSelect } from "@/components/PlantSelect";
 import { PlantCareSummary } from "@/components/PlantCareSummary";
 import { PlantCoverThumbnail } from "@/components/PlantCoverThumbnail";
-import { matchesPlantSearch } from "@/lib/plant-search";
+import { canSelectPlant, matchesPlantSearch } from "@/lib/plant-search";
 
 type ManagementCalendarProps = {
   plants: Plant[];
@@ -82,10 +82,10 @@ export function ManagementCalendar({ plants, onSelectPlant, filter, onFilterChan
   const eventsByDate = useMemo(() => {
     const map = new Map<string, PlantCalendarEvent[]>();
     for (const event of events) {
-      const plant = plants.find((item) => item.id === event.plantId);
+      const plant = event.plantId ? plants.find((item) => item.id === event.plantId) : plants.find((item) => item.name === event.plantName);
       const matches = plantId
         ? (event.plantId ? event.plantId === plantId : event.plantName === selectedPlant?.name)
-        : matchesPlantSearch(plant ?? { name: event.plantName, category: "" }, query);
+        : (!query.trim() || !plant || canSelectPlant(plant)) && matchesPlantSearch(plant ?? { name: event.plantName, category: "" }, query);
       if (matches) map.set(event.date, [...(map.get(event.date) ?? []), event]);
     }
     return map;

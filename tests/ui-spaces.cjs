@@ -60,7 +60,7 @@ async function main() {
       await page.screenshot({ path: path.join(directory, `room-${viewport.width}.png`) });
       await page.getByRole("button", { name: "5단장 · 미니온실 1번", exact: true }).click();
       await page.getByRole("button", { name: /위치 미지정 3/ }).click();
-      await page.getByRole("textbox", { name: "이동할 식물 검색" }).fill("ㅂㅂㄴ");
+      await page.getByRole("searchbox", { name: "이동할 식물 검색" }).fill("ㅂㅂㄴ");
       assert.equal(await page.getByRole("checkbox").count(), 1);
       await page.getByRole("checkbox").check();
       await page.getByRole("button", { name: "공간 이동", exact: true }).click();
@@ -84,7 +84,7 @@ async function main() {
       assert.equal(moved.positions.one, "right-black:1");
       assert.equal(moved.history.length, 2);
       assert.equal(moved.history[0].from, "left-five:1");
-      await page.getByRole("button", { name: /이동 기록 2건/ }).click();
+      await page.getByRole("button", { name: /관리 타임라인 2건/ }).click();
       assert.equal(await page.locator(".spaces-history article").count(), 2);
       await page.screenshot({ path: path.join(directory, `history-${viewport.width}.png`), fullPage: true });
       await page.getByRole("button", { name: /위치 미지정 2/ }).click();

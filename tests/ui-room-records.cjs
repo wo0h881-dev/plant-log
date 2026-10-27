@@ -88,14 +88,14 @@ async function main() {
       await timeline.getByText("뿌리깍지벌레 발견", { exact: false }).waitFor();
       await timeline.getByText("5단장 · 미니온실 2번(26℃ / 85%)으로 이동", { exact: false }).waitFor();
       await timeline.getByText("새 잎 확인", { exact: true }).waitFor();
-      assert.ok((await timeline.innerText()).includes("물줌"));
+      assert.equal((await timeline.innerText()).includes("물줌"), false);
       assert.ok((await timeline.innerText()).includes("26℃ / 90%"));
       await page.screenshot({ path: path.join(out, `profile-${width}.png`), fullPage: true });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       assert.deepEqual(errors, []);
       await page.context().close();
     }
-    console.log("PASS: room measurements/partial carry-forward, retry ID, historical move snapshots, single shared-care event, profile observation/watering/location/common timeline, mobile and desktop containment");
+    console.log("PASS: room measurements/partial carry-forward, retry ID, historical move snapshots, single shared-care event, profile observation/location/common timeline without watering entries, mobile and desktop containment");
   } finally { await browser.close(); }
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

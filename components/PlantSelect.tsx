@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronRight, Search, X } from "lucide-react";
 import { PlantCoverThumbnail } from "@/components/PlantCoverThumbnail";
-import { matchesPlantSearch } from "@/lib/plant-search";
+import { canSelectPlant, matchesPlantSearch } from "@/lib/plant-search";
 import type { Plant } from "@/types/plant";
 
 type PlantSelectProps = {
@@ -16,20 +16,22 @@ type PlantSelectProps = {
   variant?: "row" | "search";
   openRequest?: number;
   showPhotos?: boolean;
+  includeDead?: boolean;
 };
 
 function formatPlantName(plant: Plant) {
   return `${plant.category} - ${plant.name}`;
 }
 
-export function PlantSelect({ plants, value, query, recentPlants, onQueryChange, onSelect, variant = "row", openRequest = 0, showPhotos = true }: PlantSelectProps) {
+export function PlantSelect({ plants, value, query, recentPlants, onQueryChange, onSelect, variant = "row", openRequest = 0, showPhotos = true, includeDead = false }: PlantSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const pointerWasOpen = useRef(false);
   const inputId = useId();
   const normalizedQuery = query.trim().toLowerCase();
-  const filteredPlants = plants.filter((plant) => matchesPlantSearch(plant, normalizedQuery));
+  const selectablePlants = plants.filter((plant) => canSelectPlant(plant, includeDead));
+  const filteredPlants = selectablePlants.filter((plant) => matchesPlantSearch(plant, normalizedQuery));
   const selectedPlant = plants.find((plant) => formatPlantName(plant) === value);
 
   function openList() {
@@ -110,7 +112,7 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
           {!normalizedQuery && recentPlants.length ? (
             <div className="mb-2 flex gap-2 overflow-x-auto px-1 pb-1">
               {recentPlants.map((plantName) => {
-                const plant = plants.find((item) => formatPlantName(item) === plantName);
+                const plant = selectablePlants.find((item) => formatPlantName(item) === plantName);
                 return plant ? <button key={plantName} type="button" onClick={() => choosePlant(plant)} className="shrink-0 rounded-full bg-[#EEF2FF] px-3 py-2 text-xs font-bold text-[#4263EB]">{plant.name}</button> : null;
               })}
             </div>

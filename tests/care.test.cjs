@@ -36,6 +36,7 @@ const { parseNotionPlantPage, parseNotionPlantPages } = require("../lib/plants.t
 const { LOCATIONS, LOCATION_GROUPS, emptyLocationState, parseLocationState, recordMovement } = require("../lib/plant-locations.ts");
 const { locationTimeline } = require("../lib/plant-locations.ts");
 const { environmentAt, isEnvironment, formatLocationEnvironment } = require("../lib/location-environment.ts");
+const { canSelectPlant, matchesPlantSearch } = require("../lib/plant-search.ts");
 const plantId = "11111111-1111-4111-8111-111111111111";
 const originalFetch = global.fetch;
 const envKeys = ["NOTION_TOKEN", "NOTION_PLANTS_DATA_SOURCE_ID", "NOTION_DATA_SOURCE_ID", "NOTION_DATABASE_ID", "NOTION_WATERING_DATA_SOURCE_ID", "NOTION_SETTINGS_DATA_SOURCE_ID", "NOTION_SETTINGS_DATABASE_ID"];
@@ -73,6 +74,14 @@ test("plant list keeps cycle-day alerts and missing-date behavior", () => {
   assert.deepEqual(plants.map((plant) => [plant.daysSinceWatered, plant.isWateringDue]), [
     [3, true], [2, true], [1, false], [undefined, true], [3, false], [0, false],
   ]);
+});
+
+test("plant selection excludes deceased plants by default, explicitly allows My Plants, and keeps initial search", () => {
+  assert.equal(canSelectPlant({ category: " 사망 " }), false);
+  assert.equal(canSelectPlant({ category: "사망" }, true), true);
+  assert.equal(canSelectPlant({ category: "자구" }), true);
+  assert.equal(canSelectPlant({ category: "부활중" }), true);
+  assert.equal(matchesPlantSearch({ name: "밤비노 핑크", category: "알로카시아" }, "ㅂㅂㄴ"), true);
 });
 
 test("plant list refreshes its reference day across Korean midnight and year end", () => {

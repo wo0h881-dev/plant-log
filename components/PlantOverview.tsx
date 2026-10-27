@@ -11,7 +11,6 @@ import { PlantPhotoCarousel } from "@/components/PlantPhotoCarousel";
 import { plantCarouselPhotos } from "@/lib/plant-photos";
 import { emptyLocationState, locationTimeline, parseLocationState, type LocationState } from "@/lib/plant-locations";
 import { environmentAt, formatLocationEnvironment } from "@/lib/location-environment";
-import type { WateringStats } from "@/lib/watering";
 
 type DetailsResponse = {
   observations?: PlantObservationSummary[];
@@ -36,7 +35,6 @@ export function PlantOverview({ plant, categories, onOpenCalendar, onPlantRename
   const [editingField, setEditingField] = useState<ProfileField | null>(null);
   const [roomState, setRoomState] = useState<LocationState>(emptyLocationState);
   const [roomError, setRoomError] = useState("");
-  const [wateringStats, setWateringStats] = useState<WateringStats | null>(null);
 
   useEffect(() => {
     let controller: AbortController;
@@ -61,7 +59,6 @@ export function PlantOverview({ plant, categories, onOpenCalendar, onPlantRename
       return { ...observation, recordedAt: "", title: observation.tags.join(" · ") || "관찰 기록", category: "", context: position ? `${position.destinationLabel || position.to} · ${formatLocationEnvironment(environment)}` : "" };
     }),
     ...locationTimeline(roomState, plant.id).map((record) => ({ ...record, url: undefined, tags: [] })),
-    ...(wateringStats?.wateringDates ?? []).map((date) => ({ id: `watering-${date}`, date, recordedAt: "", title: "물줌", category: "물주기", note: "", url: undefined, tags: [] })),
   ].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "") || b.recordedAt.localeCompare(a.recordedAt));
 
   useEffect(() => {
@@ -105,7 +102,7 @@ export function PlantOverview({ plant, categories, onOpenCalendar, onPlantRename
         </div>
       </section>
 
-      <PlantCareSummary key={plant.id} plant={plant} onOpenCalendar={onOpenCalendar} vertical onStatsLoaded={setWateringStats} />
+      <PlantCareSummary key={plant.id} plant={plant} onOpenCalendar={onOpenCalendar} vertical />
       </section>
 
       {editingField ? <PlantProfileEditor plant={plant} field={editingField} categories={categories} onSaved={onPlantRenamed} onClose={() => setEditingField(null)} /> : null}

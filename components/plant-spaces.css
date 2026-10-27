@@ -85,7 +85,7 @@
 .spaces-scope button { min-height: 34px; padding: 6px 11px; border-radius: 7px; background: #f4f5f8; color: #7b8798; font-size: 11px; }
 .spaces-scope button[aria-pressed="true"] { background: #eef2ff; color: #4263eb; font-weight: 650; }
 .spaces-search { display: flex; align-items: center; gap: 9px; min-height: 46px; border-radius: 8px; background: #f5f6f8; padding: 0 12px; color: #a0a8b4; }
-.spaces-search input { min-width: 0; flex: 1; width: 100%; font-size: 14px; outline: 0; background: transparent; color: #202632; }
+.spaces-search input { min-width: 0; flex: 1; width: 100%; font-size: 16px; outline: 0; background: transparent; color: #202632; }
 .spaces-search button { display: grid; place-items: center; min-height: 32px; min-width: 28px; }
 .spaces-selection { display: flex; justify-content: space-between; margin: 15px 0 4px; font-size: 11px; color: #939cab; }
 .spaces-selection button { color: #4263eb; min-height: 30px; }

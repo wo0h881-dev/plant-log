@@ -8,7 +8,7 @@ import { PlantCoverThumbnail } from "@/components/PlantCoverThumbnail";
 import { RoomRecordDialog, type RoomRecordInput } from "@/components/RoomRecordDialog";
 import { environmentAt, formatLocationEnvironment } from "@/lib/location-environment";
 import { emptyLocationState, LOCATION_GROUPS, LOCATIONS, LOCATION_STORAGE_KEY, locationLabel as defaultLocationLabel, locationTimeline, parseLocationState, recordMovement, type LocationState } from "@/lib/plant-locations";
-import { matchesPlantSearch } from "@/lib/plant-search";
+import { canSelectPlant, matchesPlantSearch } from "@/lib/plant-search";
 import type { Plant } from "@/types/plant";
 import "./plant-spaces.css";
 
@@ -108,9 +108,9 @@ export function PlantSpaces({ embedded = false }: { embedded?: boolean }) {
     for (const plant of plants) { const position = state.positions[plant.id]; if (position) result[position] = (result[position] || 0) + 1; }
     return result;
   }, [plants, state.positions]);
-  const unassigned = plants.filter((plant) => !state.positions[plant.id]).length;
-  const displayed = plants.filter((plant) => (scope === "all" || (scope === "unassigned" ? !state.positions[plant.id] : state.positions[plant.id] === scope)) && matchesPlantSearch(plant, query));
-  const selectedPlants = plants.filter((plant) => selected.includes(plant.id));
+  const unassigned = plants.filter((plant) => canSelectPlant(plant) && !state.positions[plant.id]).length;
+  const displayed = plants.filter((plant) => canSelectPlant(plant) && (scope === "all" || (scope === "unassigned" ? !state.positions[plant.id] : state.positions[plant.id] === scope)) && matchesPlantSearch(plant, query));
+  const selectedPlants = plants.filter((plant) => canSelectPlant(plant) && selected.includes(plant.id));
   const chosenLocation = LOCATIONS.find((item) => item.id === location)!;
   const group = LOCATION_GROUPS.find((item) => item.id === chosenLocation.groupId)!;
   const locationLabel = (id: string | null | undefined) => defaultLocationLabel(id, state.labels);
@@ -235,10 +235,10 @@ export function PlantSpaces({ embedded = false }: { embedded?: boolean }) {
           <button type="button" aria-pressed={scope === "unassigned"} onClick={() => changeScope("unassigned")}>위치 미지정 {unassigned}</button>
           <button type="button" aria-pressed={scope === "all"} onClick={() => changeScope("all")}>전체</button>
         </div>
-        <div className="spaces-search"><Search size={17} /><input aria-label="이동할 식물 검색" placeholder="어떤 식물을 옮길까요?" value={query} onChange={(event) => setQuery(event.target.value)} />{query ? <button type="button" onClick={() => setQuery("")} aria-label="검색어 지우기"><X size={17} /></button> : null}</div>
+        <div className="spaces-search"><Search size={17} /><input type="search" aria-label="이동할 식물 검색" placeholder="어떤 식물을 옮길까요?" value={query} onChange={(event) => setQuery(event.target.value)} />{query ? <button type="button" onClick={() => setQuery("")} aria-label="검색어 지우기"><X size={17} /></button> : null}</div>
         {sourceError ? <p role="alert" className="spaces-error">{sourceError}</p> : null}
         {displayed.length ? <div className="spaces-selection"><span>{selected.length}개 선택</span><button type="button" onClick={() => setSelected((current) => allChecked ? current.filter((id) => !displayed.some((plant) => plant.id === id)) : [...new Set([...current, ...displayed.map((plant) => plant.id)])])}>{allChecked ? "전체 해제" : "전체 선택"}</button></div> : null}
-        <div className="spaces-plant-list">{displayed.map((plant) => <label key={plant.id} className="spaces-plant-row"><input type="checkbox" checked={selected.includes(plant.id)} onChange={() => toggle(plant.id)} /><span className="spaces-checkbox" aria-hidden="true">{selected.includes(plant.id) ? <Check size={15} /> : null}</span><span className="spaces-plant-identity"><strong>{plant.name}</strong><small>{plant.category} · {locationLabel(state.positions[plant.id])}</small></span></label>)}</div>
+        <div className="spaces-plant-list">{displayed.map((plant) => <label key={plant.id} className="spaces-plant-row"><input type="checkbox" checked={selected.includes(plant.id)} onChange={() => toggle(plant.id)} /><span className="spaces-checkbox" aria-hidden="true">{selected.includes(plant.id) ? <Check size={15} /> : null}</span><PlantCoverThumbnail key={plant.coverPhotoUrl ?? "no-cover"} src={plant.coverPhotoUrl} /><span className="spaces-plant-identity"><strong>{plant.name}</strong><small>{plant.category} · {locationLabel(state.positions[plant.id])}</small></span></label>)}</div>
         {!loading && !displayed.length && !sourceError ? <div className="spaces-empty"><MapPin size={25} /><p>{query ? "검색 결과가 없어요." : "이 공간에 배치된 식물이 없어요."}</p><button type="button" onClick={() => changeScope("unassigned")}>미지정 식물에서 배치하기 <ArrowRight size={14} /></button></div> : null}
       </section>
       {message ? <p role="status" className="spaces-success"><Check size={16} />{message}</p> : null}
