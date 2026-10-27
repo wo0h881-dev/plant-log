@@ -1,3 +1,5 @@
+import { environmentAt, formatLocationEnvironment, isEnvironment, type LocationEnvironment, type EnvironmentRecord, type CommonCareRecord } from "@/lib/location-environment";
+
 export const LOCATION_STORAGE_KEY = "plant-log:location-trial:v1";
 
 export const LOCATION_GROUPS = [
@@ -14,10 +16,11 @@ export const LOCATIONS = LOCATION_GROUPS.flatMap((group) => group.levels.map((na
 
 export type MovementRecord = {
   id: string; plantId: string; plantName: string; from: string | null; to: string;
-  date: string; reason: string; recordedAt: string;
+  date: string; reason: string; recordedAt: string; environment?: LocationEnvironment; destinationLabel?: string;
 };
 export type LocationState = {
   version: 1; positions: Record<string, string>; history: MovementRecord[]; labels?: Record<string, string>;
+  environments?: EnvironmentRecord[]; commonCare?: CommonCareRecord[];
 };
 export const emptyLocationState = (): LocationState => ({ version: 1, positions: {}, history: [] });
 const knownLocation = (id: unknown): id is string => typeof id === "string" && LOCATIONS.some((location) => location.id === id);
@@ -36,7 +39,9 @@ export function parseLocationState(raw: string | null): LocationState {
   const labels = "labels" in value && value.labels && typeof value.labels === "object" && !Array.isArray(value.labels)
     ? Object.fromEntries(Object.entries(value.labels).filter(([id, name]) => knownLocation(id) && typeof name === "string" && name.trim().length > 0 && name.trim().length <= 40).map(([id, name]) => [id, (name as string).trim()]))
     : undefined;
-  return { version: 1, positions: Object.fromEntries(validPositions), history: validHistory, ...(labels ? { labels } : {}) };
+  const environments = "environments" in value && Array.isArray(value.environments) ? value.environments.filter((item): item is EnvironmentRecord => Boolean(item && typeof item.id === "string" && knownLocation(item.locationId) && typeof item.date === "string" && typeof item.recordedAt === "string" && isEnvironment(item))) : undefined;
+  const commonCare = "commonCare" in value && Array.isArray(value.commonCare) ? value.commonCare.filter((item): item is CommonCareRecord => Boolean(item && typeof item.id === "string" && typeof item.date === "string" && typeof item.recordedAt === "string" && typeof item.title === "string" && typeof item.note === "string")) : undefined;
+  return { version: 1, positions: Object.fromEntries(validPositions), history: validHistory, ...(labels ? { labels } : {}), ...(environments ? { environments } : {}), ...(commonCare ? { commonCare } : {}) };
 }
 
 export function recordMovement(state: LocationState, plants: { id: string; name: string }[], destination: string, date: string, reason: string, operationId: string, now = new Date()): LocationState {
@@ -54,7 +59,8 @@ export function recordMovement(state: LocationState, plants: { id: string; name:
     if (state.history.some((item) => item.id === id) || positions[plant.id] === destination) continue;
     const last = state.history.find((item) => item.plantId === plant.id);
     if (last && last.date > date) throw new Error(`${plant.name}: 가장 최근 이동일 이후 날짜로 기록해주세요.`);
-    added.push({ id, plantId: plant.id, plantName: plant.name, from: positions[plant.id] ?? null, to: destination, date, reason: reason.trim(), recordedAt: now.toISOString() });
+    const environment = environmentAt(state.environments ?? [], destination, date);
+    added.push({ id, plantId: plant.id, plantName: plant.name, from: positions[plant.id] ?? null, to: destination, date, reason: reason.trim(), recordedAt: now.toISOString(), ...(environment ? { environment } : {}), destinationLabel: locationLabel(destination, state.labels) });
     positions[plant.id] = destination;
   }
   return { ...state, version: 1, positions, history: [...added, ...state.history] };
@@ -63,4 +69,22 @@ export function recordMovement(state: LocationState, plants: { id: string; name:
 export function locationLabel(id: string | null | undefined, labels?: Record<string, string>) {
   const location = LOCATIONS.find((item) => item.id === id);
   return location ? `${location.groupName} · ${labels?.[location.id] || location.name}` : "위치 미지정";
+}
+
+export function locationTimeline(state: LocationState, plantId?: string) {
+  const entries = state.history.filter((record) => !plantId || record.plantId.replaceAll("-", "") === plantId.replaceAll("-", "")).map((record) => ({
+    id: record.id, date: record.date, recordedAt: record.recordedAt,
+    title: `${record.destinationLabel || locationLabel(record.to, state.labels)}${record.environment ? `(${formatLocationEnvironment(record.environment)})` : "(온습도 미기록)"}으로 이동`,
+    note: record.reason, category: plantId ? "위치 이동" : record.plantName,
+  }));
+  for (const record of state.commonCare ?? []) entries.push({ ...record, category: "전체 공통" });
+  if (!plantId) {
+    const measured = new Map<string, LocationEnvironment>();
+    for (const record of (state.environments ?? []).toSorted((a, b) => a.date.localeCompare(b.date) || a.recordedAt.localeCompare(b.recordedAt))) {
+      const environment = { ...measured.get(record.locationId), ...(record.temperature !== undefined ? { temperature: record.temperature } : {}), ...(record.humidity !== undefined ? { humidity: record.humidity } : {}) };
+      measured.set(record.locationId, environment);
+      entries.push({ ...record, title: `${locationLabel(record.locationId, state.labels)} · ${formatLocationEnvironment(environment)}`, note: record.note ?? "", category: "온습도 측정" });
+    }
+  }
+  return entries.sort((a, b) => b.date.localeCompare(a.date) || b.recordedAt.localeCompare(a.recordedAt));
 }

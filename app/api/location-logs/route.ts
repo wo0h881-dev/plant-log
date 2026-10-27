@@ -5,6 +5,7 @@ import { hasNotionPageId } from "@/lib/notion";
 import { PlantRequestError, readEditablePlant } from "@/lib/notion-plant-page";
 import { parseNotionPlantPage } from "@/lib/plants";
 import { seoulDate } from "@/lib/watering";
+import { isEnvironment } from "@/lib/location-environment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +22,23 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const payload = await request.json().catch(() => null);
+    if (payload?.kind === "environment" || payload?.kind === "common") {
+      const { kind, date, operationId, locationId, environment, title, note = "" } = payload;
+      if (!hasNotionPageId(operationId) || typeof note !== "string" || note.length > 500 || typeof date !== "string") throw new PlantRequestError("날짜와 기록 내용을 확인해주세요.");
+      try { recordMovement({ version: 1, positions: {}, history: [] }, [{ id: "validation", name: "validation" }], LOCATIONS[0].id, date, "", operationId); }
+      catch { throw new PlantRequestError("오늘 또는 과거의 올바른 날짜를 선택해주세요."); }
+      if (kind === "environment" && (!LOCATIONS.some((item) => item.id === locationId) || !isEnvironment(environment))) throw new PlantRequestError("온도(-50~80℃) 또는 습도(0~100%)를 입력해주세요.");
+      if (kind === "common" && (typeof title !== "string" || !title.trim() || title.trim().length > 100)) throw new PlantRequestError("공통 기록 제목을 1~100자로 입력해주세요.");
+      const connection = await locationConnection();
+      const pages = await readLocationPages(connection);
+      const key = `${kind}:${operationId}`;
+      if (!pages.some((page) => propertyText(page.properties.이동ID) === key)) {
+        const state = locationStateFromPages(pages);
+        const saved = await createLocationPage(connection, { kind, to: kind === "environment" ? locationId : "", label: kind === "environment" ? locationLabel(locationId, state.labels) : "전체 공통", date, note, operationKey: key, ...(kind === "environment" ? { environment } : { title: title.trim() }) });
+        pages.push(saved);
+      }
+      return NextResponse.json({ success: true, source: "notion", state: locationStateFromPages(pages) });
+    }
     const ids: unknown = payload?.plantIds;
     const to = payload?.destination;
     const date = payload?.date;
@@ -48,7 +66,7 @@ export async function POST(request: Request) {
         const next = recordMovement(state, [plant], to, date, note, operation);
         if (next.history.length === state.history.length) { results.push({ plantId, success: true, message: "이미 이 공간에 있어요." }); continue; }
         const labels = { ...state.labels, ...(label ? { [to]: label.trim() } : {}) };
-        const saved = await createLocationPage(connection, { plantId, plantName: plant.name, from, to, date, note, label: locationLabel(to, labels), operationKey: key, labels });
+        const saved = await createLocationPage(connection, { plantId, plantName: plant.name, from, to, date, note, label: locationLabel(to, labels), operationKey: key, labels, environment: next.history[0]?.environment });
         pages.push(saved); state = { ...next, labels };
         results.push({ plantId, success: true, pageId: saved.id });
       } catch (error) { results.push({ plantId, success: false, message: error instanceof Error ? error.message : "저장하지 못했어요." }); }

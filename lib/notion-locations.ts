@@ -1,6 +1,7 @@
 import { createNotionHeaders, hasNotionPageId, readNotionJson, resolveDataSourceId } from "@/lib/notion";
 import { emptyLocationState, LOCATIONS, locationLabel, type LocationState } from "@/lib/plant-locations";
 import { PlantRequestError } from "@/lib/notion-plant-page";
+import { environmentMemo, readEnvironmentMemo, type LocationEnvironment } from "@/lib/location-environment";
 
 const API = "https://api.notion.com/v1";
 type Property = {
@@ -50,6 +51,20 @@ export function locationStateFromPages(pages: LocationPage[]): LocationState {
     const prefix = `${location.groupName} · `;
     if (label) state.labels[id] = label.startsWith(prefix) ? label.slice(prefix.length) : label;
   }
+  state.environments = [];
+  state.commonCare = [];
+  for (const page of sorted) {
+    const key = propertyText(page.properties.이동ID);
+    const date = page.properties.날짜?.date?.start?.slice(0, 10);
+    if (!date) continue;
+    const recordedAt = page.created_time ?? `${date}T00:00:00Z`;
+    if (key.startsWith("environment:")) {
+      const locationId = propertyText(page.properties.위치ID);
+      const { environment, note } = readEnvironmentMemo(propertyText(page.properties.메모));
+      if (environment && LOCATIONS.some((item) => item.id === locationId)) state.environments.push({ ...environment, id: page.id, locationId, date, recordedAt, note });
+    }
+    if (key.startsWith("common:")) state.commonCare.push({ id: page.id, date, recordedAt, title: propertyText(page.properties.이름), note: propertyText(page.properties.메모) });
+  }
   const movements = sorted.filter((page) => Boolean(page.properties.식물?.relation?.[0]?.id));
   movements.sort((a, b) => (a.properties.날짜?.date?.start ?? "").localeCompare(b.properties.날짜?.date?.start ?? "") || (a.created_time ?? "").localeCompare(b.created_time ?? ""));
   for (const page of movements) {
@@ -59,7 +74,8 @@ export function locationStateFromPages(pages: LocationPage[]): LocationState {
     if (!plantId || !hasNotionPageId(plantId) || !date || !LOCATIONS.some((item) => item.id === to)) continue;
     const from = state.positions[plantId] ?? null;
     state.positions[plantId] = to;
-    state.history.unshift({ id: page.id, plantId, plantName: propertyText(page.properties.이름).replace(/ 위치 이동$/, "") || "식물", from, to, date, reason: propertyText(page.properties.메모), recordedAt: page.created_time ?? `${date}T00:00:00Z` });
+    const { note, environment } = readEnvironmentMemo(propertyText(page.properties.메모));
+    state.history.unshift({ id: page.id, plantId, plantName: propertyText(page.properties.이름).replace(/ 위치 이동$/, "") || "식물", from, to, date, reason: note, recordedAt: page.created_time ?? `${date}T00:00:00Z`, ...(environment ? { environment } : {}), destinationLabel: propertyText(page.properties.위치) || locationLabel(to) });
   }
   return state;
 }
@@ -67,15 +83,16 @@ export function locationStateFromPages(pages: LocationPage[]): LocationState {
 export async function createLocationPage(connection: { token: string; source: string }, input: {
   plantId?: string; plantName?: string; from?: string | null; to: string; label: string;
   date: string; note: string; operationKey: string; labels?: Record<string, string>;
+  environment?: LocationEnvironment; kind?: "environment" | "common"; title?: string;
 }) {
   return readNotionJson<LocationPage>(await fetch(`${API}/pages`, {
     method: "POST", headers: createNotionHeaders(connection.token),
     body: JSON.stringify({ parent: { type: "data_source_id", data_source_id: connection.source }, properties: {
-      이름: { title: [{ text: { content: input.plantId ? `${input.plantName} 위치 이동` : "공간 이름 변경" } }] },
+      이름: { title: [{ text: { content: input.kind === "common" ? input.title : input.kind === "environment" ? `${input.label} 온습도` : input.plantId ? `${input.plantName} 위치 이동` : "공간 이름 변경" } }] },
       날짜: { date: { start: input.date } }, 유형: { select: { name: "위치" } },
       ...(input.plantId ? { 식물: { relation: [{ id: input.plantId }] } } : {}),
       위치: richText(input.label), 위치ID: richText(input.to), 이동ID: richText(input.operationKey),
-      "이전 위치": richText(input.plantId ? locationLabel(input.from, input.labels) : ""), 메모: richText(input.note),
+      "이전 위치": richText(input.plantId ? locationLabel(input.from, input.labels) : ""), 메모: richText(input.environment ? environmentMemo(input.note, input.environment) : input.note),
     } }),
   }));
 }

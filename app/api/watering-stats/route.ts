@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { hasNotionPageId } from "@/lib/notion";
 import { readWateringHistory } from "@/lib/watering-history";
-import { calculateWateringStats } from "@/lib/watering";
+import { calculateWateringStats, normalizeDay, seoulDate } from "@/lib/watering";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +12,9 @@ export async function GET(request: Request) {
   try {
     const pages = await readWateringHistory({ property: "식물", relation: { contains: plantId } });
     const dates = pages.flatMap((page) => page.properties["날짜"]?.date?.start ?? []);
-    return NextResponse.json(calculateWateringStats(dates), { headers: { "Cache-Control": "no-store" } });
+    const today = seoulDate();
+    const wateringDates = [...new Set(dates.map(normalizeDay).filter((day): day is string => Boolean(day && day <= today)))].sort();
+    return NextResponse.json({ ...calculateWateringStats(dates, today), wateringDates }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return NextResponse.json({ message: error instanceof Error ? error.message : "물주기 기록을 불러오지 못했습니다." }, { status: 500 });
   }

@@ -10,7 +10,7 @@ function formatDate(value?: string) {
   return new Intl.DateTimeFormat("ko-KR", { month: "numeric", day: "numeric" }).format(new Date(`${value.slice(0, 10)}T12:00:00`));
 }
 
-export function PlantCareSummary({ plant, onOpenCalendar, vertical = false }: { plant: Plant; onOpenCalendar?: (plant: Plant) => void; vertical?: boolean }) {
+export function PlantCareSummary({ plant, onOpenCalendar, vertical = false, onStatsLoaded }: { plant: Plant; onOpenCalendar?: (plant: Plant) => void; vertical?: boolean; onStatsLoaded?: (stats: WateringStats) => void }) {
   const [stats, setStats] = useState<WateringStats | null>(null);
   const [error, setError] = useState("");
 
@@ -20,11 +20,11 @@ export function PlantCareSummary({ plant, onOpenCalendar, vertical = false }: { 
       .then(async (response) => {
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.message ?? "물주기 기록을 불러오지 못했습니다.");
-        if (!controller.signal.aborted) setStats(payload as WateringStats);
+        if (!controller.signal.aborted) { setStats(payload as WateringStats); onStatsLoaded?.(payload as WateringStats); }
       })
       .catch((reason) => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "물주기 기록을 불러오지 못했습니다."); });
     return () => controller.abort();
-  }, [plant.id]);
+  }, [plant.id, onStatsLoaded]);
 
   return <section className={vertical ? "profile-care" : "mt-6"} aria-label={`${plant.name} 관리 정보`}>
     <div className="care-overview">

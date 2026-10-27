@@ -9,6 +9,9 @@ import { PlantCoverEditor } from "@/components/PlantCoverEditor";
 import { PlantProfileEditor, type ProfileField } from "@/components/PlantProfileEditor";
 import { PlantPhotoCarousel } from "@/components/PlantPhotoCarousel";
 import { plantCarouselPhotos } from "@/lib/plant-photos";
+import { emptyLocationState, locationTimeline, parseLocationState, type LocationState } from "@/lib/plant-locations";
+import { environmentAt, formatLocationEnvironment } from "@/lib/location-environment";
+import type { WateringStats } from "@/lib/watering";
 
 type DetailsResponse = {
   observations?: PlantObservationSummary[];
@@ -31,6 +34,35 @@ export function PlantOverview({ plant, categories, onOpenCalendar, onPlantRename
   const [galleryPhotoId, setGalleryPhotoId] = useState(initialGalleryPhotoId);
   const [coverEditorOpen, setCoverEditorOpen] = useState(false);
   const [editingField, setEditingField] = useState<ProfileField | null>(null);
+  const [roomState, setRoomState] = useState<LocationState>(emptyLocationState);
+  const [roomError, setRoomError] = useState("");
+  const [wateringStats, setWateringStats] = useState<WateringStats | null>(null);
+
+  useEffect(() => {
+    let controller: AbortController;
+    function load() {
+      controller?.abort(); controller = new AbortController();
+      void fetch("/api/location-logs", { signal: controller.signal, cache: "no-store" }).then(async (response) => {
+        if (!response.ok) throw new Error();
+        const payload = await response.json();
+        if (payload.state) setRoomState(parseLocationState(JSON.stringify(payload.state)));
+        setRoomError("");
+      }).catch((reason) => { if (reason?.name !== "AbortError") setRoomError("위치·공통 기록을 불러오지 못했어요."); });
+    }
+    load();
+    window.addEventListener("plant-log:locations-updated", load);
+    return () => { controller.abort(); window.removeEventListener("plant-log:locations-updated", load); };
+  }, [plant.id]);
+  const entries = [
+    ...observations.map((observation) => {
+      const date = observation.date?.slice(0, 10) ?? "";
+      const position = roomState.history.find((record) => record.plantId.replaceAll("-", "") === plant.id.replaceAll("-", "") && record.date <= date);
+      const environment = position ? environmentAt(roomState.environments ?? [], position.to, date) ?? position.environment : undefined;
+      return { ...observation, recordedAt: "", title: observation.tags.join(" · ") || "관찰 기록", category: "", context: position ? `${position.destinationLabel || position.to} · ${formatLocationEnvironment(environment)}` : "" };
+    }),
+    ...locationTimeline(roomState, plant.id).map((record) => ({ ...record, url: undefined, tags: [] })),
+    ...(wateringStats?.wateringDates ?? []).map((date) => ({ id: `watering-${date}`, date, recordedAt: "", title: "물줌", category: "물주기", note: "", url: undefined, tags: [] })),
+  ].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "") || b.recordedAt.localeCompare(a.recordedAt));
 
   useEffect(() => {
     const controller = new AbortController();
@@ -73,26 +105,28 @@ export function PlantOverview({ plant, categories, onOpenCalendar, onPlantRename
         </div>
       </section>
 
-      <PlantCareSummary key={plant.id} plant={plant} onOpenCalendar={onOpenCalendar} vertical />
+      <PlantCareSummary key={plant.id} plant={plant} onOpenCalendar={onOpenCalendar} vertical onStatsLoaded={setWateringStats} />
       </section>
 
       {editingField ? <PlantProfileEditor plant={plant} field={editingField} categories={categories} onSaved={onPlantRenamed} onClose={() => setEditingField(null)} /> : null}
 
       <section className="section-divider">
-        <div className="flex items-center gap-2"><History size={17} className="text-[#8B929B]" aria-hidden="true" /><h2 className="section-title">최근 관찰</h2></div>
+        <div className="flex items-center gap-2"><History size={17} className="text-[#8B929B]" aria-hidden="true" /><h2 className="section-title">관리 타임라인</h2></div>
         {isLoading ? <p className="py-6 text-center text-sm text-[#909090]">기록을 불러오는 중...</p> : null}
         {!isLoading && error ? <p className="mt-3 rounded-2xl bg-red-50 px-3 py-3 text-sm text-red-700">{error}</p> : null}
-        {!isLoading && !error && !observations.length ? <p className="py-6 text-center text-sm text-[#909090]">아직 관찰 기록이 없어요.</p> : null}
-        {observations.length ? <ol className="editorial-journal mt-5">{observations.map((observation) => (
+        {roomError ? <p className="mt-3 text-xs text-[#8B929B]">{roomError}</p> : null}
+        {!isLoading && !error && !entries.length ? <p className="py-6 text-center text-sm text-[#909090]">아직 관찰 기록이 없어요.</p> : null}
+        {entries.length ? <ol className="editorial-journal mt-5">{entries.map((observation) => (
           <li key={observation.id} className="editorial-entry">
             <span className="editorial-entry-number" aria-hidden="true" />
             <div className="min-w-0">
               <time className="mb-2 block text-xs text-[#909090]">{formatDate(observation.date)}</time>
               <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold leading-6">{observation.tags.join(" · ") || "관찰 기록"}</h3>
+                <h3 className="text-sm font-semibold leading-6">{observation.category ? <span className="mr-1 text-xs text-[#4263EB]">{observation.category} · </span> : null}{observation.title}</h3>
                 {observation.url ? <a href={observation.url} target="_blank" rel="noreferrer" aria-label="Notion에서 관찰 기록 열기" className="grid h-8 w-8 shrink-0 place-items-center text-[#909090]"><ExternalLink size={14} aria-hidden="true" /></a> : null}
               </div>
               {observation.note ? <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-[#555954]">{observation.note}</p> : null}
+              {"context" in observation && observation.context ? <p className="mt-2 text-xs leading-5 text-[#8B929B]">{observation.context}</p> : null}
             </div>
           </li>
         ))}</ol> : null}

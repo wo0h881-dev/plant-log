@@ -122,3 +122,11 @@
 .spaces-modal select, .spaces-modal input, .spaces-modal textarea { min-width: 0; width: 100%; min-height: 46px; background: #f5f6f8; border-radius: 7px; padding: 12px; font-size: 14px; font-weight: 400; }
 @media (min-width: 640px) { .space-room { height: 470px; } .spaces-intro { padding-top: 24px; } }
 @media (max-width: 359px) { .spaces-body, .spaces-intro { padding-left: 18px; padding-right: 18px; } .space-room { height: 350px; } }
+.spaces-environment { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; margin-bottom: 18px; border-radius: 20px; background: #f3f6ff; }
+.spaces-environment > div { min-width: 0; }
+.spaces-environment strong { display: block; font-size: 14px; overflow-wrap: anywhere; }
+.spaces-environment small { display: block; margin-top: 5px; font-size: 11px; color: #8b929b; }
+.spaces-environment button, .spaces-history-heading > button { flex-shrink: 0; border-radius: 18px; padding: 10px; font-size: 11px; color: #4263eb; background: #fff; }
+.spaces-history-heading { display: flex; align-items: center; gap: 8px; }
+.spaces-history-heading .spaces-history-toggle { flex: 1; min-width: 0; }
+.spaces-move-environment { font-size: 12px; line-height: 1.7; color: #4263eb; overflow-wrap: anywhere; }

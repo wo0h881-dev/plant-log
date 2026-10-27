@@ -5,7 +5,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Download, History, Layers3, MapPin, Pencil, Search, X } from "lucide-react";
 import { PlantRoomIsometric } from "@/components/PlantRoomIsometric";
 import { PlantCoverThumbnail } from "@/components/PlantCoverThumbnail";
-import { emptyLocationState, LOCATION_GROUPS, LOCATIONS, LOCATION_STORAGE_KEY, locationLabel as defaultLocationLabel, parseLocationState, recordMovement, type LocationState } from "@/lib/plant-locations";
+import { RoomRecordDialog, type RoomRecordInput } from "@/components/RoomRecordDialog";
+import { environmentAt, formatLocationEnvironment } from "@/lib/location-environment";
+import { emptyLocationState, LOCATION_GROUPS, LOCATIONS, LOCATION_STORAGE_KEY, locationLabel as defaultLocationLabel, locationTimeline, parseLocationState, recordMovement, type LocationState } from "@/lib/plant-locations";
 import { matchesPlantSearch } from "@/lib/plant-search";
 import type { Plant } from "@/types/plant";
 import "./plant-spaces.css";
@@ -40,6 +42,7 @@ export function PlantSpaces({ embedded = false }: { embedded?: boolean }) {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [cardsOpen, setCardsOpen] = useState(false);
+  const [recordKind, setRecordKind] = useState<"environment" | "common" | null>(null);
   const cardsBack = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -112,6 +115,27 @@ export function PlantSpaces({ embedded = false }: { embedded?: boolean }) {
   const group = LOCATION_GROUPS.find((item) => item.id === chosenLocation.groupId)!;
   const locationLabel = (id: string | null | undefined) => defaultLocationLabel(id, state.labels);
   const allChecked = displayed.length > 0 && displayed.every((plant) => selected.includes(plant.id));
+  const timeline = useMemo(() => locationTimeline(state), [state]);
+  const currentEnvironment = environmentAt(state.environments ?? [], location, today());
+
+  async function saveRoomRecord(input: RoomRecordInput) {
+    if (!storageReady || storageBlocked) throw new Error("storage unavailable");
+    if (persistence === "notion") {
+      const response = await fetch("/api/location-logs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+      const data = await response.json();
+      if (!response.ok || !data.success || !data.state) throw new Error("save failed");
+      setState(parseLocationState(JSON.stringify(data.state)));
+    } else {
+      const latest = parseLocationState(window.localStorage.getItem(LOCATION_STORAGE_KEY));
+      const record = { id: input.operationId, date: input.date, recordedAt: new Date().toISOString() };
+      const next: LocationState = input.kind === "environment"
+        ? { ...latest, environments: [...(latest.environments ?? []).filter((item) => item.id !== record.id), { ...record, locationId: input.locationId, note: input.note, ...input.environment }] }
+        : { ...latest, commonCare: [...(latest.commonCare ?? []).filter((item) => item.id !== record.id), { ...record, title: input.title!, note: input.note }] };
+      window.localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(next)); setState(next);
+    }
+    window.dispatchEvent(new Event("plant-log:locations-updated"));
+    setMessage(input.kind === "environment" ? "공간 온습도를 저장했어요." : "전체 공통 기록을 저장했어요.");
+  }
 
   function selectLocation(id: string) { setLocation(id); setScope(id); setQuery(""); setSelected([]); setMessage(""); setEditingName(false); setCardsOpen(false); }
   function changeScope(value: string) { setScope(value); setSelected([]); setQuery(""); setCardsOpen(false); }
@@ -147,6 +171,7 @@ export function PlantSpaces({ embedded = false }: { embedded?: boolean }) {
         try { await refreshLocations(); }
         catch { setError("저장 결과는 위와 같아요. 최신 위치를 불러오려면 새로고침해주세요. 같은 기록을 다시 만들 필요는 없어요."); }
         if (successes === results.length) { operation.current = null; setLocation(destination); setScope(destination); setQuery(""); setMoving(false); setReason(""); }
+        if (successes) window.dispatchEvent(new Event("plant-log:locations-updated"));
         return;
       }
       // Read immediately before saving so another tab's latest positions are not overwritten.
@@ -157,6 +182,7 @@ export function PlantSpaces({ embedded = false }: { embedded?: boolean }) {
       window.localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(next));
       setState(next); setLocation(destination); setScope(destination); setSelected([]); setQuery(""); setMoving(false); setReason(""); setError("");
       setMessage(`${added}개 식물의 ${latest.history.length ? "위치 변경" : "위치"}을 이 기기에 저장했어요.`);
+      window.dispatchEvent(new Event("plant-log:locations-updated"));
     } catch (cause) { setError(cause instanceof Error ? cause.message : "저장 공간이 부족하거나 저장이 차단되어 있어요."); }
     finally { savingNow.current = false; setSaving(false); }
   }
@@ -202,6 +228,7 @@ export function PlantSpaces({ embedded = false }: { embedded?: boolean }) {
         <div className="spaces-rename">{editingName ? <form onSubmit={(event) => { event.preventDefault(); saveName(); }}><input autoFocus aria-label="공간 이름" value={nameDraft} maxLength={40} onChange={(event) => setNameDraft(event.target.value)} /><button type="submit" className="icon-button" aria-label="공간 이름 저장" disabled={!nameDraft.trim() || storageBlocked}><Check size={17} /></button><button type="button" className="icon-button" aria-label="이름 변경 취소" onClick={() => setEditingName(false)}><X size={17} /></button></form> : <button type="button" onClick={() => { setNameDraft(state.labels?.[location] || chosenLocation.name); setEditingName(true); }} disabled={!storageReady || storageBlocked}><Pencil size={13} />선택한 공간 이름 변경</button>}</div>
       </section>
       <section className="spaces-plants" aria-label="공간별 식물">
+        <div className="spaces-environment"><div><strong>{formatLocationEnvironment(currentEnvironment)}</strong><small>{currentEnvironment ? "마지막 측정값 유지" : "아직 측정 기록이 없어요"}</small></div><button type="button" disabled={!storageReady || storageBlocked || saving} onClick={() => setRecordKind("environment")}>온습도 기록</button></div>
         <div className="spaces-section-heading"><h2>{scope === "unassigned" ? "아직 자리가 없는 식물" : scope === "all" ? "전체 식물" : state.labels?.[location] || chosenLocation.name}</h2><span>{loading ? "불러오는 중" : `${displayed.length}개`}</span></div>
         <div className="spaces-scope" role="group" aria-label="식물 목록 범위">
           <button type="button" aria-pressed={scope === location} onClick={() => changeScope(location)}>이 공간 {counts[location] || 0}</button>
@@ -217,7 +244,7 @@ export function PlantSpaces({ embedded = false }: { embedded?: boolean }) {
       {message ? <p role="status" className="spaces-success"><Check size={16} />{message}</p> : null}
       {saveResults.length ? <div className="spaces-save-results" aria-label="식물별 위치 저장 결과">{saveResults.map((result) => <p key={result.plantId} className={result.success ? "spaces-success" : "spaces-error"}>{plants.find((plant) => plant.id === result.plantId)?.name} · {result.success ? "저장 완료" : result.message || "저장 확인 필요"}</p>)}</div> : null}
       {error && !moving ? <p role="alert" className="spaces-error">{error}</p> : null}
-      <section className="spaces-history"><button type="button" className="spaces-history-toggle" aria-expanded={historyOpen} onClick={() => setHistoryOpen(!historyOpen)}><History size={18} /><span>이동 기록</span><small>{state.history.length}건</small><ChevronDown size={17} style={{ transform: historyOpen ? "rotate(180deg)" : undefined }} /></button>{historyOpen ? <div>{state.history.length ? state.history.map((record) => <article key={record.id}><time>{record.date}</time><strong>{record.plantName}</strong><p>{locationLabel(record.from)} <ArrowRight size={12} /> {locationLabel(record.to)}</p>{record.reason ? <small>{record.reason}</small> : null}</article>) : <p className="spaces-history-empty">아직 이동 기록이 없어요.</p>}</div> : null}</section>
+      <section className="spaces-history"><div className="spaces-history-heading"><button type="button" className="spaces-history-toggle" aria-expanded={historyOpen} onClick={() => setHistoryOpen(!historyOpen)}><History size={18} /><span>관리 타임라인</span><small>{timeline.length}건</small><ChevronDown size={17} style={{ transform: historyOpen ? "rotate(180deg)" : undefined }} /></button><button type="button" disabled={!storageReady || storageBlocked || saving} onClick={() => setRecordKind("common")}>공통 기록 추가</button></div>{historyOpen ? <div>{timeline.length ? timeline.map((record) => <article key={record.id}><time>{record.date}</time><strong>{record.category}</strong><p>{record.title}</p>{record.note ? <small>{record.note}</small> : null}</article>) : <p className="spaces-history-empty">아직 관리 기록이 없어요.</p>}</div> : null}</section>
     </div>
     {cardsOpen ? <section role="dialog" aria-modal="true" aria-label="공간 안의 식물 카드" className="spaces-cards-screen">
       <header className="spaces-cards-header"><button ref={cardsBack} type="button" className="icon-button" aria-label="식물방으로 돌아가기" onClick={() => setCardsOpen(false)}><ArrowLeft size={21} /></button><h2>{locationLabel(location)}</h2><span>{counts[location] || 0}개</span></header>
@@ -236,6 +263,7 @@ export function PlantSpaces({ embedded = false }: { embedded?: boolean }) {
         <p className="spaces-moving-names">{selectedPlants.slice(0, 3).map((plant) => plant.name).join(", ")}{selected.length > 3 ? ` 외 ${selected.length - 3}개` : ""}</p>
         <label>옮길 공간<select value={destination} onChange={(event) => setDestination(event.target.value)}>{LOCATION_GROUPS.map((item) => <optgroup key={item.id} label={item.name}>{LOCATIONS.filter((zone) => zone.groupId === item.id).map((zone) => <option key={zone.id} value={zone.id}>{locationLabel(zone.id)}</option>)}</optgroup>)}</select></label>
         <label>이동 날짜<input type="date" value={date} max={today()} onChange={(event) => setDate(event.target.value)} /></label>
+        <p className="spaces-move-environment">{locationLabel(destination)}({formatLocationEnvironment(environmentAt(state.environments ?? [], destination, date))})으로 이동</p>
         <label>메모<textarea value={reason} maxLength={500} rows={2} placeholder="빛이 더 잘 드는 자리로 옮겼어요" onChange={(event) => setReason(event.target.value)} /></label>
         {error ? <p role="alert" className="spaces-error">{error}</p> : null}
         {saveResults.some((result) => !result.success) ? <div role="status" className="spaces-error">{saveResults.filter((result) => !result.success).map((result) => <p key={result.plantId}>{plants.find((plant) => plant.id === result.plantId)?.name} · {result.message || "저장 확인 필요"}</p>)}</div> : null}
@@ -243,5 +271,6 @@ export function PlantSpaces({ embedded = false }: { embedded?: boolean }) {
         </fieldset>
       </section>
     </div> : null}
+    {recordKind ? <RoomRecordDialog kind={recordKind} locationId={location} locationName={locationLabel(location)} current={currentEnvironment} onSave={saveRoomRecord} onClose={() => setRecordKind(null)} /> : null}
   </div>;
 }

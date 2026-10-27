@@ -34,6 +34,8 @@ const statsApi = require("../app/api/watering-stats/route.ts");
 const { isRecentObservation } = require("../lib/notion-observation.ts");
 const { parseNotionPlantPage, parseNotionPlantPages } = require("../lib/plants.ts");
 const { LOCATIONS, LOCATION_GROUPS, emptyLocationState, parseLocationState, recordMovement } = require("../lib/plant-locations.ts");
+const { locationTimeline } = require("../lib/plant-locations.ts");
+const { environmentAt, isEnvironment, formatLocationEnvironment } = require("../lib/location-environment.ts");
 const plantId = "11111111-1111-4111-8111-111111111111";
 const originalFetch = global.fetch;
 const envKeys = ["NOTION_TOKEN", "NOTION_PLANTS_DATA_SOURCE_ID", "NOTION_DATA_SOURCE_ID", "NOTION_DATABASE_ID", "NOTION_WATERING_DATA_SOURCE_ID", "NOTION_SETTINGS_DATA_SOURCE_ID", "NOTION_SETTINGS_DATABASE_ID"];
@@ -702,4 +704,60 @@ test("location API rejects invalid input, foreign plants and absent connections 
   assert.equal(foreign.results[0].success, false);
   delete process.env.NOTION_TOKEN;
   assert.equal((await locationsApi.GET()).status, 503);
+});
+
+test("room environment retains each last known field and ignores measurements after the event day", () => {
+  const environments = [
+    { id: "a", locationId: "left-five:2", date: "2026-10-20", recordedAt: "2026-10-20T00:00:00Z", temperature: 26, humidity: 85 },
+    { id: "b", locationId: "left-five:2", date: "2026-10-23", recordedAt: "2026-10-23T00:00:00Z", temperature: 27 },
+    { id: "c", locationId: "left-five:2", date: "2026-10-25", recordedAt: "2026-10-25T00:00:00Z", humidity: 90 },
+  ];
+  assert.deepEqual(environmentAt(environments, "left-five:2", "2026-10-24"), { temperature: 27, humidity: 85 });
+  assert.deepEqual(environmentAt(environments, "left-five:2", "2026-11-01"), { temperature: 27, humidity: 90 });
+  assert.equal(environmentAt(environments, "left-five:1", "2026-11-01"), undefined);
+  const state = { ...emptyLocationState(), environments };
+  const moved = recordMovement(state, trialPlants, "left-five:2", "2026-10-24", "자리 이동", "snapshot", trialNow);
+  assert.deepEqual(moved.history[0].environment, { temperature: 27, humidity: 85 });
+  assert.match(locationTimeline(moved, trialPlants[0].id)[0].title, /미니온실 2번\(27℃ \/ 85%\)으로 이동/);
+  assert.equal(formatLocationEnvironment({ temperature: 0, humidity: 0 }), "0℃ / 0%");
+  assert.equal(isEnvironment({ temperature: Infinity }), false);
+});
+
+test("Notion stores environment readings once and snapshots movements without changing old history", async () => {
+  const mock = mockLocationNotion();
+  const payload = { kind: "environment", locationId: "left-five:5", date: "2026-10-23", environment: { temperature: 26, humidity: 85 }, note: "첫 측정", operationId: locationOperation };
+  for (let i = 0; i < 2; i++) assert.equal((await locationsApi.POST(locationRequest(payload))).status, 200);
+  assert.equal(mock.pages.length, 1);
+  assert.equal(mock.pages[0].properties.식물, undefined);
+  await locationsApi.POST(locationRequest(locationPayload()));
+  let state = locationStateFromPages(mock.pages);
+  assert.deepEqual(state.history[0].environment, { temperature: 26, humidity: 85 });
+  assert.equal(state.history[0].reason, "빛 조절");
+  await locationsApi.POST(locationRequest({ ...payload, date: "2026-10-25", environment: { humidity: 90 }, operationId: secondLocationPlantId }));
+  state = locationStateFromPages(mock.pages);
+  assert.deepEqual(environmentAt(state.environments, "left-five:5", "2026-10-26"), { temperature: 26, humidity: 90 });
+  assert.deepEqual(state.history[0].environment, { temperature: 26, humidity: 85 });
+  assert.equal(state.environments[0].note, "첫 측정");
+  assert.equal(state.environments.length, 2);
+});
+
+test("shared care creates one event, appears on every plant timeline, and never changes positions", async () => {
+  const mock = mockLocationNotion();
+  const input = { kind: "common", date: "2026-10-24", title: "뿌리깍지벌레 발견", note: "코니도 입제 처리", operationId: locationOperation };
+  for (let i = 0; i < 2; i++) assert.equal((await locationsApi.POST(locationRequest(input))).status, 200);
+  const state = locationStateFromPages(mock.pages);
+  assert.equal(mock.pages.length, 1); assert.equal(state.commonCare.length, 1);
+  assert.deepEqual(state.positions, {}); assert.equal(state.history.length, 0);
+  for (const id of [plantId, secondLocationPlantId]) {
+    assert.equal(locationTimeline(state, id)[0].category, "전체 공통");
+    assert.equal(locationTimeline(state, id)[0].note, "코니도 입제 처리");
+  }
+});
+
+test("room environment and common record validation rejects invalid input before Notion writes", async () => {
+  for (const environment of [{}, { temperature: 81 }, { humidity: 101 }, { temperature: "26" }, { humidity: null }]) {
+    assert.equal((await locationsApi.POST(locationRequest({ kind: "environment", locationId: "left-five:2", date: "2026-10-24", environment, operationId: locationOperation }))).status, 400);
+  }
+  assert.equal((await locationsApi.POST(locationRequest({ kind: "common", date: "2026-02-30", title: "기록", operationId: locationOperation }))).status, 400);
+  assert.equal((await locationsApi.POST(locationRequest({ kind: "common", date: "2026-10-24", title: " ", operationId: locationOperation }))).status, 400);
 });

@@ -8,6 +8,7 @@ export type WateringStats = {
   averageDays?: number;
   wateringDays: number;
   recentIntervals: number;
+  wateringDates?: string[];
 };
 
 export function seoulDate(date = new Date()) {
