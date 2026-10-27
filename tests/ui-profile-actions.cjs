@@ -18,13 +18,14 @@ async function main() {
       const svg = await fs.readFile(path.join(__dirname, "../public/icon.svg"));
       await page.route("**/fixture/**", (route) => route.fulfill({ contentType: "image/svg+xml", body: svg }));
       await page.route("**/_next/image?**", (route) => route.fulfill({ contentType: "image/svg+xml", body: svg }));
-      let watering; let observation; let edit;
+      let watering; let observation; let edit; let failWatering = true;
       await page.route("**/api/**", async (route) => {
         const req = route.request(); const url = new URL(req.url()); let data = {};
         if (url.pathname === "/api/plants") {
           if (req.method() === "PATCH") { edit = req.postDataJSON(); Object.assign(plant, edit); data = { plant }; }
           else data = { plants: [plant], source: "notion" };
         } else if (url.pathname === "/api/watering-logs") {
+          if (req.method() === "POST" && failWatering) { failWatering = false; return route.fulfill({ json: { successCount: 0, failureCount: 1, results: [{ plantId: plant.id, plantName: plant.name, ok: false }] } }); }
           if (req.method() === "POST") { watering = req.postDataJSON(); data = { successCount: 1, results: [{ plantId: plant.id, plantName: plant.name, ok: true }] }; }
           else data = { plants: [] };
         } else if (url.pathname === "/api/plant-logs") { if (req.method() === "POST") observation = req.postData(); data = {}; }
@@ -44,8 +45,12 @@ async function main() {
       await page.getByLabel("물 준 날짜", { exact: true }).fill("2026-10-01");
       await page.locator('[data-screen="water"]').getByRole("checkbox").first().click();
       await page.getByRole("button", { name: /물주기 저장/ }).click();
+      await page.getByRole("button", { name: "실패한 1개 다시 저장", exact: true }).waitFor();
+      assert.equal(await page.locator('[data-screen="water"]').getByRole("checkbox", { checked: true }).count(), 1);
+      await page.getByRole("button", { name: "실패한 1개 다시 저장", exact: true }).click();
       await page.waitForFunction(() => document.body.textContent.includes("1개 식물의 물주기를 저장했습니다."));
       assert.equal(watering.wateredAt, "2026-10-01");
+      assert.equal(await page.locator('[data-screen="water"]').getByRole("checkbox", { checked: true }).count(), 0);
       await nav.getByRole("button", { name: "관찰일지", exact: true }).click();
       await page.getByLabel("관찰 날짜", { exact: true }).fill("2026-10-02");
       await page.getByRole("button", { name: "식물을 선택하세요", exact: true }).click();
@@ -60,6 +65,9 @@ async function main() {
       await page.waitForFunction(() => document.body.textContent.includes("관찰일지를 Notion에 저장했습니다."));
       assert.ok(observation.includes('name="createdAt"\r\n\r\n2026-10-02'));
       assert.ok(observation.includes("신엽"));
+      await page.getByRole("button", { name: "식물을 선택하세요", exact: true }).waitFor();
+      assert.equal(await page.getByLabel("메모", { exact: true }).inputValue(), "");
+      assert.equal(await page.locator('[data-screen="observation"] .status-chips button[aria-pressed="true"]').count(), 0);
       await nav.getByRole("button", { name: "내 식물", exact: true }).click();
       await page.locator('.app-header').getByRole("searchbox").fill(plant.name);
       await page.locator('.app-header').getByRole("button", { name: /밤비노 핑크/ }).click();

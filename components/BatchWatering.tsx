@@ -20,7 +20,8 @@ type BatchWateringProps = {
   onOpenCalendar?: (plant: Plant) => void;
   wateredAt?: string;
   onSavingChange?: (saving: boolean) => void;
-  onSelectionChange?: (ids: string[]) => void;
+  selectedIds: string[];
+  onSelectionChange: (ids: string[]) => void;
 };
 
 type WateringResult = { plantId: string; plantName: string; ok: boolean; message?: string };
@@ -46,10 +47,10 @@ export function BatchWatering({
   onOpenCalendar,
   wateredAt,
   onSavingChange,
+  selectedIds,
   onSelectionChange,
 }: BatchWateringProps) {
   const today = seoulDate();
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dismissedDueIds, setDismissedDueIds] = useState<string[]>([]);
   const [isDueOpen, setIsDueOpen] = useState(false);
   const [isPupsOpen, setIsPupsOpen] = useState(false);
@@ -104,7 +105,10 @@ export function BatchWatering({
     () => wateringPlants.filter((plant) => matchesPlantSearch(plant, query)),
     [query, wateringPlants],
   );
-  useEffect(() => { onSelectionChange?.(wateringPlants.filter((plant) => selectedIds.includes(plant.id)).map((plant) => plant.id)); }, [selectedIds, wateringPlants, onSelectionChange]);
+  useEffect(() => {
+    const eligibleIds = selectedIds.filter((id) => wateringPlants.some((plant) => plant.id === id));
+    if (!isListLoading && eligibleIds.length !== selectedIds.length) onSelectionChange(eligibleIds);
+  }, [selectedIds, wateringPlants, onSelectionChange, isListLoading]);
   const dueSelectedCount = duePlants.filter((plant) => selectedIdSet.has(plant.id)).length;
   const selectedWateringCount = wateringPlants.filter((plant) => selectedIdSet.has(plant.id)).length;
   const dueMaturePlants = duePlants.filter((plant) => plant.category.trim() !== "자구");
@@ -176,17 +180,17 @@ export function BatchWatering({
 
   function togglePlant(plantId: string) {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    setSelectedIds((current) =>
-      current.includes(plantId) ? current.filter((id) => id !== plantId) : [...current, plantId],
+    onSelectionChange(
+      selectedIds.includes(plantId) ? selectedIds.filter((id) => id !== plantId) : [...selectedIds, plantId],
     );
   }
 
   function toggleAllDuePlants() {
     const dueIds = duePlants.map((plant) => plant.id);
-    setSelectedIds((current) =>
+    onSelectionChange(
       areAllDueSelected
-        ? current.filter((id) => !dueIds.includes(id))
-        : [...new Set([...current, ...dueIds])],
+        ? selectedIds.filter((id) => !dueIds.includes(id))
+        : [...new Set([...selectedIds, ...dueIds])],
     );
   }
 
@@ -218,7 +222,7 @@ export function BatchWatering({
       const failureCount = payload.failureCount ?? failedIds.length;
 
       setResults(nextResults);
-      setSelectedIds(failedIds);
+      onSelectionChange(failedIds);
       if (wateredDate === today) {
         setDismissedDueIds((current) => [...new Set([...current, ...succeededIds])]);
       }

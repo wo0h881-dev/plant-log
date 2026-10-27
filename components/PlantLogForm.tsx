@@ -356,6 +356,7 @@ export function PlantLogForm() {
               onOpenCalendar={openCalendarForPlant}
               wateredAt={wateredDate}
               onSavingChange={setIsWaterSaving}
+              selectedIds={waterSelection}
               onSelectionChange={setWaterSelection}
             />
           </section>
@@ -439,7 +440,7 @@ export function PlantLogForm() {
         <button type="button" onClick={() => { setQuickAction(""); setIsAddingPlant(true); scrollPositions.current.profile = 0; changeTab("profile"); window.scrollTo(0, 0); }}>새 식물 추가</button>
         <button type="button" onClick={() => { setQuickAction(""); if (profilePlant && !selectedPlant) selectPlant(profilePlant); scrollPositions.current.observation = 0; changeTab("observation"); window.scrollTo(0, 0); }}>관찰일지 추가</button>
       </div></PlantDialog> : null}
-      {cycleEditorOpen ? <BulkWateringCycleEditor plants={plants.filter((plant) => waterSelection.includes(plant.id))} onSaved={handlePlantRenamed} onClose={() => setCycleEditorOpen(false)} /> : null}
+      {cycleEditorOpen ? <BulkWateringCycleEditor plants={plants.filter((plant) => waterSelection.includes(plant.id))} onSaved={(plant) => { handlePlantRenamed(plant); setWaterSelection((current) => current.filter((id) => id !== plant.id)); }} onClose={() => setCycleEditorOpen(false)} /> : null}
       <nav className="bottom-nav" aria-label="주요 화면">
         <div className="grid grid-cols-5 gap-1">
           {tabs.flatMap(({ id, label, icon }, index) => {
