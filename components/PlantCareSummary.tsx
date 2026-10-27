@@ -27,6 +27,7 @@ export function PlantCareSummary({ plant, onOpenCalendar, vertical = false }: { 
   }, [plant.id]);
 
   return <section className={vertical ? "profile-care" : "mt-6"} aria-label={`${plant.name} 관리 정보`}>
+    <div className="care-overview">
     <h2 className="section-title">{vertical ? "관리 정보" : `${plant.name} 관리 정보`}</h2>
     <div className="metric-grid">
       {([
@@ -38,7 +39,8 @@ export function PlantCareSummary({ plant, onOpenCalendar, vertical = false }: { 
         return onOpenCalendar ? <button key={label} type="button" onClick={() => onOpenCalendar(plant)} aria-label={`${plant.name} ${label} 캘린더 보기`} className="min-h-11 min-w-0 text-left">{content}</button> : <div key={label} className="min-w-0">{content}</div>;
       })}
     </div>
-    <div className="space-y-4 py-5">
+    </div>
+    <div className="care-actual space-y-4 py-5">
       <h3 className="text-sm font-semibold">실제 물주기</h3>
       {error ? <p role="status" className="text-xs text-red-700">{error}</p> : !stats ? <p className="text-xs text-[#909090]">기록을 확인하고 있어요.</p> : <>
         <dl className="space-y-3 text-xs">

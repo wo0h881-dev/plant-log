@@ -20,6 +20,11 @@ export function BulkWateringCycleEditor({ plants, onSaved, onClose }: { plants: 
   const pending = preview.filter((plant) => results[plant.id] !== true);
   const finished = preview.length > 0 && pending.length === 0;
 
+  function stepAmount(direction: -1 | 1) {
+    const next = (Number.isFinite(delta) ? delta : 0) + direction;
+    setAmount(String(next === 0 ? direction : next));
+  }
+
   async function save() {
     if (busy.current || !valid || !pending.length) return;
     busy.current = true; setSaving(true); setError("");
@@ -44,9 +49,9 @@ export function BulkWateringCycleEditor({ plants, onSaved, onClose }: { plants: 
     {!targets.length ? <p className="text-sm leading-6 text-[#8B929B]">물주기 목록에서 편집할 식물의 체크박스를 먼저 선택해주세요.</p> : <>
       <p className="text-sm text-[#8B929B]">선택한 {targets.length}개 식물의 기존 주기에 일수를 더해요.</p>
       <div className="cycle-stepper" aria-label="관수 주기 추가 일수">
-        <button type="button" disabled={saving || Boolean(plan)} onClick={() => setAmount(String((Number.isFinite(delta) ? delta : 0) - 1))} aria-label="1일 줄이기" title="1일 줄이기"><Minus size={20} /></button>
-        <label><input aria-label="추가할 일수" type="number" step="1" value={amount} disabled={saving || Boolean(plan)} onChange={(event) => setAmount(event.target.value)} /><span>일</span></label>
-        <button type="button" disabled={saving || Boolean(plan)} onClick={() => setAmount(String((Number.isFinite(delta) ? delta : 0) + 1))} aria-label="1일 늘리기" title="1일 늘리기"><Plus size={20} /></button>
+        <button type="button" disabled={saving || Boolean(plan)} onClick={() => stepAmount(-1)} aria-label="1일 줄이기" title="1일 줄이기"><Minus size={20} /></button>
+        <label><input aria-label="추가할 일수" type="number" step="1" value={amount} disabled={saving || Boolean(plan)} onChange={(event) => { const value = event.target.value; setAmount(value.trim() && Number(value) === 0 ? (delta < 0 ? "1" : "-1") : value); }} /><span>일</span></label>
+        <button type="button" disabled={saving || Boolean(plan)} onClick={() => stepAmount(1)} aria-label="1일 늘리기" title="1일 늘리기"><Plus size={20} /></button>
       </div>
       {!valid ? <p className="mb-3 text-xs text-red-700">0이 아닌 정수를 입력하고, 변경 후 주기가 1일 이상이 되게 해주세요.</p> : null}
       <ul className="cycle-preview">{preview.map((plant) => <li key={plant.id}><span>{plant.name}</span><span>{plant.previous === undefined ? "미설정" : `${plant.previous}일`} → {Number.isFinite(plant.next) ? `${plant.next}일` : "—"}<small>{results[plant.id] === true ? "저장 완료" : results[plant.id] === false ? "저장 실패" : ""}</small></span></li>)}</ul>
