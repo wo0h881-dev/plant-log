@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } 
 import dynamic from "next/dynamic";
 import { AlertCircle, ArrowLeft, Check, House, Pencil, RefreshCcw } from "lucide-react";
 import { PlantDialog } from "@/components/PlantDialog";
+import { RoomRecordDialog, type RoomRecordInput } from "@/components/RoomRecordDialog";
 import { HeaderDatePicker } from "@/components/HeaderDatePicker";
 import { BulkWateringCycleEditor } from "@/components/BulkWateringCycleEditor";
 import { AddPlantForm } from "@/components/AddPlantForm";
@@ -64,6 +65,8 @@ export function PlantLogForm() {
   const [quickAction, setQuickAction] = useState<"" | "menu">("");
   const [waterSelection, setWaterSelection] = useState<string[]>([]);
   const [cycleEditorOpen, setCycleEditorOpen] = useState(false);
+  const [commonOpen, setCommonOpen] = useState(false);
+  const [commonMessage, setCommonMessage] = useState("");
   const [spaceOrigin, setSpaceOrigin] = useState<"profile" | "more">("profile");
   const [wateredDate, setWateredDate] = useState(getTodayValue);
   const [isWaterSaving, setIsWaterSaving] = useState(false);
@@ -322,6 +325,14 @@ export function PlantLogForm() {
     } finally { observationSubmitting.current = false; }
   }
 
+  async function saveCommonNotice(input: RoomRecordInput) {
+    const response = await fetch("/api/location-logs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error("notice save failed");
+    setCommonMessage("전체 공지를 저장했어요.");
+    window.dispatchEvent(new Event("plant-log:locations-updated"));
+  }
+
   const tabs = [
     { id: "water" as const, label: "물주기", icon: "droplet" },
     { id: "observation" as const, label: "관찰일지", icon: "pen" },
@@ -331,13 +342,14 @@ export function PlantLogForm() {
 
   return (
     <main className="app-shell text-[#191F28]">
-      <header className={`app-header${activeTab === "water" ? " watering-header" : ""}`}>
+      <header className={`app-header${activeTab === "water" ? " watering-header" : activeTab === "observation" ? " observation-header" : ""}`}>
         <h1>{activeTab === "spaces" ? "식물방" : tabs.find((tab) => tab.id === activeTab)?.label}</h1>
         {activeTab === "profile" && !isAddingPlant ? <div className="header-search"><PlantSelect key="profile" includeDead plants={plants} value={profilePlant ? formatPlantName(profilePlant) : ""} query={profileQuery} recentPlants={[]} onQueryChange={(value) => { setProfileQuery(value); if (value !== profilePlant?.name) setProfilePlantId(""); }} onSelect={selectProfilePlant} variant="search" /></div> : null}
         {activeTab === "more" ? <div className="header-search"><PlantSelect key="calendar" plants={plants} value={calendarPlant ? formatPlantName(calendarPlant) : ""} query={calendarFilter.query} recentPlants={[]} onQueryChange={(value) => setCalendarFilter({ query: value, plantId: "" })} onSelect={(plant) => setCalendarFilter({ plantId: plant.id, query: plant.name })} variant="search" /></div> : null}
         {activeTab === "profile" || activeTab === "more" ? <button type="button" onClick={() => { setSpaceOrigin(activeTab === "more" ? "more" : "profile"); changeTab("spaces"); }} aria-label="식물방 열기" title="식물방" className="icon-button"><House size={22} /></button> : null}
         {activeTab === "spaces" ? <button type="button" onClick={() => changeTab(spaceOrigin)} aria-label={spaceOrigin === "more" ? "캘린더로 돌아가기" : "내 식물로 돌아가기"} title="돌아가기" className="icon-button"><ArrowLeft size={22} /></button> : null}
         {activeTab === "water" ? <button type="button" className="header-cycle-button" disabled={isWaterSaving || isPlantsLoading} onClick={() => setCycleEditorOpen(true)} aria-label="관수주기 편집"><Pencil size={13} aria-hidden="true" />관수주기</button> : null}
+        {activeTab === "observation" ? <button type="button" className="header-cycle-button" disabled={isPlantsLoading || observationSaveState === "saving"} onClick={() => { setCommonMessage(""); setCommonOpen(true); }}>전체 공지</button> : null}
         {activeTab === "water" || activeTab === "observation" ? <HeaderDatePicker label={activeTab === "water" ? "물 준 날짜" : "관찰 날짜"} value={activeTab === "water" ? wateredDate : observedDate} disabled={isPlantsLoading || (activeTab === "water" ? isWaterSaving : observationSaveState === "saving" || Boolean(recentObservationChoice))} onChange={activeTab === "water" ? setWateredDate : setObservedDate} /> : null}
       </header>
       <div className="app-content">
@@ -364,6 +376,7 @@ export function PlantLogForm() {
 
         {visitedTabs.includes("observation") ? (
           <section data-screen="observation" hidden={activeTab !== "observation"}>
+            {commonMessage ? <p role="status" className="mb-4 text-sm text-[#4263EB]">{commonMessage}</p> : null}
             <form onSubmit={saveObservation} className="space-y-6">
               <fieldset disabled={observationSaveState === "saving" || Boolean(recentObservationChoice)} className="space-y-6" aria-busy={observationSaveState === "saving"}>
               <PlantPhotoUploader files={photos} onChange={setPhotos} onCaptureDateChange={(date) => setObservedDate(date ?? getTodayValue())} onBusyChange={setIsCompressing} />
@@ -441,6 +454,7 @@ export function PlantLogForm() {
         <button type="button" onClick={() => { setQuickAction(""); if (profilePlant && !selectedPlant) selectPlant(profilePlant); scrollPositions.current.observation = 0; changeTab("observation"); window.scrollTo(0, 0); }}>관찰일지 추가</button>
       </div></PlantDialog> : null}
       {cycleEditorOpen ? <BulkWateringCycleEditor plants={plants.filter((plant) => waterSelection.includes(plant.id))} onSaved={(plant) => { handlePlantRenamed(plant); setWaterSelection((current) => current.filter((id) => id !== plant.id)); }} onClose={() => setCycleEditorOpen(false)} /> : null}
+      {commonOpen ? <RoomRecordDialog kind="common" locationId="" locationName="전체 식물" plants={plants} initialDate={observedDate} onSave={saveCommonNotice} onClose={() => setCommonOpen(false)} /> : null}
       <nav className="bottom-nav" aria-label="주요 화면">
         <div className="grid grid-cols-5 gap-1">
           {tabs.flatMap(({ id, label, icon }, index) => {

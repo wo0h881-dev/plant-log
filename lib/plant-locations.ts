@@ -5,7 +5,10 @@ export const LOCATION_STORAGE_KEY = "plant-log:location-trial:v1";
 export const LOCATION_GROUPS = [
   { id: "left-three", name: "3단장", description: "왼쪽 · 실습", levels: ["실습 1단", "실습 2단", "실습 3단"] },
   { id: "left-five", name: "5단장", description: "왼쪽 · 미니온실", levels: ["미니온실 1번", "미니온실 2번", "미니온실 3번", "4단", "5단"] },
-  { id: "lerberg", name: "레르베리", description: "가운데 · 흰색장", levels: ["실습 1단", "실습 2단", "실습 3단", "실습 4단"] },
+  { id: "center-white-1", name: "흰색 5단장 1", description: "가운데 · 왼쪽", levels: ["1단", "2단", "3단", "4단", "5단"] },
+  { id: "center-white-2", name: "흰색 5단장 2", description: "가운데 · 오른쪽", levels: ["1단", "2단", "3단", "4단", "5단"] },
+  { id: "lerberg", name: "레르베리", description: "오른쪽 · 흰색장", levels: ["실습 1단", "실습 2단", "실습 3단", "실습 4단"] },
+  { id: "right-trolley", name: "3단 트롤리", description: "오른쪽 · 가운데", levels: ["1단", "2단", "3단"] },
   { id: "right-black", name: "검은색장", description: "오른쪽", levels: ["온실", "실습"] },
 ] as const;
 
@@ -77,7 +80,7 @@ export function locationTimeline(state: LocationState, plantId?: string) {
     title: `${record.destinationLabel || locationLabel(record.to, state.labels)}${record.environment ? `(${formatLocationEnvironment(record.environment)})` : "(온습도 미기록)"}으로 이동`,
     note: record.reason, category: plantId ? "위치 이동" : record.plantName,
   }));
-  for (const record of state.commonCare ?? []) entries.push({ ...record, category: "전체 공통" });
+  for (const record of state.commonCare ?? []) if (!plantId || !record.excludedPlantIds?.some((id) => id.replaceAll("-", "").toLowerCase() === plantId.replaceAll("-", "").toLowerCase())) entries.push({ ...record, category: "전체 공지" });
   if (!plantId) {
     const measured = new Map<string, LocationEnvironment>();
     for (const record of (state.environments ?? []).toSorted((a, b) => a.date.localeCompare(b.date) || a.recordedAt.localeCompare(b.recordedAt))) {

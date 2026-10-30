@@ -14,6 +14,23 @@
 .space-isometric { position: relative; width: 100%; height: 300px; overflow: hidden; }
 .space-isometric canvas { display: block; width: 100%; height: 100%; }
 .space-isometric::after { content: ""; position: absolute; inset: 20px 28% 20px 44%; border-inline: 1px solid #e2e7ee; pointer-events: none; }
+.space-isometric.room-interior { height: 400px; }
+.space-isometric.room-interior .space-pin { width: 14px; min-width: 14px; height: 14px; font-size: 8px; }
+.room-interior .space-zone-count { min-width: 26px; height: 14px; padding-inline: 4px; font-size: 8px; }
+.room-interior::after { display: none; }
+.room-interior canvas { touch-action: pan-y; }
+.room-rack-label { position: absolute; top: -100px; left: -100px; transform: translate(-50%, -50%); padding: 6px 8px; border-radius: 12px; background: #fffffff2; border: 1px solid #dfe5ee; font-size: 10px; color: #65738b; white-space: nowrap; }
+.room-rack-label[aria-pressed="true"] { color: #4263eb; border-color: #aabcfb; background: #eef2ff; }
+.room-view-controls { position: absolute; bottom: 12px; right: 14px; display: flex; gap: 6px; }
+.room-view-controls button { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: #fff; color: #65738b; }
+.space-isometric-wrap:has(.room-interior) .space-isometric-headings { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding-inline: 14px; }
+.space-isometric-headings h2 { word-break: keep-all; overflow-wrap: anywhere; }
+@media (max-width: 359px) {
+  .space-isometric.room-interior { height: 330px; }
+  .space-isometric.room-interior .space-pin { width: 10px; min-width: 10px; height: 10px; font-size: 7px; }
+  .room-interior .space-zone-count { min-width: 20px; height: 10px; padding-inline: 2px; font-size: 7px; }
+  .room-interior .room-rack-label { font-size: 8px; padding: 4px 6px; }
+}
 .space-isometric .space-pin { width: 18px; min-width: 18px; height: 18px; font-size: 9px; }
 .space-zone-elements { display: contents; }
 .space-zone-count { position: absolute; left: -100px; top: -100px; transform: translate(-50%, -50%); pointer-events: none; display: grid; min-width: 31px; height: 22px; place-items: center; padding: 0 5px; border: 1px solid #dde4ef; border-radius: 6px; background: #fff; color: #3d4b60; font-size: 10px; font-weight: 750; white-space: nowrap; box-shadow: 0 1px 3px #20304715; }
@@ -46,7 +63,7 @@
 .spaces-note { display: flex; gap: 6px; align-items: center; padding: 12px 24px; color: #8993a2; font-size: 11px; }
 .spaces-note-dot { width: 5px; height: 5px; background: #8da4c4; border-radius: 50%; }
 .spaces-body { padding: 8px 24px; }
-.spaces-group-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 8px; background: #f1f3f7; margin-bottom: 24px; }
+.spaces-group-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 8px; background: #f1f3f7; margin-bottom: 24px; }
 .spaces-group-tabs button { min-height: 38px; font-size: 12px; color: #8390a2; border-radius: 6px; }
 .spaces-group-tabs button[aria-pressed="true"] { background: #fff; color: #202632; font-weight: 700; box-shadow: 0 1px 4px #1c28360a; }
 .spaces-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { LOCATIONS, locationLabel, recordMovement } from "@/lib/plant-locations";
-import { createLocationPage, locationConnection, locationStateFromPages, propertyText, readLocationPages } from "@/lib/notion-locations";
+import { createLocationPage, locationConnection, locationStateFromPages, propertyText, readLocationPages, readLocationState } from "@/lib/notion-locations";
 import { hasNotionPageId } from "@/lib/notion";
 import { PlantRequestError, readEditablePlant } from "@/lib/notion-plant-page";
 import { parseNotionPlantPage } from "@/lib/plants";
@@ -9,12 +9,15 @@ import { isEnvironment } from "@/lib/location-environment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-const fail = (error: unknown) => NextResponse.json({ message: error instanceof Error ? error.message : "위치 기록을 처리하지 못했어요." }, { status: error instanceof PlantRequestError ? error.status : 500 });
+const fail = (error: unknown) => {
+  const timeout = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+  return NextResponse.json({ message: timeout ? "노션 응답이 늦어지고 있어요. 기록은 유지되니 잠시 후 다시 확인해주세요." : error instanceof Error ? error.message : "위치 기록을 처리하지 못했어요." }, { status: timeout ? 503 : error instanceof PlantRequestError ? error.status : 500 });
+};
 
 export async function GET() {
   try {
     const connection = await locationConnection();
-    const state = locationStateFromPages(await readLocationPages(connection));
+    const state = await readLocationState(connection);
     return NextResponse.json({ state, source: "notion" }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return fail(error); }
 }
@@ -23,18 +26,19 @@ export async function POST(request: Request) {
   try {
     const payload = await request.json().catch(() => null);
     if (payload?.kind === "environment" || payload?.kind === "common") {
-      const { kind, date, operationId, locationId, environment, title, note = "" } = payload;
+      const { kind, date, operationId, locationId, environment, title, note = "", excludedPlantIds = [] } = payload;
       if (!hasNotionPageId(operationId) || typeof note !== "string" || note.length > 500 || typeof date !== "string") throw new PlantRequestError("날짜와 기록 내용을 확인해주세요.");
       try { recordMovement({ version: 1, positions: {}, history: [] }, [{ id: "validation", name: "validation" }], LOCATIONS[0].id, date, "", operationId); }
       catch { throw new PlantRequestError("오늘 또는 과거의 올바른 날짜를 선택해주세요."); }
       if (kind === "environment" && (!LOCATIONS.some((item) => item.id === locationId) || !isEnvironment(environment))) throw new PlantRequestError("온도(-50~80℃) 또는 습도(0~100%)를 입력해주세요.");
       if (kind === "common" && (typeof title !== "string" || !title.trim() || title.trim().length > 100)) throw new PlantRequestError("공통 기록 제목을 1~100자로 입력해주세요.");
+      if (kind === "common" && (!Array.isArray(excludedPlantIds) || excludedPlantIds.length > 500 || excludedPlantIds.some((id) => typeof id !== "string" || !hasNotionPageId(id)))) throw new PlantRequestError("공지에서 제외할 식물을 확인해주세요.");
       const connection = await locationConnection();
       const pages = await readLocationPages(connection);
       const key = `${kind}:${operationId}`;
       if (!pages.some((page) => propertyText(page.properties.이동ID) === key)) {
         const state = locationStateFromPages(pages);
-        const saved = await createLocationPage(connection, { kind, to: kind === "environment" ? locationId : "", label: kind === "environment" ? locationLabel(locationId, state.labels) : "전체 공통", date, note, operationKey: key, ...(kind === "environment" ? { environment } : { title: title.trim() }) });
+        const saved = await createLocationPage(connection, { kind, to: kind === "environment" ? locationId : "", label: kind === "environment" ? locationLabel(locationId, state.labels) : "전체 공통", date, note, operationKey: key, ...(kind === "environment" ? { environment } : { title: title.trim(), excludedPlantIds: [...new Set((excludedPlantIds as string[]).map((id) => id.replaceAll("-", "").toLowerCase()))] }) });
         pages.push(saved);
       }
       return NextResponse.json({ success: true, source: "notion", state: locationStateFromPages(pages) });

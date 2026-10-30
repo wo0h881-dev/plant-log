@@ -29,7 +29,7 @@ async function main() {
       const plan = page.getByRole("group", { name: "식물방 2.5D 배치도" });
       await plan.waitFor();
       assert.equal(await plan.locator("h2").count(), 3);
-      assert.equal(await plan.getByRole("button").count(), 14);
+      assert.equal(await plan.getByRole("button").count(), 13);
       await plan.locator("canvas").waitFor();
       await page.waitForFunction(() => document.querySelector('[data-zone="lerberg:1"]')?.style.left?.endsWith("px"));
       const pixels = await page.evaluate(() => {
@@ -52,12 +52,14 @@ async function main() {
       assert.ok(regions[0].x < regions[1].x && regions[1].x < regions[2].x);
       assert.ok(regions.every((region) => region.y === regions[0].y && region.width > 90));
       for (const name of ["3단장 · 실습 3단", "레르베리 · 실습 4단", "검은색장 · 온실"]) {
+        await plan.getByRole("button", { name: `${name.split(" · ")[0]} 선택`, exact: true }).click();
         const button = plan.getByRole("button", { name, exact: true });
         await button.click();
         assert.equal(await button.getAttribute("aria-pressed"), "true");
       }
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
       await page.screenshot({ path: path.join(directory, `room-${viewport.width}.png`) });
+      await plan.getByRole("button", { name: "5단장 선택", exact: true }).click();
       await page.getByRole("button", { name: "5단장 · 미니온실 1번", exact: true }).click();
       await page.getByRole("button", { name: /위치 미지정 3/ }).click();
       await page.getByRole("searchbox", { name: "이동할 식물 검색" }).fill("ㅂㅂㄴ");

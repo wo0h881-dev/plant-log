@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Download, History, Layers3, MapPin, Pencil, Search, X } from "lucide-react";
-import { PlantRoomIsometric } from "@/components/PlantRoomIsometric";
+import { PlantRoomInterior } from "@/components/PlantRoomInterior";
 import { PlantCoverThumbnail } from "@/components/PlantCoverThumbnail";
 import { RoomRecordDialog, type RoomRecordInput } from "@/components/RoomRecordDialog";
 import { environmentAt, formatLocationEnvironment } from "@/lib/location-environment";
@@ -42,7 +42,7 @@ export function PlantSpaces({ embedded = false }: { embedded?: boolean }) {
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [cardsOpen, setCardsOpen] = useState(false);
-  const [recordKind, setRecordKind] = useState<"environment" | "common" | null>(null);
+  const [recordKind, setRecordKind] = useState<"environment" | null>(null);
   const cardsBack = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -91,7 +91,16 @@ export function PlantSpaces({ embedded = false }: { embedded?: boolean }) {
       catch { setStorageBlocked(true); setError("다른 창의 위치 기록을 읽을 수 없어요."); }
     };
     window.addEventListener("storage", sync);
-    return () => { active = false; controller.abort(); window.removeEventListener("storage", sync); };
+    const refresh = () => {
+      if (source.current !== "notion") return;
+      void fetch("/api/location-logs", { signal: controller.signal, cache: "no-store" }).then(async (response) => {
+        const data = await response.json();
+        if (!response.ok || !data.state) throw new Error();
+        if (active) setState(parseLocationState(JSON.stringify(data.state)));
+      }).catch(() => { if (active) setError("새 관리 기록을 불러오지 못했어요. 기존 기록은 유지하고 있어요."); });
+    };
+    window.addEventListener("plant-log:locations-updated", refresh);
+    return () => { active = false; controller.abort(); window.removeEventListener("storage", sync); window.removeEventListener("plant-log:locations-updated", refresh); };
   }, []);
 
   useEffect(() => {
@@ -215,7 +224,7 @@ export function PlantSpaces({ embedded = false }: { embedded?: boolean }) {
   return <div className={`spaces-page${embedded ? " spaces-embedded" : ""}`}>
     <header className="spaces-header">{!embedded ? <Link href="/" aria-label="식물페이지로 돌아가기" className="icon-button"><ArrowLeft size={21} /></Link> : <span className="text-xs text-[#8B929B]">선반을 눌러 식물을 확인해요.</span>}{!embedded ? <span>식물방</span> : null}<button type="button" className="icon-button" onClick={download} title="위치 기록 백업" aria-label="위치 기록 백업"><Download size={19} /></button></header>
     {!embedded ? <div className="spaces-intro"><div><p className="spaces-eyebrow">MY PLANT ROOM</p><h1>초록이들의 자리</h1></div><span className="spaces-trial">{persistence === "notion" ? "나의 공간" : persistence === "local" ? "시험 공간" : "연결 확인"}</span></div> : null}
-    <PlantRoomIsometric selected={location} onSelect={selectLocation} counts={counts} labels={state.labels} />
+    <PlantRoomInterior selected={location} onSelect={selectLocation} counts={counts} labels={state.labels} />
     <div className="spaces-note"><span className="spaces-note-dot" />{persistence === "notion" ? "식물 세팅 변경 기록 DB와 연결되어 있어요" : persistence === "local" ? "개발 시험용 · 이 기기에만 저장돼요" : persistence === "error" ? "노션 연결을 확인해주세요" : "노션 위치 기록을 가져오고 있어요"}</div>
     <div className="spaces-body">
       <div className="spaces-group-tabs" aria-label="선반 선택">{LOCATION_GROUPS.map((item) => <button type="button" key={item.id} aria-pressed={group.id === item.id} onClick={() => selectLocation(`${item.id}:1`)}>{item.name}</button>)}</div>
@@ -244,7 +253,7 @@ export function PlantSpaces({ embedded = false }: { embedded?: boolean }) {
       {message ? <p role="status" className="spaces-success"><Check size={16} />{message}</p> : null}
       {saveResults.length ? <div className="spaces-save-results" aria-label="식물별 위치 저장 결과">{saveResults.map((result) => <p key={result.plantId} className={result.success ? "spaces-success" : "spaces-error"}>{plants.find((plant) => plant.id === result.plantId)?.name} · {result.success ? "저장 완료" : result.message || "저장 확인 필요"}</p>)}</div> : null}
       {error && !moving ? <p role="alert" className="spaces-error">{error}</p> : null}
-      <section className="spaces-history"><div className="spaces-history-heading"><button type="button" className="spaces-history-toggle" aria-expanded={historyOpen} onClick={() => setHistoryOpen(!historyOpen)}><History size={18} /><span>관리 타임라인</span><small>{timeline.length}건</small><ChevronDown size={17} style={{ transform: historyOpen ? "rotate(180deg)" : undefined }} /></button><button type="button" disabled={!storageReady || storageBlocked || saving} onClick={() => setRecordKind("common")}>공통 기록 추가</button></div>{historyOpen ? <div>{timeline.length ? timeline.map((record) => <article key={record.id}><time>{record.date}</time><strong>{record.category}</strong><p>{record.title}</p>{record.note ? <small>{record.note}</small> : null}</article>) : <p className="spaces-history-empty">아직 관리 기록이 없어요.</p>}</div> : null}</section>
+      <section className="spaces-history"><div className="spaces-history-heading"><button type="button" className="spaces-history-toggle" aria-expanded={historyOpen} onClick={() => setHistoryOpen(!historyOpen)}><History size={18} /><span>관리 타임라인</span><small>{timeline.length}건</small><ChevronDown size={17} style={{ transform: historyOpen ? "rotate(180deg)" : undefined }} /></button></div>{historyOpen ? <div>{timeline.length ? timeline.map((record) => <article key={record.id}><time>{record.date}</time><strong>{record.category}</strong><p>{record.title}</p>{record.note ? <small>{record.note}</small> : null}</article>) : <p className="spaces-history-empty">아직 관리 기록이 없어요.</p>}</div> : null}</section>
     </div>
     {cardsOpen ? <section role="dialog" aria-modal="true" aria-label="공간 안의 식물 카드" className="spaces-cards-screen">
       <header className="spaces-cards-header"><button ref={cardsBack} type="button" className="icon-button" aria-label="식물방으로 돌아가기" onClick={() => setCardsOpen(false)}><ArrowLeft size={21} /></button><h2>{locationLabel(location)}</h2><span>{counts[location] || 0}개</span></header>

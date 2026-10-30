@@ -566,9 +566,10 @@ test("observation rejects combined upload limit before external requests", async
   assert.equal((await observationApi.POST(request(form))).status, 400);
 });
 
-test("room defines all 14 spaces in bottom-to-top order including every five-tier shelf", () => {
-  assert.equal(LOCATIONS.length, 14);
-  assert.deepEqual(LOCATION_GROUPS.map((group) => group.levels.length), [3, 5, 4, 2]);
+test("room defines 27 spaces on three walls while preserving every original location ID", () => {
+  assert.equal(LOCATIONS.length, 27);
+  assert.deepEqual(LOCATION_GROUPS.map((group) => group.levels.length), [3, 5, 5, 5, 4, 3, 2]);
+  for (const group of ["left-three", "left-five", "lerberg", "right-black"]) assert.ok(LOCATIONS.some((location) => location.groupId === group));
   assert.equal(LOCATIONS.find((location) => location.id === "right-black:1").name, "온실");
   assert.equal(LOCATIONS.find((location) => location.id === "right-black:2").name, "실습");
   assert.equal(LOCATIONS.find((location) => location.id === "left-five:1").name, "미니온실 1번");
@@ -677,6 +678,18 @@ test("Notion location writes use the existing settings source and plant relation
   assert.equal(state.history.length, 1);
 });
 
+test("new white shelves and trolley save through the existing location database without changing original IDs", async () => {
+  const mock = mockLocationNotion();
+  for (const [index, destination] of ["center-white-1:5", "center-white-2:5", "right-trolley:3"].entries()) {
+    const operationId = (index + 100).toString(16).padStart(32, "0");
+    const response = await locationsApi.POST(locationRequest(locationPayload({ destination, operationId })));
+    assert.equal((await response.json()).results[0].success, true);
+    assert.equal(locationStateFromPages(mock.pages).positions[plantId], destination);
+  }
+  assert.equal(mock.pages.length, 3);
+  assert.ok(mock.bodies.every((body) => body.parent.data_source_id === plantId));
+});
+
 test("Notion location partial failures retain successes and retries only create missing records", async () => {
   const mock = mockLocationNotion({ failSecond: true });
   const payload = locationPayload({ plantIds: [plantId, secondLocationPlantId] });
@@ -758,7 +771,7 @@ test("shared care creates one event, appears on every plant timeline, and never 
   assert.equal(mock.pages.length, 1); assert.equal(state.commonCare.length, 1);
   assert.deepEqual(state.positions, {}); assert.equal(state.history.length, 0);
   for (const id of [plantId, secondLocationPlantId]) {
-    assert.equal(locationTimeline(state, id)[0].category, "전체 공통");
+    assert.equal(locationTimeline(state, id)[0].category, "전체 공지");
     assert.equal(locationTimeline(state, id)[0].note, "코니도 입제 처리");
   }
 });
@@ -769,4 +782,39 @@ test("room environment and common record validation rejects invalid input before
   }
   assert.equal((await locationsApi.POST(locationRequest({ kind: "common", date: "2026-02-30", title: "기록", operationId: locationOperation }))).status, 400);
   assert.equal((await locationsApi.POST(locationRequest({ kind: "common", date: "2026-10-24", title: " ", operationId: locationOperation }))).status, 400);
+});
+
+test("shared notices persist normalized exclusions, keep legacy notices, and split large Notion rich text safely", async () => {
+  const mock = mockLocationNotion();
+  const excludedPlantIds = Array.from({ length: 150 }, (_, index) => (index + 1).toString(16).padStart(32, "0"));
+  excludedPlantIds.push(plantId.toUpperCase());
+  const response = await locationsApi.POST(locationRequest({ kind: "common", date: "2026-10-24", title: "전체 처리", note: "메모 보존", excludedPlantIds, operationId: locationOperation }));
+  assert.equal(response.status, 200);
+  assert.ok(mock.bodies[0].properties.메모.rich_text.length > 1);
+  assert.ok(mock.bodies[0].properties.메모.rich_text.every((part) => part.text.content.length <= 1800));
+  const state = locationStateFromPages(mock.pages);
+  assert.equal(state.commonCare[0].note, "메모 보존");
+  assert.equal(locationTimeline(state, plantId).length, 0);
+  assert.equal(locationTimeline(state, secondLocationPlantId).length, 1);
+  assert.equal(locationTimeline(parseLocationState(JSON.stringify(state)), plantId).length, 0);
+  assert.equal((await locationsApi.POST(locationRequest({ kind: "common", date: "2026-10-24", title: "검증", excludedPlantIds: ["invalid"], operationId: locationOperation }))).status, 400);
+  assert.equal(mock.pages.length, 1);
+});
+
+test("simultaneous room GETs share one bounded Notion query without caching later reads or failures", async () => {
+  let reads = 0;
+  global.fetch = async (_url, options) => {
+    reads++; assert.ok(options.signal instanceof AbortSignal);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    return json({ results: [], has_more: false });
+  };
+  const responses = await Promise.all([locationsApi.GET(), locationsApi.GET(), locationsApi.GET()]);
+  assert.ok(responses.every((response) => response.status === 200));
+  assert.equal(reads, 1);
+  await locationsApi.GET(); assert.equal(reads, 2);
+  global.fetch = async () => { throw new DOMException("internal timeout", "TimeoutError"); };
+  const timedOut = await locationsApi.GET(); assert.equal(timedOut.status, 503);
+  assert.ok(!(await timedOut.text()).includes("internal timeout"));
+  global.fetch = async () => json({ results: [], has_more: false });
+  assert.equal((await locationsApi.GET()).status, 200);
 });

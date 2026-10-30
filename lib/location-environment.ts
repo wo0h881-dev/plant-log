@@ -2,7 +2,21 @@ export type LocationEnvironment = { temperature?: number; humidity?: number };
 export type EnvironmentRecord = LocationEnvironment & {
   id: string; locationId: string; date: string; recordedAt: string; note?: string;
 };
-export type CommonCareRecord = { id: string; date: string; recordedAt: string; title: string; note: string };
+export type CommonCareRecord = { id: string; date: string; recordedAt: string; title: string; note: string; excludedPlantIds?: string[] };
+
+const COMMON_MARKER = "\n[plant-log:common-care:v1]";
+export function commonCareMemo(note: string, excludedPlantIds: string[]) {
+  return excludedPlantIds.length ? `${note}${COMMON_MARKER}${JSON.stringify({ excludedPlantIds })}` : note;
+}
+export function readCommonCareMemo(note: string): { note: string; excludedPlantIds?: string[] } {
+  const index = note.lastIndexOf(COMMON_MARKER);
+  if (index < 0) return { note };
+  try {
+    const value: unknown = JSON.parse(note.slice(index + COMMON_MARKER.length));
+    if (value && typeof value === "object" && "excludedPlantIds" in value && Array.isArray(value.excludedPlantIds) && value.excludedPlantIds.every((id) => typeof id === "string" && /^[0-9a-f]{32}$/i.test(id.replaceAll("-", "")))) return { note: note.slice(0, index), excludedPlantIds: [...new Set(value.excludedPlantIds.map((id: string) => id.replaceAll("-", "").toLowerCase()))] };
+  } catch { /* Keep legacy memo text intact. */ }
+  return { note };
+}
 
 export function isEnvironment(value: unknown): value is LocationEnvironment {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;

@@ -238,6 +238,9 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
   .app-shell { max-width: 440px; margin: auto; box-shadow: 0 0 0 1px #eceef1; }
 }
 @media (max-width: 359px) {
+  .observation-header { gap: 6px; padding-inline: 16px; }
+  .observation-header h1 { font-size: 16px; }
+  .observation-header .header-cycle-button { padding-inline: 9px; }
   .app-content { padding-left: 18px; padding-right: 18px; }
   .header-cycle-button { padding-inline: 11px; font-size: 10px; }
 }
