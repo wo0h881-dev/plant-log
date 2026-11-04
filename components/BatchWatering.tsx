@@ -19,6 +19,8 @@ type BatchWateringProps = {
   onSelectPlant?: (plant: Plant) => void;
   onOpenCalendar?: (plant: Plant) => void;
   wateredAt?: string;
+  fertilizer?: string;
+  onComplete?: () => void;
   onSavingChange?: (saving: boolean) => void;
   selectedIds: string[];
   onSelectionChange: (ids: string[]) => void;
@@ -46,6 +48,8 @@ export function BatchWatering({
   onSelectPlant,
   onOpenCalendar,
   wateredAt,
+  fertilizer,
+  onComplete,
   onSavingChange,
   selectedIds,
   onSelectionChange,
@@ -209,6 +213,7 @@ export function BatchWatering({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           wateredAt: wateredDate,
+          ...(fertilizer ? { fertilizer } : {}),
           plants: selectedPlants.map(({ id, name }) => ({ id, name })),
         }),
       });
@@ -243,6 +248,7 @@ export function BatchWatering({
         refreshTodayWatered();
       }
       if (successCount) onWateringSaved?.();
+      if (successCount === selectedPlants.length && !failureCount) onComplete?.();
     } catch (error) {
       setSaveState("error");
       setMessage(error instanceof Error ? error.message : "물주기 기록 저장에 실패했습니다.");

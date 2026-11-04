@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   createWateringLogPage,
+  readWateringFertilizers,
   resolveDataSourceId,
 } from "@/lib/notion";
 import { readWateringHistory } from "@/lib/watering-history";
@@ -48,6 +49,16 @@ function readTitle(page: WateringLogPage) {
 export async function GET(request: Request) {
   const token = process.env.NOTION_TOKEN;
   const wateringDatabaseId = process.env.NOTION_WATERING_DATABASE_ID;
+  if (new URL(request.url).searchParams.get("options") === "fertilizer") {
+    const source = process.env.NOTION_WATERING_DATA_SOURCE_ID;
+    if (!token || (!source && !wateringDatabaseId)) return NextResponse.json({ message: "물주기 기록 DB 연결을 확인해주세요." }, { status: 503 });
+    try {
+      const options = await readWateringFertilizers(token, source || await resolveDataSourceId(token, wateringDatabaseId!));
+      return NextResponse.json({ options }, { headers: { "Cache-Control": "no-store" } });
+    } catch (error) {
+      return NextResponse.json({ message: error instanceof Error ? error.message : "비료 목록을 불러오지 못했어요." }, { status: 502 });
+    }
+  }
   const requestedDate = new URL(request.url).searchParams.get("date") || getSeoulDateValue();
 
   if (!token || (!wateringDatabaseId && !process.env.NOTION_WATERING_DATA_SOURCE_ID)) {
@@ -101,7 +112,7 @@ export async function POST(request: Request) {
   const wateringDatabaseId = process.env.NOTION_WATERING_DATABASE_ID;
   const configuredWateringDataSourceId = process.env.NOTION_WATERING_DATA_SOURCE_ID;
 
-  if (!token || !wateringDatabaseId) {
+  if (!token || (!wateringDatabaseId && !configuredWateringDataSourceId)) {
     return NextResponse.json(
       { message: "NOTION_TOKEN, NOTION_WATERING_DATABASE_ID를 설정하세요." },
       { status: 500 },
@@ -113,17 +124,24 @@ export async function POST(request: Request) {
       plants?: WateringPlant[];
       wateredAt?: string;
       note?: string;
+      fertilizer?: string;
     };
     const plants = payload.plants?.filter((plant) => plant.id && plant.name) ?? [];
     const wateredAt = payload.wateredAt || new Date().toISOString();
     const note = payload.note?.trim() ?? "물 줌";
+    if (payload.fertilizer !== undefined && (typeof payload.fertilizer !== "string" || !payload.fertilizer.trim() || payload.fertilizer.trim().length > 100 || /[,\r\n]/.test(payload.fertilizer))) {
+      return NextResponse.json({ message: "비료 이름을 쉼표 없이 1~100자로 입력해주세요." }, { status: 400 });
+    }
+    const fertilizer = payload.fertilizer?.trim();
 
     if (!plants.length) {
       return NextResponse.json({ message: "물 준 식물을 선택하세요." }, { status: 400 });
     }
 
     const wateringParentId =
-      configuredWateringDataSourceId || (await resolveDataSourceId(token, wateringDatabaseId));
+      configuredWateringDataSourceId || (await resolveDataSourceId(token, wateringDatabaseId!));
+    const options = fertilizer ? await readWateringFertilizers(token, wateringParentId, true) : [];
+    const selectedFertilizer = options.find((option) => option.trim().toLowerCase() === fertilizer?.toLowerCase()) ?? fertilizer;
     const results: WateringResult[] = [];
 
     for (const plant of plants) {
@@ -135,6 +153,7 @@ export async function POST(request: Request) {
           plantName: plant.name,
           wateredAt,
           note,
+          fertilizer: selectedFertilizer,
         });
 
         results.push({

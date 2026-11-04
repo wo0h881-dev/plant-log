@@ -65,6 +65,36 @@ function wateringPage(lastWateredAt, cycle = 2) {
   });
 }
 
+test("fertilizer uses the watering DB select property and leaves plain watering unchanged", async () => {
+  const calls = [];
+  let property;
+  global.fetch = async (url, options) => {
+    const body = options.body && JSON.parse(options.body);
+    calls.push({ url, method: options.method, body });
+    if (url.endsWith("/pages")) {
+      const name = body.properties.비료?.select.name;
+      if (name) property.select.options.push({ name });
+      return json({ id: plantId });
+    }
+    if (options.method === "PATCH") property = { type: "select", select: { options: [] } };
+    return json({ properties: property ? { 비료: property } : {} });
+  };
+  const save = (fertilizer) => wateringApi.POST(new Request("http://localhost/api/watering-logs", { method: "POST", body: JSON.stringify({ plants: [{ id: plantId, name: "핑크" }], fertilizer }) }));
+  assert.equal((await (await save()).json()).successCount, 1);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].body.properties.비료, undefined);
+  assert.equal((await save("A,B")).status, 400);
+  assert.equal((await (await save(" 액체 비료 ")).json()).successCount, 1);
+  assert.deepEqual(calls[2].body, { properties: { 비료: { select: {} } } });
+  assert.deepEqual(calls[3].body.properties.비료, { select: { name: "액체 비료" } });
+  const options = await wateringApi.GET(new Request("http://localhost/api/watering-logs?options=fertilizer"));
+  assert.deepEqual(await options.json(), { options: ["액체 비료"] });
+  property = { type: "rich_text" };
+  const before = calls.length;
+  assert.equal((await save("다른 비료")).status, 500);
+  assert.equal(calls.length, before + 1, "incompatible existing property is not changed");
+});
+
 test("plant list keeps cycle-day alerts and missing-date behavior", () => {
   const plants = parseNotionPlantPages([
     wateringPage("2026-10-21"), wateringPage("2026-10-22"),

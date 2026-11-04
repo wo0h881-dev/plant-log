@@ -2,7 +2,8 @@
 
 import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { AlertCircle, ArrowLeft, Check, House, Pencil, RefreshCcw } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, House, Pencil, RefreshCcw, Sprout } from "lucide-react";
+import { FertilizerPicker } from "@/components/FertilizerPicker";
 import { PlantDialog } from "@/components/PlantDialog";
 import { RoomRecordDialog, type RoomRecordInput } from "@/components/RoomRecordDialog";
 import { HeaderDatePicker } from "@/components/HeaderDatePicker";
@@ -69,6 +70,8 @@ export function PlantLogForm() {
   const [commonMessage, setCommonMessage] = useState("");
   const [spaceOrigin, setSpaceOrigin] = useState<"profile" | "more">("profile");
   const [wateredDate, setWateredDate] = useState(getTodayValue);
+  const [fertilizer, setFertilizer] = useState("");
+  const [fertilizerOpen, setFertilizerOpen] = useState(false);
   const [isWaterSaving, setIsWaterSaving] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
   const [purchaseSourceOptions, setPurchaseSourceOptions] = useState<string[]>([]);
@@ -349,6 +352,7 @@ export function PlantLogForm() {
         {activeTab === "profile" || activeTab === "more" ? <button type="button" onClick={() => { setSpaceOrigin(activeTab === "more" ? "more" : "profile"); changeTab("spaces"); }} aria-label="식물방 열기" title="식물방" className="icon-button"><House size={22} /></button> : null}
         {activeTab === "spaces" ? <button type="button" onClick={() => changeTab(spaceOrigin)} aria-label={spaceOrigin === "more" ? "캘린더로 돌아가기" : "내 식물로 돌아가기"} title="돌아가기" className="icon-button"><ArrowLeft size={22} /></button> : null}
         {activeTab === "water" ? <button type="button" className="header-cycle-button" disabled={isWaterSaving || isPlantsLoading} onClick={() => setCycleEditorOpen(true)} aria-label="관수주기 편집"><Pencil size={13} aria-hidden="true" />관수주기</button> : null}
+        {activeTab === "water" ? <button type="button" className="header-cycle-button header-fertilizer-button" disabled={isWaterSaving} onClick={() => setFertilizerOpen(true)} aria-label="비료 선택" title="비료 선택" aria-pressed={Boolean(fertilizer)}><Sprout size={14} aria-hidden="true" /><span>비료</span></button> : null}
         {activeTab === "observation" ? <button type="button" className="header-cycle-button" disabled={isPlantsLoading || observationSaveState === "saving"} onClick={() => { setCommonMessage(""); setCommonOpen(true); }}>전체 공지</button> : null}
         {activeTab === "water" || activeTab === "observation" ? <HeaderDatePicker label={activeTab === "water" ? "물 준 날짜" : "관찰 날짜"} value={activeTab === "water" ? wateredDate : observedDate} disabled={isPlantsLoading || (activeTab === "water" ? isWaterSaving : observationSaveState === "saving" || Boolean(recentObservationChoice))} onChange={activeTab === "water" ? setWateredDate : setObservedDate} /> : null}
       </header>
@@ -357,6 +361,7 @@ export function PlantLogForm() {
           <section data-screen="water" hidden={activeTab !== "water"}>
             <div className="mb-5 flex items-center justify-between gap-3">
               <p className="text-xs text-[#8B929B]">오늘 돌볼 식물들을 확인해요.</p>
+              {fertilizer ? <button type="button" className="status-chip min-w-0 break-all" aria-pressed="true" disabled={isWaterSaving} onClick={() => setFertilizerOpen(true)}>비료: {fertilizer}</button> : null}
             </div>
             <BatchWatering
               plants={plants}
@@ -367,6 +372,8 @@ export function PlantLogForm() {
               onSelectPlant={openPlantFromCalendar}
               onOpenCalendar={openCalendarForPlant}
               wateredAt={wateredDate}
+              fertilizer={fertilizer}
+              onComplete={() => setFertilizer("")}
               onSavingChange={setIsWaterSaving}
               selectedIds={waterSelection}
               onSelectionChange={setWaterSelection}
@@ -455,6 +462,7 @@ export function PlantLogForm() {
       </div></PlantDialog> : null}
       {cycleEditorOpen ? <BulkWateringCycleEditor plants={plants.filter((plant) => waterSelection.includes(plant.id))} onSaved={(plant) => { handlePlantRenamed(plant); setWaterSelection((current) => current.filter((id) => id !== plant.id)); }} onClose={() => setCycleEditorOpen(false)} /> : null}
       {commonOpen ? <RoomRecordDialog kind="common" locationId="" locationName="전체 식물" plants={plants} initialDate={observedDate} onSave={saveCommonNotice} onClose={() => setCommonOpen(false)} /> : null}
+      {fertilizerOpen ? <FertilizerPicker selected={fertilizer} onSelect={setFertilizer} onClose={() => setFertilizerOpen(false)} /> : null}
       <nav className="bottom-nav" aria-label="주요 화면">
         <div className="grid grid-cols-5 gap-1">
           {tabs.flatMap(({ id, label, icon }, index) => {

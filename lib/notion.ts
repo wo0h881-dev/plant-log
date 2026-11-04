@@ -53,6 +53,7 @@ type CreateWateringLogPageParams = {
   plantName: string;
   wateredAt: string;
   note: string;
+  fertilizer?: string;
 };
 
 type UpdatePlantSettingsPageParams = {
@@ -178,6 +179,20 @@ export async function getDataSourceOptions(token: string, dataSourceId: string, 
   return (await getDataSourceOptionGroups(token, dataSourceId))[propertyName] ?? [];
 }
 
+export async function readWateringFertilizers(token: string, sourceId: string, createIfMissing = false) {
+  const url = `${NOTION_API_BASE}/data_sources/${sourceId}`;
+  const headers = notionHeaders(token);
+  const source = await readNotionJson<NotionDataSource>(await fetch(url, { headers, cache: "no-store" }));
+  const property = source.properties?.["비료"];
+  if (property && property.type !== "select") throw new Error("노션 물주기 기록의 ‘비료’ 속성을 선택 유형으로 확인해주세요.");
+  if (!property && createIfMissing) {
+    await readNotionJson(await fetch(url, {
+      method: "PATCH", headers, body: JSON.stringify({ properties: { 비료: { select: {} } } }),
+    }));
+  }
+  return (property?.select?.options ?? []).flatMap((option) => option.name ? [option.name] : []);
+}
+
 export async function getDatabasePropertyOptions(token: string, databaseId: string, propertyName: string) {
   const dataSourceId = await resolveDataSourceId(token, databaseId);
   return getDataSourceOptions(token, dataSourceId, propertyName);
@@ -292,6 +307,7 @@ export async function createWateringLogPage({
   plantName,
   wateredAt,
   note,
+  fertilizer,
 }: CreateWateringLogPageParams) {
   return readNotionJson<{ id: string; url?: string }>(
     await fetch(`${NOTION_API_BASE}/pages`, {
@@ -316,6 +332,7 @@ export async function createWateringLogPage({
           물줌: {
             checkbox: true,
           },
+          ...(fertilizer ? { 비료: { select: { name: fertilizer } } } : {}),
           메모: {
             rich_text: note ? [{ text: { content: note } }] : [],
           },
