@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
 import {
   createWateringLogPage,
+  createPlantLogPage,
+  hasNotionPageId,
   readWateringFertilizers,
   resolveDataSourceId,
 } from "@/lib/notion";
 import { readWateringHistory } from "@/lib/watering-history";
+import type { WateredPlant } from "@/lib/watering";
 
 type WateringPlant = {
   id: string;
   name: string;
+  category?: string;
 };
 
 type WateringResult = {
@@ -17,6 +21,7 @@ type WateringResult = {
   ok: boolean;
   pageId?: string;
   message?: string;
+  observationWarning?: boolean;
 };
 
 type RichText = { plain_text?: string };
@@ -71,13 +76,16 @@ export async function GET(request: Request) {
 
   try {
     const pages = await readWateringHistory({ property: "날짜", date: { equals: requestedDate } });
-    const uniquePlants = new Map<string, WateringPlant>();
+    const uniquePlants = new Map<string, WateredPlant>();
 
     for (const page of pages) {
       const id = page.properties["식물"]?.relation?.[0]?.id ?? "";
       const name = readTitle(page);
       if (!name) continue;
-      uniquePlants.set(id || name, { id, name });
+      const fertilizer = page.properties["비료"]?.select?.name;
+      const fertilizerRatio = page.properties["비료 비율"]?.rich_text?.map((part) => part.plain_text ?? "").join("");
+      const existing = uniquePlants.get(id || name);
+      if (!existing || (!existing.fertilizer && fertilizer)) uniquePlants.set(id || name, { id, name, ...(fertilizer ? { fertilizer, fertilizerRatio } : {}) });
     }
 
     return NextResponse.json(
@@ -125,6 +133,7 @@ export async function POST(request: Request) {
       wateredAt?: string;
       note?: string;
       fertilizer?: string;
+      fertilizerRatio?: string;
     };
     const plants = payload.plants?.filter((plant) => plant.id && plant.name) ?? [];
     const wateredAt = payload.wateredAt || new Date().toISOString();
@@ -133,6 +142,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "비료 이름을 쉼표 없이 1~100자로 입력해주세요." }, { status: 400 });
     }
     const fertilizer = payload.fertilizer?.trim();
+    if (payload.fertilizerRatio !== undefined && (typeof payload.fertilizerRatio !== "string" || payload.fertilizerRatio.trim().length > 100 || !fertilizer)) {
+      return NextResponse.json({ message: "비료를 선택하고 비율을 100자 이내로 입력해주세요." }, { status: 400 });
+    }
+    const fertilizerRatio = payload.fertilizerRatio?.trim();
 
     if (!plants.length) {
       return NextResponse.json({ message: "물 준 식물을 선택하세요." }, { status: 400 });
@@ -140,7 +153,12 @@ export async function POST(request: Request) {
 
     const wateringParentId =
       configuredWateringDataSourceId || (await resolveDataSourceId(token, wateringDatabaseId!));
-    const options = fertilizer ? await readWateringFertilizers(token, wateringParentId, true) : [];
+    const observationDatabase = process.env.NOTION_DATABASE_ID;
+    const observationSource = fertilizer ? process.env.NOTION_DATA_SOURCE_ID || (observationDatabase ? await resolveDataSourceId(token, observationDatabase) : undefined) : undefined;
+    if (fertilizer && (!observationSource || observationSource === wateringParentId || plants.some((plant) => !hasNotionPageId(plant.id)))) {
+      return NextResponse.json({ message: "비료를 기록하려면 식물과 관찰일지 DB 연결을 확인해주세요." }, { status: 400 });
+    }
+    const options = fertilizer ? await readWateringFertilizers(token, wateringParentId, true, Boolean(fertilizerRatio)) : [];
     const selectedFertilizer = options.find((option) => option.trim().toLowerCase() === fertilizer?.toLowerCase()) ?? fertilizer;
     const results: WateringResult[] = [];
 
@@ -154,13 +172,22 @@ export async function POST(request: Request) {
           wateredAt,
           note,
           fertilizer: selectedFertilizer,
+          fertilizerRatio,
         });
+
+        let observationWarning = false;
+        if (selectedFertilizer && observationSource) {
+          try {
+            await createPlantLogPage({ token, parentId: observationSource, plantId: plant.id, plantName: plant.name, plantCategory: typeof plant.category === "string" ? plant.category : "", createdAt: wateredAt, tags: [selectedFertilizer], photos: [], note: fertilizerRatio ? `비료 비율: ${fertilizerRatio}` : "비료 사용" });
+          } catch { observationWarning = true; }
+        }
 
         results.push({
           plantId: plant.id,
           plantName: plant.name,
           ok: true,
           pageId: page.id,
+          ...(observationWarning ? { observationWarning } : {}),
         });
       } catch (error) {
         results.push({

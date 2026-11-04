@@ -1,6 +1,6 @@
 import type { Plant } from "@/types/plant";
 
-export type WateredPlant = { id: string; name: string };
+export type WateredPlant = { id: string; name: string; fertilizer?: string; fertilizerRatio?: string };
 export type WateringStats = {
   lastWateredAt?: string;
   daysSinceWatered?: number;

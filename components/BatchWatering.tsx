@@ -20,13 +20,14 @@ type BatchWateringProps = {
   onOpenCalendar?: (plant: Plant) => void;
   wateredAt?: string;
   fertilizer?: string;
+  fertilizerRatio?: string;
   onComplete?: () => void;
   onSavingChange?: (saving: boolean) => void;
   selectedIds: string[];
   onSelectionChange: (ids: string[]) => void;
 };
 
-type WateringResult = { plantId: string; plantName: string; ok: boolean; message?: string };
+type WateringResult = { plantId: string; plantName: string; ok: boolean; message?: string; observationWarning?: boolean };
 type WateringResponse = {
   successCount?: number;
   failureCount?: number;
@@ -49,6 +50,7 @@ export function BatchWatering({
   onOpenCalendar,
   wateredAt,
   fertilizer,
+  fertilizerRatio,
   onComplete,
   onSavingChange,
   selectedIds,
@@ -214,7 +216,8 @@ export function BatchWatering({
         body: JSON.stringify({
           wateredAt: wateredDate,
           ...(fertilizer ? { fertilizer } : {}),
-          plants: selectedPlants.map(({ id, name }) => ({ id, name })),
+          ...(fertilizer && fertilizerRatio ? { fertilizerRatio } : {}),
+          plants: selectedPlants.map(({ id, name, category }) => ({ id, name, category })),
         }),
       });
       const payload = (await response.json()) as WateringResponse;
@@ -232,17 +235,16 @@ export function BatchWatering({
         setDismissedDueIds((current) => [...new Set([...current, ...succeededIds])]);
       }
       setSaveState(failureCount ? "error" : "success");
-      setMessage(
-        failureCount
+      const summary = failureCount
           ? `${successCount}개 저장, ${failureCount}개 실패했습니다.`
-          : `${successCount}개 식물의 물주기를 저장했습니다.`,
-      );
+          : `${successCount}개 식물의 물주기를 저장했습니다.`;
+      setMessage(summary + (fertilizer && successCount ? ` 비료: ${fertilizer}${fertilizerRatio ? ` · ${fertilizerRatio}` : ""}` : ""));
 
       if (wateredDate === today && succeededIds.length) {
         const succeededPlants = selectedPlants.filter((plant) => succeededIds.includes(plant.id));
         setTodayWateredPlants((current) => {
           const unique = new Map(current.map((plant) => [plant.id || plant.name, plant]));
-          succeededPlants.forEach((plant) => unique.set(plant.id, { id: plant.id, name: plant.name }));
+          succeededPlants.forEach((plant) => unique.set(plant.id, { id: plant.id, name: plant.name, fertilizer, fertilizerRatio }));
           return [...unique.values()];
         });
         refreshTodayWatered();
@@ -343,13 +345,14 @@ export function BatchWatering({
         {isTodayLoading ? <div className="h-14 animate-pulse rounded-2xl bg-white" /> : todayWateringError ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-center text-xs text-red-700">오늘 기록을 불러오지 못했어요.</div> : todayWateredPlants.length ? (
           <div className="flex gap-2 overflow-x-auto pb-1">{todayWateredPlants.map((watered) => {
             const plant = watered.id ? plants.find((item) => item.id.replaceAll("-", "").toLowerCase() === watered.id?.replaceAll("-", "").toLowerCase()) : plants.find((item) => item.name === watered.name);
-            return <button key={watered.id || watered.name} type="button" disabled={!plant || !onSelectPlant} onClick={() => { if (plant) onSelectPlant?.(plant); }} aria-label={`${watered.name} 식물 상세 보기`} className="today-watered-plant"><PlantCoverThumbnail key={plant?.coverPhotoUrl ?? "no-cover"} src={plant?.coverPhotoUrl} /><span>{watered.name}</span></button>;
+            return <button key={watered.id || watered.name} type="button" disabled={!plant || !onSelectPlant} onClick={() => { if (plant) onSelectPlant?.(plant); }} aria-label={`${watered.name} 식물 상세 보기`} className="today-watered-plant"><PlantCoverThumbnail key={plant?.coverPhotoUrl ?? "no-cover"} src={plant?.coverPhotoUrl} /><span>{watered.name}</span>{watered.fertilizer ? <small className="w-full break-words text-[10px] text-[#4263EB]">{watered.fertilizer}{watered.fertilizerRatio ? <span className="block">{watered.fertilizerRatio}</span> : null}</small> : null}</button>;
           })}</div>
         ) : <div className="rounded-2xl bg-white px-4 py-3 text-center text-xs text-[#909090]">아직 오늘 물 준 식물이 없어요.</div>}
       </section>
 
       {message ? <div className={`rounded-2xl px-4 py-3 text-sm ${saveState === "error" ? "bg-red-50 text-red-700" : "bg-[#EEF2FF] text-[#4263EB]"}`}><div className="flex items-start gap-2">{saveState === "error" ? <AlertCircle size={17} className="mt-0.5 shrink-0" aria-hidden="true" /> : <Check size={17} className="mt-0.5 shrink-0" aria-hidden="true" />}<div><p className="font-semibold">{message}</p>{successfulResults.length ? <p className="mt-1">성공: {successfulResults.map((result) => result.plantName).join(", ")}</p> : null}{failedResults.length ? <p className="mt-1">실패: {failedResults.map((result) => result.plantName).join(", ")}</p> : null}</div></div></div> : null}
 
+      {results.some((result) => result.observationWarning) ? <p role="alert" className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900">물주기는 저장했지만 관찰일지를 확인하지 못했어요: {results.filter((result) => result.observationWarning).map((result) => result.plantName).join(", ")}. 노션 관찰일지를 확인해주세요.</p> : null}
       {selectedWateringCount ? <div className="save-dock"><button type="button" onClick={saveWateringLogs} disabled={saveState === "saving"} className="primary-button">{saveState === "saving" ? "저장 중..." : failedResults.length ? `실패한 ${selectedWateringCount}개 다시 저장` : `${selectedWateringCount}개 물주기 저장`}</button></div> : null}
     </fieldset>
   );

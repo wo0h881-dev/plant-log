@@ -30,7 +30,7 @@ async function main() {
           else if (url.searchParams.get("options") === "fertilizer") data = { options: watering ? ["완효성", watering.fertilizer] : ["완효성"] };
           else data = { plants: [] };
         } else if (url.pathname === "/api/plant-logs") { if (req.method() === "POST") observation = req.postData(); data = {}; }
-        else if (url.pathname === "/api/plant-details") data = { recentPlants: [], photos: [], observations: [] };
+        else if (url.pathname === "/api/plant-details") data = { recentPlants: [], photos: [], observations: watering ? [{ id: "fertilizer-record", date: watering.wateredAt, tags: [watering.fertilizer], note: `비료 비율: ${watering.fertilizerRatio}` }] : [] };
         else if (url.pathname === "/api/watering-stats") data = { wateringDays: 0, recentIntervals: 0 };
         await route.fulfill({ json: data });
       });
@@ -48,20 +48,27 @@ async function main() {
       await fertilizer.getByRole("button", { name: "완효성", exact: true }).waitFor();
       await fertilizer.getByLabel("새 비료 이름").fill("액체 비료");
       await fertilizer.getByRole("button", { name: "새 비료 선택", exact: true }).click();
+      await fertilizer.getByLabel("물 (mL)", { exact: true }).fill("750");
+      await fertilizer.getByLabel("비료 (mL)", { exact: true }).fill("0.75");
+      await fertilizer.getByText("물:비료 750mL : 0.75mL (비료:물 1:1000)", { exact: true }).waitFor();
+      await fertilizer.getByRole("button", { name: "적용", exact: true }).click();
       await page.getByLabel("물 준 날짜", { exact: true }).fill("2026-10-01");
       await page.locator('[data-screen="water"]').getByRole("checkbox").first().click();
       await page.getByRole("button", { name: /물주기 저장/ }).click();
       await page.getByRole("button", { name: "실패한 1개 다시 저장", exact: true }).waitFor();
-      await page.getByRole("button", { name: "비료: 액체 비료", exact: true }).waitFor();
+      await page.getByRole("button", { name: /^비료: 액체 비료/ }).waitFor();
       assert.equal(await page.locator('[data-screen="water"]').getByRole("checkbox", { checked: true }).count(), 1);
       await page.getByRole("button", { name: "실패한 1개 다시 저장", exact: true }).click();
       await page.waitForFunction(() => document.body.textContent.includes("1개 식물의 물주기를 저장했습니다."));
       assert.equal(watering.wateredAt, "2026-10-01");
       assert.equal(watering.fertilizer, "액체 비료");
+      assert.equal(watering.fertilizerRatio, "물:비료 750mL : 0.75mL (비료:물 1:1000)");
+      await page.locator('[data-screen="water"]').getByText(/물주기를 저장했습니다.*비료: 액체 비료.*1:1000/).waitFor();
       assert.equal(await page.getByRole("button", { name: "비료 선택", exact: true }).getAttribute("aria-pressed"), "false");
       await page.getByRole("button", { name: "비료 선택", exact: true }).click();
       await fertilizer.getByRole("button", { name: "액체 비료", exact: true }).waitFor();
       await fertilizer.getByRole("button", { name: "비료 없음", exact: true }).click();
+      await fertilizer.getByRole("button", { name: "적용", exact: true }).click();
       assert.equal(await page.locator('[data-screen="water"]').getByRole("checkbox", { checked: true }).count(), 0);
       await nav.getByRole("button", { name: "관찰일지", exact: true }).click();
       await page.getByLabel("관찰 날짜", { exact: true }).fill("2026-10-02");
@@ -83,6 +90,7 @@ async function main() {
       await nav.getByRole("button", { name: "내 식물", exact: true }).click();
       await page.locator('.app-header').getByRole("searchbox").fill(plant.name);
       await page.locator('.app-header').getByRole("button", { name: /밤비노 핑크/ }).click();
+      await page.getByText(`비료 비율: ${watering.fertilizerRatio}`, { exact: true }).waitFor();
       await page.getByRole("button", { name: "프로필 편집 메뉴", exact: true }).click();
       await page.getByRole("button", { name: "식물 이름 편집", exact: true }).click();
       await page.getByLabel("새 식물명", { exact: true }).fill("밤비노 핑크 1");

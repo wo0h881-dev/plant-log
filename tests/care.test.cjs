@@ -37,6 +37,7 @@ const { LOCATIONS, LOCATION_GROUPS, emptyLocationState, parseLocationState, reco
 const { locationTimeline } = require("../lib/plant-locations.ts");
 const { environmentAt, isEnvironment, formatLocationEnvironment } = require("../lib/location-environment.ts");
 const { canSelectPlant, matchesPlantSearch } = require("../lib/plant-search.ts");
+const { formatFertilizerMix } = require("../lib/fertilizer.ts");
 const plantId = "11111111-1111-4111-8111-111111111111";
 const originalFetch = global.fetch;
 const envKeys = ["NOTION_TOKEN", "NOTION_PLANTS_DATA_SOURCE_ID", "NOTION_DATA_SOURCE_ID", "NOTION_DATABASE_ID", "NOTION_WATERING_DATA_SOURCE_ID", "NOTION_SETTINGS_DATA_SOURCE_ID", "NOTION_SETTINGS_DATABASE_ID"];
@@ -68,6 +69,8 @@ function wateringPage(lastWateredAt, cycle = 2) {
 test("fertilizer uses the watering DB select property and leaves plain watering unchanged", async () => {
   const calls = [];
   let property;
+  const observationId = "22222222-2222-4222-8222-222222222222";
+  process.env.NOTION_DATA_SOURCE_ID = observationId;
   global.fetch = async (url, options) => {
     const body = options.body && JSON.parse(options.body);
     calls.push({ url, method: options.method, body });
@@ -79,20 +82,32 @@ test("fertilizer uses the watering DB select property and leaves plain watering 
     if (options.method === "PATCH") property = { type: "select", select: { options: [] } };
     return json({ properties: property ? { 비료: property } : {} });
   };
-  const save = (fertilizer) => wateringApi.POST(new Request("http://localhost/api/watering-logs", { method: "POST", body: JSON.stringify({ plants: [{ id: plantId, name: "핑크" }], fertilizer }) }));
+  const save = (fertilizer, fertilizerRatio) => wateringApi.POST(new Request("http://localhost/api/watering-logs", { method: "POST", body: JSON.stringify({ plants: [{ id: plantId, name: "핑크" }], fertilizer, fertilizerRatio }) }));
   assert.equal((await (await save()).json()).successCount, 1);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].body.properties.비료, undefined);
   assert.equal((await save("A,B")).status, 400);
-  assert.equal((await (await save(" 액체 비료 ")).json()).successCount, 1);
-  assert.deepEqual(calls[2].body, { properties: { 비료: { select: {} } } });
+  const ratio = formatFertilizerMix({ water: "1000", fertilizer: "10" });
+  assert.equal((await (await save(" 액체 비료 ", ratio)).json()).successCount, 1);
+  assert.deepEqual(calls[2].body, { properties: { 비료: { select: {} }, "비료 비율": { rich_text: {} } } });
   assert.deepEqual(calls[3].body.properties.비료, { select: { name: "액체 비료" } });
+  assert.equal(calls[3].body.properties["비료 비율"].rich_text[0].text.content, ratio);
+  assert.equal(calls[4].body.parent.data_source_id, observationId);
+  assert.deepEqual(calls[4].body.properties.관찰태그.multi_select, [{ name: "액체 비료" }]);
+  assert.equal(calls[4].body.properties.관찰일지.rich_text[0].text.content, `비료 비율: ${ratio}`);
   const options = await wateringApi.GET(new Request("http://localhost/api/watering-logs?options=fertilizer"));
   assert.deepEqual(await options.json(), { options: ["액체 비료"] });
   property = { type: "rich_text" };
   const before = calls.length;
   assert.equal((await save("다른 비료")).status, 500);
   assert.equal(calls.length, before + 1, "incompatible existing property is not changed");
+});
+
+test("fertilizer ratio supports arbitrary water volumes and rejects invalid or incomplete mixes", () => {
+  assert.equal(formatFertilizerMix({ water: "1000", fertilizer: "10" }), "물:비료 1000mL : 10mL (비료:물 1:100)");
+  assert.equal(formatFertilizerMix({ water: "750", fertilizer: "0.75" }), "물:비료 750mL : 0.75mL (비료:물 1:1000)");
+  assert.equal(formatFertilizerMix({ water: "250", fertilizer: "0" }), "");
+  assert.equal(formatFertilizerMix({ water: "", fertilizer: "2" }), "");
 });
 
 test("plant list keeps cycle-day alerts and missing-date behavior", () => {

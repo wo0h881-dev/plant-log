@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } 
 import dynamic from "next/dynamic";
 import { AlertCircle, ArrowLeft, Check, House, Pencil, RefreshCcw, Sprout } from "lucide-react";
 import { FertilizerPicker } from "@/components/FertilizerPicker";
+import { formatFertilizerMix, type FertilizerMix } from "@/lib/fertilizer";
 import { PlantDialog } from "@/components/PlantDialog";
 import { RoomRecordDialog, type RoomRecordInput } from "@/components/RoomRecordDialog";
 import { HeaderDatePicker } from "@/components/HeaderDatePicker";
@@ -71,6 +72,9 @@ export function PlantLogForm() {
   const [spaceOrigin, setSpaceOrigin] = useState<"profile" | "more">("profile");
   const [wateredDate, setWateredDate] = useState(getTodayValue);
   const [fertilizer, setFertilizer] = useState("");
+  const [fertilizerMix, setFertilizerMix] = useState<FertilizerMix>({ water: "", fertilizer: "" });
+  const fertilizerRatio = formatFertilizerMix(fertilizerMix);
+  const [observationRevision, setObservationRevision] = useState(0);
   const [fertilizerOpen, setFertilizerOpen] = useState(false);
   const [isWaterSaving, setIsWaterSaving] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
@@ -361,19 +365,20 @@ export function PlantLogForm() {
           <section data-screen="water" hidden={activeTab !== "water"}>
             <div className="mb-5 flex items-center justify-between gap-3">
               <p className="text-xs text-[#8B929B]">오늘 돌볼 식물들을 확인해요.</p>
-              {fertilizer ? <button type="button" className="status-chip min-w-0 break-all" aria-pressed="true" disabled={isWaterSaving} onClick={() => setFertilizerOpen(true)}>비료: {fertilizer}</button> : null}
+              {fertilizer ? <button type="button" className="status-chip min-w-0 break-all" aria-pressed="true" disabled={isWaterSaving} onClick={() => setFertilizerOpen(true)}>비료: {fertilizer}{fertilizerRatio ? ` · ${fertilizerRatio}` : ""}</button> : null}
             </div>
             <BatchWatering
               plants={plants}
               recentPlants={recentObservedPlants}
               isLoading={isPlantsLoading}
               isPhotoLoading={isPlantsLoading || isRecentPlantsLoading}
-              onWateringSaved={refreshPlants}
+              onWateringSaved={() => { refreshPlants(); if (fertilizer) { refreshRecentPlants(); setObservationRevision((value) => value + 1); } }}
               onSelectPlant={openPlantFromCalendar}
               onOpenCalendar={openCalendarForPlant}
               wateredAt={wateredDate}
               fertilizer={fertilizer}
-              onComplete={() => setFertilizer("")}
+              fertilizerRatio={fertilizerRatio}
+              onComplete={() => { setFertilizer(""); setFertilizerMix({ water: "", fertilizer: "" }); }}
               onSavingChange={setIsWaterSaving}
               selectedIds={waterSelection}
               onSelectionChange={setWaterSelection}
@@ -444,7 +449,7 @@ export function PlantLogForm() {
           <>
             <p className="mb-5 text-xs text-[#8B929B]">{isPlantsLoading ? "식물을 불러오고 있어요." : `${plants.length}개의 식물과 함께하고 있어요.`}</p>
             <div className="space-y-5">
-              {profilePlant ? <PlantOverview key={profilePlant.id} plant={profilePlant} categories={[...new Set([...categoryOptions, ...plants.map((item) => item.category)])]} onOpenCalendar={openCalendarForPlant} onPlantRenamed={handlePlantRenamed} initialGalleryOpen={profileOpenPhotos} initialGalleryPhotoId={profilePhotoId} /> : <RecentObservedPlants plants={plants} recentPlants={recentObservedPlants} onSelect={selectProfilePlant} />}
+              {profilePlant ? <PlantOverview key={profilePlant.id} plant={profilePlant} categories={[...new Set([...categoryOptions, ...plants.map((item) => item.category)])]} onOpenCalendar={openCalendarForPlant} onPlantRenamed={handlePlantRenamed} initialGalleryOpen={profileOpenPhotos} initialGalleryPhotoId={profilePhotoId} observationRevision={observationRevision} /> : <RecentObservedPlants plants={plants} recentPlants={recentObservedPlants} onSelect={selectProfilePlant} />}
             </div>
           </>
         ) : null}
@@ -462,7 +467,7 @@ export function PlantLogForm() {
       </div></PlantDialog> : null}
       {cycleEditorOpen ? <BulkWateringCycleEditor plants={plants.filter((plant) => waterSelection.includes(plant.id))} onSaved={(plant) => { handlePlantRenamed(plant); setWaterSelection((current) => current.filter((id) => id !== plant.id)); }} onClose={() => setCycleEditorOpen(false)} /> : null}
       {commonOpen ? <RoomRecordDialog kind="common" locationId="" locationName="전체 식물" plants={plants} initialDate={observedDate} onSave={saveCommonNotice} onClose={() => setCommonOpen(false)} /> : null}
-      {fertilizerOpen ? <FertilizerPicker selected={fertilizer} onSelect={setFertilizer} onClose={() => setFertilizerOpen(false)} /> : null}
+      {fertilizerOpen ? <FertilizerPicker selected={fertilizer} selectedMix={fertilizerMix} onSelect={(name, mix) => { setFertilizer(name); setFertilizerMix(mix); }} onClose={() => setFertilizerOpen(false)} /> : null}
       <nav className="bottom-nav" aria-label="주요 화면">
         <div className="grid grid-cols-5 gap-1">
           {tabs.flatMap(({ id, label, icon }, index) => {

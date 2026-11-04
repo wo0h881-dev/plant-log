@@ -54,6 +54,7 @@ type CreateWateringLogPageParams = {
   wateredAt: string;
   note: string;
   fertilizer?: string;
+  fertilizerRatio?: string;
 };
 
 type UpdatePlantSettingsPageParams = {
@@ -179,15 +180,18 @@ export async function getDataSourceOptions(token: string, dataSourceId: string, 
   return (await getDataSourceOptionGroups(token, dataSourceId))[propertyName] ?? [];
 }
 
-export async function readWateringFertilizers(token: string, sourceId: string, createIfMissing = false) {
+export async function readWateringFertilizers(token: string, sourceId: string, createIfMissing = false, needsRatio = false) {
   const url = `${NOTION_API_BASE}/data_sources/${sourceId}`;
   const headers = notionHeaders(token);
   const source = await readNotionJson<NotionDataSource>(await fetch(url, { headers, cache: "no-store" }));
   const property = source.properties?.["비료"];
   if (property && property.type !== "select") throw new Error("노션 물주기 기록의 ‘비료’ 속성을 선택 유형으로 확인해주세요.");
-  if (!property && createIfMissing) {
+  const ratio = source.properties?.["비료 비율"];
+  if (needsRatio && ratio && ratio.type !== "rich_text") throw new Error("노션 물주기 기록의 ‘비료 비율’ 속성을 텍스트 유형으로 확인해주세요.");
+  const missing = { ...(!property && createIfMissing ? { 비료: { select: {} } } : {}), ...(needsRatio && !ratio ? { "비료 비율": { rich_text: {} } } : {}) };
+  if (Object.keys(missing).length) {
     await readNotionJson(await fetch(url, {
-      method: "PATCH", headers, body: JSON.stringify({ properties: { 비료: { select: {} } } }),
+      method: "PATCH", headers, body: JSON.stringify({ properties: missing }),
     }));
   }
   return (property?.select?.options ?? []).flatMap((option) => option.name ? [option.name] : []);
@@ -257,9 +261,7 @@ export async function createPlantLogPage({
           식물명: {
             title: [{ text: { content: plantName } }],
           },
-          분류: {
-            select: { name: plantCategory },
-          },
+          ...(plantCategory ? { 분류: { select: { name: plantCategory } } } : {}),
           사진: {
             files: photos.map((photo) => ({
               type: "file_upload",
@@ -308,6 +310,7 @@ export async function createWateringLogPage({
   wateredAt,
   note,
   fertilizer,
+  fertilizerRatio,
 }: CreateWateringLogPageParams) {
   return readNotionJson<{ id: string; url?: string }>(
     await fetch(`${NOTION_API_BASE}/pages`, {
@@ -333,6 +336,7 @@ export async function createWateringLogPage({
             checkbox: true,
           },
           ...(fertilizer ? { 비료: { select: { name: fertilizer } } } : {}),
+          ...(fertilizerRatio ? { "비료 비율": { rich_text: [{ text: { content: fertilizerRatio } }] } } : {}),
           메모: {
             rich_text: note ? [{ text: { content: note } }] : [],
           },
