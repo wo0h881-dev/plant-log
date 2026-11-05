@@ -221,6 +221,7 @@ test("recipes persist to the settings source, support edit and last-container re
     return json(saved);
   };
   assert.deepEqual((await (await recipesApi.GET()).json()).state.batches, []);
+  assert.deepEqual(calls[0].body.filter, { property: "이동ID", rich_text: { equals: "plant-log:fertilizer-recipes:v1" } }, "first lookup uses the existing text marker field, not an uncreated select option");
   const state = { version: 1, batches: [{ water: "1000", fertilizers: [{ name: "A", amount: "10" }] }], index: 0 };
   const save = (value, version) => recipesApi.PUT(new Request("http://localhost/api/fertilizer-recipes", { method: "PUT", body: JSON.stringify({ state: value, revision: version }) }));
   assert.equal((await save(state, null)).status, 200);

@@ -7,13 +7,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const API = "https://api.notion.com/v1";
 const title = "Plant Log 비료 물통 설정";
+const marker = "plant-log:fertilizer-recipes:v1";
 type RecipePage = { id: string; last_edited_time: string; properties: Record<string, { rich_text?: Array<{ plain_text?: string; text?: { content?: string } }> }> };
 
 async function readRecipes() {
   const connection = await locationConnection();
   const result = await readNotionJson<{ results: RecipePage[] }>(await fetch(`${API}/data_sources/${connection.source}/query`, {
     method: "POST", headers: createNotionHeaders(connection.token), cache: "no-store", signal: AbortSignal.timeout(12000),
-    body: JSON.stringify({ page_size: 1, filter: { and: [{ property: "이름", title: { equals: title } }, { property: "유형", select: { equals: "비료 설정" } }] }, sorts: [{ timestamp: "last_edited_time", direction: "descending" }] }),
+    body: JSON.stringify({ page_size: 1, filter: { property: "이동ID", rich_text: { equals: marker } }, sorts: [{ timestamp: "last_edited_time", direction: "descending" }] }),
   }));
   const page = result.results[0];
   let state: FertilizerRecipes = emptyFertilizerRecipes();
@@ -46,7 +47,7 @@ export async function PUT(request: Request) {
     const memo = { rich_text: Array.from({ length: Math.ceil(content.length / 1800) }, (_, index) => ({ text: { content: content.slice(index * 1800, (index + 1) * 1800) } })) };
     const saved = await readNotionJson<RecipePage>(await fetch(page ? `${API}/pages/${page.id}` : `${API}/pages`, {
       method: page ? "PATCH" : "POST", headers: createNotionHeaders(connection.token), signal: AbortSignal.timeout(12000),
-      body: JSON.stringify(page ? { properties: { 메모: memo } } : { parent: { type: "data_source_id", data_source_id: connection.source }, properties: { 이름: { title: [{ text: { content: title } }] }, 유형: { select: { name: "비료 설정" } }, 메모: memo } }),
+      body: JSON.stringify(page ? { properties: { 메모: memo } } : { parent: { type: "data_source_id", data_source_id: connection.source }, properties: { 이름: { title: [{ text: { content: title } }] }, 유형: { select: { name: "비료 설정" } }, 이동ID: { rich_text: [{ text: { content: marker } }] }, 메모: memo } }),
     }));
     return NextResponse.json({ state, revision: saved.last_edited_time });
   } catch {
