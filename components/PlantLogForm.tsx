@@ -72,10 +72,12 @@ export function PlantLogForm() {
   const [spaceOrigin, setSpaceOrigin] = useState<"profile" | "more">("profile");
   const [wateredDate, setWateredDate] = useState(getTodayValue);
   const [fertilizerBatches, setFertilizerBatches] = useState<FertilizerBatch[]>([]);
-  const fertilizers = [...new Set(fertilizerBatches.flatMap((batch) => batch.fertilizers.map((item) => item.name)))];
+  const [fertilizerBatchIndex, setFertilizerBatchIndex] = useState(0);
+  const activeFertilizerBatch = fertilizerBatches[fertilizerBatchIndex];
+  const fertilizers = [...new Set(activeFertilizerBatch?.fertilizers.map((item) => item.name) ?? [])];
   const fertilizer = fertilizers.join(" + ");
   const [fertilizerEnabled, setFertilizerEnabled] = useState(false);
-  const fertilizerRatio = formatFertilizerBatches(fertilizerBatches);
+  const fertilizerRatio = activeFertilizerBatch ? formatFertilizerBatches([activeFertilizerBatch], fertilizerBatchIndex) : "";
   const [observationRevision, setObservationRevision] = useState(0);
   const [fertilizerOpen, setFertilizerOpen] = useState(false);
   const [isWaterSaving, setIsWaterSaving] = useState(false);
@@ -367,7 +369,12 @@ export function PlantLogForm() {
           <section data-screen="water" hidden={activeTab !== "water"}>
             <div className="mb-5 flex items-center justify-between gap-3">
               <p className="text-xs text-[#8B929B]">오늘 돌볼 식물들을 확인해요.</p>
-              {fertilizer ? <button type="button" className="status-chip min-w-0 break-all" data-active={fertilizerEnabled} title="비료 종류와 비율 변경" disabled={isWaterSaving} onClick={() => setFertilizerOpen(true)}>{fertilizerEnabled ? "비료" : "비료 끔"}: {fertilizer}{fertilizerRatio ? ` · ${fertilizerRatio}` : ""}</button> : null}
+              {fertilizerBatches.length ? <div className="space-y-2">
+                <div role="tablist" aria-label="사용할 물통" className="flex gap-2 overflow-x-auto pb-1">
+                  {fertilizerBatches.map((batch, index) => <button key={index} type="button" role="tab" aria-selected={fertilizerBatchIndex === index} data-active={fertilizerEnabled && fertilizerBatchIndex === index} className="status-chip shrink-0" disabled={isWaterSaving || !batch.fertilizers.length} onClick={() => { setFertilizerBatchIndex(index); setFertilizerEnabled(true); setWaterSelection([]); }}>물통 {index + 1}</button>)}
+                </div>
+                <button type="button" className="status-chip" data-active={fertilizerEnabled} aria-label="비료 설정" title="비료 종류와 비율 변경" disabled={isWaterSaving} onClick={() => setFertilizerOpen(true)}>{fertilizerEnabled ? "비료" : "비료 끔"} · {activeFertilizerBatch?.water ? `물 ${activeFertilizerBatch.water}mL · ` : ""}{fertilizers.length}종</button>
+              </div> : null}
             </div>
             <BatchWatering
               plants={plants}
@@ -470,7 +477,7 @@ export function PlantLogForm() {
       </div></PlantDialog> : null}
       {cycleEditorOpen ? <BulkWateringCycleEditor plants={plants.filter((plant) => waterSelection.includes(plant.id))} onSaved={(plant) => { handlePlantRenamed(plant); setWaterSelection((current) => current.filter((id) => id !== plant.id)); }} onClose={() => setCycleEditorOpen(false)} /> : null}
       {commonOpen ? <RoomRecordDialog kind="common" locationId="" locationName="전체 식물" plants={plants} initialDate={observedDate} onSave={saveCommonNotice} onClose={() => setCommonOpen(false)} /> : null}
-      {fertilizerOpen ? <FertilizerPicker selected={fertilizerBatches} onSelect={(batches) => { setFertilizerBatches(batches); setFertilizerEnabled(batches.some((batch) => batch.fertilizers.length > 0)); }} onRemove={(name) => { setFertilizerBatches((current) => current.map((batch) => ({ ...batch, fertilizers: batch.fertilizers.filter((item) => item.name !== name) }))); if (fertilizers.every((value) => value === name)) setFertilizerEnabled(false); }} onClose={() => setFertilizerOpen(false)} /> : null}
+      {fertilizerOpen ? <FertilizerPicker selected={fertilizerBatches} selectedIndex={fertilizerBatchIndex} onSelect={(batches, index) => { setFertilizerBatches(batches); setFertilizerBatchIndex(index); setFertilizerEnabled(Boolean(batches[index]?.fertilizers.length)); setWaterSelection([]); }} onRemove={(name) => { setFertilizerBatches((current) => current.map((batch) => ({ ...batch, fertilizers: batch.fertilizers.filter((item) => item.name !== name) }))); if (fertilizers.every((value) => value === name)) setFertilizerEnabled(false); }} onClose={() => setFertilizerOpen(false)} /> : null}
       <nav className="bottom-nav" aria-label="주요 화면">
         <div className="grid grid-cols-5 gap-1">
           {tabs.flatMap(({ id, label, icon }, index) => {

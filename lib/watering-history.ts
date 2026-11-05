@@ -1,6 +1,7 @@
 import { createNotionHeaders, readNotionJson, resolveDataSourceId } from "@/lib/notion";
 
 type WateringPage = {
+  id?: string;
   properties: Record<string, {
     title?: Array<{ plain_text?: string }>;
     relation?: Array<{ id: string }>;

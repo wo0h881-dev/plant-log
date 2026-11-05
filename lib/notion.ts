@@ -305,6 +305,21 @@ export async function createPlantLogPage({
   );
 }
 
+function wateringFertilizerProperties(fertilizer?: string, fertilizers?: string[], fertilizerRatio?: string) {
+  return {
+    ...(fertilizer ? { 비료: { select: { name: fertilizer } } } : {}),
+    ...(fertilizers?.length ? { "사용 비료": { multi_select: fertilizers.map((name) => ({ name })) } } : {}),
+    ...(fertilizerRatio ? { "비료 비율": { rich_text: Array.from({ length: Math.ceil(fertilizerRatio.length / 1800) }, (_, index) => ({ text: { content: fertilizerRatio.slice(index * 1800, (index + 1) * 1800) } })) } } : {}),
+  };
+}
+
+export async function updateWateringLogFertilizers(token: string, pageId: string, fertilizers: string[], ratio?: string) {
+  return readNotionJson<{ id: string }>(await fetch(`${NOTION_API_BASE}/pages/${pageId}`, {
+    method: "PATCH", headers: notionHeaders(token),
+    body: JSON.stringify({ properties: wateringFertilizerProperties(fertilizers[0], fertilizers, ratio) }),
+  }));
+}
+
 export async function createWateringLogPage({
   token,
   parentId,
@@ -339,9 +354,7 @@ export async function createWateringLogPage({
           물줌: {
             checkbox: true,
           },
-          ...(fertilizer ? { 비료: { select: { name: fertilizer } } } : {}),
-          ...(fertilizers?.length ? { "사용 비료": { multi_select: fertilizers.map((name) => ({ name })) } } : {}),
-          ...(fertilizerRatio ? { "비료 비율": { rich_text: Array.from({ length: Math.ceil(fertilizerRatio.length / 1800) }, (_, index) => ({ text: { content: fertilizerRatio.slice(index * 1800, (index + 1) * 1800) } })) } } : {}),
+          ...wateringFertilizerProperties(fertilizer, fertilizers, fertilizerRatio),
           메모: {
             rich_text: note ? [{ text: { content: note } }] : [],
           },

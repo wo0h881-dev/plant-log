@@ -4,10 +4,11 @@ import {
   createPlantLogPage,
   hasNotionPageId,
   readWateringFertilizers,
+  updateWateringLogFertilizers,
   resolveDataSourceId,
 } from "@/lib/notion";
 import { readWateringHistory } from "@/lib/watering-history";
-import type { WateredPlant } from "@/lib/watering";
+import { normalizeDay, type WateredPlant } from "@/lib/watering";
 
 type WateringPlant = {
   id: string;
@@ -139,6 +140,8 @@ export async function POST(request: Request) {
     };
     const plants = payload.plants?.filter((plant) => plant.id && plant.name) ?? [];
     const wateredAt = payload.wateredAt || new Date().toISOString();
+    const wateredDay = normalizeDay(wateredAt);
+    if (!wateredDay) return NextResponse.json({ message: "올바른 날짜를 선택하세요." }, { status: 400 });
     const note = payload.note?.trim() ?? "물 줌";
     const validName = (name: unknown): name is string => typeof name === "string" && Boolean(name.trim()) && name.trim().length <= 100 && !/[,\r\n]/.test(name);
     if (payload.fertilizers !== undefined && (!Array.isArray(payload.fertilizers) || !payload.fertilizers.length || payload.fertilizers.length > 20 || !payload.fertilizers.every(validName))) {
@@ -165,6 +168,7 @@ export async function POST(request: Request) {
     if (fertilizer && (!observationSource || observationSource === wateringParentId || plants.some((plant) => !hasNotionPageId(plant.id)))) {
       return NextResponse.json({ message: "비료를 기록하려면 식물과 관찰일지 DB 연결을 확인해주세요." }, { status: 400 });
     }
+    const existingPages = payload.fertilizers ? await readWateringHistory({ property: "날짜", date: { equals: wateredDay } }) : [];
     const options = fertilizer ? await readWateringFertilizers(token, wateringParentId, true, Boolean(fertilizerRatio), Boolean(payload.fertilizers)) : [];
     const selectedFertilizers = [...new Set(fertilizers.map((name) => options.find((option) => option.trim().toLowerCase() === name.toLowerCase()) ?? name))];
     const selectedFertilizer = selectedFertilizers[0];
@@ -172,7 +176,17 @@ export async function POST(request: Request) {
 
     for (const plant of plants) {
       try {
-        const page = await createWateringLogWithRetry({
+        const normalizeId = (id: string) => id.replaceAll("-", "").toLowerCase();
+        const existing = existingPages.find((page) => {
+          const relationId = page.properties["식물"]?.relation?.[0]?.id;
+          return relationId ? normalizeId(relationId) === normalizeId(plant.id) : readTitle(page) === plant.name;
+        });
+        const oldFertilizers = existing ? [...(existing.properties["사용 비료"]?.multi_select ?? []).flatMap((option) => option.name ? [option.name] : []), ...(existing.properties["비료"]?.select?.name ? [existing.properties["비료"].select.name] : [])] : [];
+        const mergedFertilizers = [...new Map([...oldFertilizers, ...selectedFertilizers].map((name) => [name.toLowerCase(), name])).values()];
+        const oldRatio = existing?.properties["비료 비율"]?.rich_text?.map((part) => part.plain_text ?? "").join("");
+        const mergedRatio = [...new Set([oldRatio, fertilizerRatio].filter(Boolean))].join("\n");
+        if (existing && !existing.id) throw new Error("기존 물주기 기록을 확인하지 못했어요. 새로고침 후 다시 시도해주세요.");
+        const page = existing ? await updateWateringLogFertilizers(token, existing.id!, mergedFertilizers, mergedRatio) : await createWateringLogWithRetry({
           token,
           parentId: wateringParentId,
           plantId: plant.id,

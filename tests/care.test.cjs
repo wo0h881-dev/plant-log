@@ -105,13 +105,14 @@ test("fertilizer uses the watering DB select property and leaves plain watering 
 
 test("mixed fertilizers keep all tags in one watering and one observation without changing old options", async () => {
   const calls = [];
+  let saved = false;
   const observationId = "22222222-2222-4222-8222-222222222222";
   process.env.NOTION_DATA_SOURCE_ID = observationId;
   global.fetch = async (url, options) => {
     const body = options.body && JSON.parse(options.body);
     calls.push({ url, method: options.method, body });
-    if (url.endsWith("/query")) return json({ results: [returnedPage({ 이름: { title: [{ text: { content: "💧핑크" } }] }, 식물: { relation: [{ id: plantId }] }, 비료: { select: { name: "액체 A" } }, "사용 비료": { multi_select: [{ name: "액체 A" }, { name: "액체 B" }] }, "비료 비율": { rich_text: [{ plain_text: "A 1:100 / B 1:1000" }] } })] });
-    if (url.endsWith("/pages")) return json({ id: plantId });
+    if (url.endsWith("/query")) return json({ results: saved ? [returnedPage({ 이름: { title: [{ text: { content: "💧핑크" } }] }, 식물: { relation: [{ id: plantId }] }, 비료: { select: { name: "액체 A" } }, "사용 비료": { multi_select: [{ name: "액체 A" }, { name: "액체 B" }] }, "비료 비율": { rich_text: [{ plain_text: "A 1:100 / B 1:1000" }] } })] : [] });
+    if (url.endsWith("/pages")) { saved = true; return json({ id: plantId }); }
     return json({ properties: { 비료: { type: "select", select: { options: [{ name: "액체 A" }] } } } });
   };
   const ratio = "A 1:100 / B 1:1000";
@@ -130,6 +131,37 @@ test("mixed fertilizers keep all tags in one watering and one observation withou
   const before = calls.length;
   for (const invalid of [[], ["A,B"], [null], Array(21).fill("A"), "A"]) assert.equal((await save(invalid)).status, 400);
   assert.equal(calls.length, before, "invalid selections do not reach Notion");
+});
+
+test("fertilizing an already watered plant adds fertilizer without duplicating or changing its watering event", async () => {
+  process.env.NOTION_DATA_SOURCE_ID = "22222222-2222-4222-8222-222222222222";
+  const calls = [];
+  global.fetch = async (url, options) => {
+    const body = options.body && JSON.parse(options.body);
+    calls.push({ url, method: options.method, body });
+    if (url.endsWith("/query")) return json({ results: [returnedPage({ 이름: { title: [{ text: { content: "💧핑크" } }] }, 식물: { relation: [{ id: plantId.replaceAll("-", "") }] }, "사용 비료": { multi_select: [{ name: "기존 A" }] }, "비료 비율": { rich_text: [{ plain_text: "기존 배합" }] } })] });
+    if (url.endsWith(`/pages/${plantId}`) || url.endsWith("/pages")) return json({ id: plantId });
+    return json({ properties: { 비료: { type: "select", select: { options: [] } }, "사용 비료": { type: "multi_select", multi_select: { options: [] } }, "비료 비율": { type: "rich_text" } } });
+  };
+  const response = await wateringApi.POST(new Request("http://localhost/api/watering-logs", { method: "POST", body: JSON.stringify({ plants: [{ id: plantId, name: "핑크" }], wateredAt: "2026-11-05", fertilizers: ["새 B"], fertilizerRatio: "새 배합" }) }));
+  assert.equal((await response.json()).successCount, 1);
+  const update = calls.find((call) => call.method === "PATCH").body.properties;
+  assert.deepEqual(Object.keys(update).sort(), ["비료", "비료 비율", "사용 비료"]);
+  assert.deepEqual(update["사용 비료"].multi_select, [{ name: "기존 A" }, { name: "새 B" }]);
+  assert.equal(update["비료 비율"].rich_text[0].text.content, "기존 배합\n새 배합");
+  const created = calls.filter((call) => call.url.endsWith("/pages"));
+  assert.equal(created.length, 1, "only the fertilizer observation is created");
+  assert.deepEqual(created[0].body.properties.관찰태그.multi_select, [{ name: "새 B" }]);
+  assert.equal(created[0].body.properties.물줌, undefined);
+});
+
+test("fertilizer refuses to create a new watering event when existing records cannot be checked", async () => {
+  const calls = [];
+  process.env.NOTION_DATA_SOURCE_ID = "22222222-2222-4222-8222-222222222222";
+  global.fetch = async (url, options) => { calls.push(options.method); return Response.json({ message: "unavailable" }, { status: 503 }); };
+  const response = await wateringApi.POST(new Request("http://localhost/api/watering-logs", { method: "POST", body: JSON.stringify({ plants: [{ id: plantId, name: "핑크" }], fertilizers: ["A"] }) }));
+  assert.equal(response.status, 500);
+  assert.deepEqual(calls, ["POST"], "only a read-only query is attempted");
 });
 
 test("fertilizer ratio supports arbitrary water volumes and rejects invalid or incomplete mixes", () => {

@@ -1,14 +1,14 @@
 export type FertilizerMix = { water: string; fertilizer: string };
 export type FertilizerBatch = { water: string; fertilizers: Array<{ name: string; amount: string }> };
 
-export function formatFertilizerBatches(batches: FertilizerBatch[]) {
+export function formatFertilizerBatches(batches: FertilizerBatch[], startIndex = 0) {
   return batches.filter((batch) => batch.fertilizers.length).map((batch, index) => {
     const ingredients = batch.fertilizers.map(({ name, amount }) => `${name}${amount ? ` ${amount}mL` : ""}`).join(" + ");
     const ratios = batch.fertilizers.flatMap(({ name, amount }) => {
       const values = fertilizerMixValues({ water: batch.water, fertilizer: amount });
       return values ? [`${name} 비료:물 ${values.fertilizer / values.divisor}:${values.water / values.divisor}`] : [];
     });
-    return `물통 ${index + 1} · ${batch.water ? `물 ${batch.water}mL + ` : ""}${ingredients}${ratios.length ? ` (${ratios.join(" / ")})` : ""}`;
+    return `물통 ${startIndex + index + 1} · ${batch.water ? `물 ${batch.water}mL + ` : ""}${ingredients}${ratios.length ? ` (${ratios.join(" / ")})` : ""}`;
   }).join("\n");
 }
 

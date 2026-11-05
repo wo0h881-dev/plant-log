@@ -73,6 +73,8 @@ export function BatchWatering({
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [message, setMessage] = useState("");
   const [results, setResults] = useState<WateringResult[]>([]);
+  const [resultScope, setResultScope] = useState("");
+  const saveScope = fertilizer ? `${fertilizer}:${fertilizerRatio ?? ""}` : "water";
   const submitting = useRef(false);
   const isListLoading = isLoading || isTodayLoading;
   useEffect(() => { onSavingChange?.(saveState === "saving"); }, [saveState, onSavingChange]);
@@ -102,12 +104,12 @@ export function BatchWatering({
 
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
   const dismissedDueIdSet = useMemo(() => new Set(dismissedDueIds), [dismissedDueIds]);
-  const wateringPlants = useMemo(() => plants.filter((plant) => canShowInWateringList(plant) && !dismissedDueIdSet.has(plant.id) && !isWateredToday(plant, todayWateredPlants, today)), [plants, dismissedDueIdSet, todayWateredPlants, today]);
+  const wateringPlants = useMemo(() => plants.filter((plant) => canShowInWateringList(plant) && (fertilizer || (!dismissedDueIdSet.has(plant.id) && !isWateredToday(plant, todayWateredPlants, today)))), [plants, dismissedDueIdSet, todayWateredPlants, today, fertilizer]);
   const duePlants = useMemo(
     () => wateringPlants
-      .filter((plant) => plant.isWateringDue && !dismissedDueIdSet.has(plant.id))
+      .filter((plant) => plant.isWateringDue && !dismissedDueIdSet.has(plant.id) && !isWateredToday(plant, todayWateredPlants, today))
       .sort((a, b) => (b.daysSinceWatered ?? 0) - (a.daysSinceWatered ?? 0)),
-    [dismissedDueIdSet, wateringPlants],
+    [dismissedDueIdSet, wateringPlants, todayWateredPlants, today],
   );
   const otherPlants = useMemo(
     () => wateringPlants.filter((plant) => matchesPlantSearch(plant, query)),
@@ -124,7 +126,7 @@ export function BatchWatering({
   const selectedPupCount = duePups.filter((plant) => selectedIdSet.has(plant.id)).length;
   const areAllDueSelected = duePlants.length > 0 && dueSelectedCount === duePlants.length;
   const successfulResults = results.filter((result) => result.ok);
-  const failedResults = results.filter((result) => !result.ok);
+  const failedResults = resultScope === saveScope ? results.filter((result) => !result.ok) : [];
   const recentPhotoByPlant = useMemo(() => {
     const photos = new Map<string, string>();
     for (const recent of recentPlants) {
@@ -210,6 +212,7 @@ export function BatchWatering({
     setSaveState("saving");
     setMessage("");
     setResults([]);
+    setResultScope(saveScope);
 
     try {
       const response = await fetch("/api/watering-logs", {
@@ -240,8 +243,8 @@ export function BatchWatering({
       setSaveState(failureCount ? "error" : "success");
       const summary = failureCount
           ? `${successCount}개 저장, ${failureCount}개 실패했습니다.`
-          : `${successCount}개 식물의 물주기를 저장했습니다.`;
-      setMessage(summary + (fertilizer && successCount ? ` 비료: ${fertilizer}${fertilizerRatio ? ` · ${fertilizerRatio}` : ""}` : ""));
+          : `${successCount}개 식물의 ${fertilizer ? "비료" : "물주기"}를 저장했습니다.`;
+      setMessage(summary);
 
       if (wateredDate === today && succeededIds.length) {
         const succeededPlants = selectedPlants.filter((plant) => succeededIds.includes(plant.id));
@@ -284,7 +287,7 @@ export function BatchWatering({
           <span className="mt-1 block truncate text-[11px] text-[#909090]">
             {due && typeof plant.wateringCycleDays === "number"
               ? `주기 ${plant.wateringCycleDays}일 · ${daysText}`
-              : daysText}
+              : fertilizer && isWateredToday(plant, todayWateredPlants, today) ? "오늘 물줌 · 비료 추가 가능" : daysText}
           </span>
         </span>
         <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-md border transition ${isSelected ? "border-[#4263EB] bg-[#4263EB] text-white" : "border-[#D6DAE0] bg-white text-transparent"}`}>
@@ -329,7 +332,7 @@ export function BatchWatering({
 
       <section>
         <button type="button" onClick={() => setIsOtherOpen((current) => !current)} className="mb-3 flex w-full items-center justify-between text-left" aria-expanded={isOtherOpen}>
-          <span className="section-title">다른 식물 물주기</span>
+          <span className="section-title">{fertilizer ? "비료 줄 식물" : "다른 식물 물주기"}</span>
           <span className="flex items-center gap-1.5 text-sm font-semibold text-[#909090]">{isListLoading ? "확인 중" : `${wateringPlants.filter((plant) => plant.category.trim() !== "자구").length}개`} <ChevronDown size={17} className={`transition ${isOtherOpen ? "rotate-180" : ""}`} aria-hidden="true" /></span>
         </button>
         {isOtherOpen ? (
@@ -356,7 +359,7 @@ export function BatchWatering({
       {message ? <div className={`rounded-2xl px-4 py-3 text-sm ${saveState === "error" ? "bg-red-50 text-red-700" : "bg-[#EEF2FF] text-[#4263EB]"}`}><div className="flex items-start gap-2">{saveState === "error" ? <AlertCircle size={17} className="mt-0.5 shrink-0" aria-hidden="true" /> : <Check size={17} className="mt-0.5 shrink-0" aria-hidden="true" />}<div><p className="font-semibold">{message}</p>{successfulResults.length ? <p className="mt-1">성공: {successfulResults.map((result) => result.plantName).join(", ")}</p> : null}{failedResults.length ? <p className="mt-1">실패: {failedResults.map((result) => result.plantName).join(", ")}</p> : null}</div></div></div> : null}
 
       {results.some((result) => result.observationWarning) ? <p role="alert" className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900">물주기는 저장했지만 관찰일지를 확인하지 못했어요: {results.filter((result) => result.observationWarning).map((result) => result.plantName).join(", ")}. 노션 관찰일지를 확인해주세요.</p> : null}
-      {selectedWateringCount ? <div className="save-dock"><button type="button" onClick={saveWateringLogs} disabled={saveState === "saving"} className="primary-button">{saveState === "saving" ? "저장 중..." : failedResults.length ? `실패한 ${selectedWateringCount}개 다시 저장` : `${selectedWateringCount}개 물주기 저장`}</button></div> : null}
+      {selectedWateringCount ? <div className="save-dock"><button type="button" onClick={saveWateringLogs} disabled={saveState === "saving"} className="primary-button">{saveState === "saving" ? "저장 중..." : failedResults.length ? `실패한 ${selectedWateringCount}개 다시 저장` : `${selectedWateringCount}개 ${fertilizer ? "비료" : "물주기"} 저장`}</button></div> : null}
     </fieldset>
   );
 }
