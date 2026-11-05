@@ -38,6 +38,9 @@ const { locationTimeline } = require("../lib/plant-locations.ts");
 const { environmentAt, isEnvironment, formatLocationEnvironment } = require("../lib/location-environment.ts");
 const { canSelectPlant, matchesPlantSearch } = require("../lib/plant-search.ts");
 const { formatFertilizerMix, formatFertilizerBatches } = require("../lib/fertilizer.ts");
+const recipesApi = require("../app/api/fertilizer-recipes/route.ts");
+const { parseFertilizerRecipes, recipeDraftKey } = require("../lib/fertilizer-recipes.ts");
+const { newFertilizerDraft, readFertilizerDraft, writeFertilizerDraft, clearFertilizerDraft } = require("../lib/fertilizer-draft.ts");
 const plantId = "11111111-1111-4111-8111-111111111111";
 const originalFetch = global.fetch;
 const envKeys = ["NOTION_TOKEN", "NOTION_PLANTS_DATA_SOURCE_ID", "NOTION_DATA_SOURCE_ID", "NOTION_DATABASE_ID", "NOTION_WATERING_DATA_SOURCE_ID", "NOTION_SETTINGS_DATA_SOURCE_ID", "NOTION_SETTINGS_DATABASE_ID"];
@@ -178,6 +181,63 @@ test("fertilizer batches distinguish shared water from separate water and preser
   ]), "물통 1 · 물 1000mL + A 10mL + B 10mL + C 5mL (A 비료:물 1:100 / B 비료:물 1:100 / C 비료:물 1:200)\n물통 2 · 물 500mL + D 1mL (D 비료:물 1:500)");
   assert.equal(formatFertilizerBatches([{ water: "", fertilizers: [{ name: "A", amount: "" }] }]), "물통 1 · A");
   assert.equal(formatFertilizerBatches([{ water: "", fertilizers: [] }]), "");
+});
+
+test("fertilizer recipes validate saved ratios but allow name-only recipes", () => {
+  const valid = { version: 1, index: 0, batches: [{ water: "1000", fertilizers: [{ name: "A", amount: "10" }] }] };
+  assert.deepEqual(parseFertilizerRecipes(valid), valid);
+  assert.equal(parseFertilizerRecipes({ ...valid, index: 3 }), null);
+  assert.equal(parseFertilizerRecipes({ ...valid, batches: [{ water: "1000", fertilizers: [{ name: "A", amount: "" }] }] }), null);
+  assert.ok(parseFertilizerRecipes({ ...valid, batches: [{ water: "", fertilizers: [{ name: "A", amount: "" }] }] }));
+  assert.equal(parseFertilizerRecipes({ ...valid, batches: Array(6).fill(valid.batches[0]) }), null);
+});
+
+test("recipe drafts preserve unfinished amounts and new names across close and reload, without requiring a save", () => {
+  const old = global.localStorage;
+  const storage = new Map();
+  global.localStorage = { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) };
+  try {
+    const draft = newFertilizerDraft([{ water: "1000", fertilizers: [{ name: "A", amount: "0." }] }], 0);
+    draft.name = "아직 추가하지 않은 이름";
+    assert.equal(writeFertilizerDraft(draft), true);
+    assert.deepEqual(readFertilizerDraft(), draft);
+    clearFertilizerDraft(); assert.equal(readFertilizerDraft(), null);
+    storage.set(recipeDraftKey, "{broken"); assert.equal(readFertilizerDraft(), null);
+    global.localStorage = { getItem() { throw new Error(); }, setItem() { throw new Error(); } };
+    assert.equal(writeFertilizerDraft(draft), false);
+    assert.equal(readFertilizerDraft(), null);
+  } finally { if (old === undefined) delete global.localStorage; else global.localStorage = old; }
+});
+
+test("recipes persist to the settings source, support edit and last-container removal, and preserve all usage records", async () => {
+  let saved; let revision = 0;
+  const calls = [];
+  global.fetch = async (url, options) => {
+    const body = JSON.parse(options.body);
+    calls.push({ url, method: options.method, body });
+    if (url.endsWith("/query")) return json({ results: saved ? [saved] : [] });
+    revision++;
+    saved = { id: plantId, last_edited_time: String(revision), properties: { 메모: body.properties.메모 } };
+    return json(saved);
+  };
+  assert.deepEqual((await (await recipesApi.GET()).json()).state.batches, []);
+  const state = { version: 1, batches: [{ water: "1000", fertilizers: [{ name: "A", amount: "10" }] }], index: 0 };
+  const save = (value, version) => recipesApi.PUT(new Request("http://localhost/api/fertilizer-recipes", { method: "PUT", body: JSON.stringify({ state: value, revision: version }) }));
+  assert.equal((await save(state, null)).status, 200);
+  assert.deepEqual((await (await recipesApi.GET()).json()).state, state);
+  state.batches[0].water = "750";
+  assert.equal((await save(state, "1")).status, 200);
+  const before = calls.length;
+  assert.equal((await save(state, "1")).status, 409);
+  assert.equal(calls.length, before + 1, "conflict only reads; it never overwrites another device");
+  assert.equal((await save({ version: 1, batches: [], index: 0 }, "2")).status, 200);
+  assert.deepEqual((await (await recipesApi.GET()).json()).state.batches, []);
+  const writes = calls.filter((call) => !call.url.endsWith("/query"));
+  assert.equal(writes.length, 3);
+  assert.deepEqual(Object.keys(writes[1].body.properties), ["메모"]);
+  assert.equal(writes[0].body.properties.유형.select.name, "비료 설정");
+  assert.ok(writes.every((call) => call.method === "POST" || call.method === "PATCH"));
+  assert.ok(writes.every((call) => !call.body.archived && !call.body.in_trash));
 });
 
 test("plant list keeps cycle-day alerts and missing-date behavior", () => {

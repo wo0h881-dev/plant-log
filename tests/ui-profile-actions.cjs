@@ -19,9 +19,13 @@ async function main() {
       await page.route("**/fixture/**", (route) => route.fulfill({ contentType: "image/svg+xml", body: svg }));
       await page.route("**/_next/image?**", (route) => route.fulfill({ contentType: "image/svg+xml", body: svg }));
       let watering; let plainWatering; let observation; let edit; let failWatering = true;
+      let recipes = { version: 1, batches: [], index: 0 }; let recipeRevision = 0;
       await page.route("**/api/**", async (route) => {
         const req = route.request(); const url = new URL(req.url()); let data = {};
-        if (url.pathname === "/api/plants") {
+        if (url.pathname === "/api/fertilizer-recipes") {
+          if (req.method() === "PUT") { recipes = req.postDataJSON().state; recipeRevision++; }
+          data = { state: recipes, revision: String(recipeRevision) };
+        } else if (url.pathname === "/api/plants") {
           if (req.method() === "PATCH") { edit = req.postDataJSON(); Object.assign(plant, edit); data = { plant }; }
           else data = { plants: [plant], source: "notion" };
         } else if (url.pathname === "/api/watering-logs") {
@@ -68,7 +72,7 @@ async function main() {
       await fertilizer.getByRole("button", { name: "물통 추가", exact: true }).click();
       const secondBatch = fertilizer.getByRole("group", { name: "물통 2", exact: true });
       await secondBatch.getByLabel("물 (mL)", { exact: true }).fill("500");
-      await secondBatch.getByRole("button", { name: "별도 비료 C", exact: true }).click();
+      await fertilizer.getByRole("button", { name: "별도 비료 C", exact: true }).click();
       await secondBatch.getByLabel("별도 비료 C (mL)", { exact: true }).fill("1");
       await fertilizer.getByRole("button", { name: "물통 추가", exact: true }).click();
       await fertilizer.getByRole("button", { name: "물통 3 삭제", exact: true }).click();
@@ -76,7 +80,8 @@ async function main() {
       assert.equal(await fertilizer.getByLabel("액체 비료 (mL)", { exact: true }).inputValue(), "0.75");
       assert.equal(await fertilizer.getByRole("group", { name: "물통 2", exact: true }).isVisible(), false);
       await page.screenshot({ path: path.join(out, `fertilizers-${width}.png`) });
-      await fertilizer.getByRole("button", { name: "적용", exact: true }).click();
+      await fertilizer.getByRole("button", { name: "물통 저장", exact: true }).click();
+      await fertilizer.waitFor({ state: "hidden" });
       assert.equal(await fertilizerToggle.getAttribute("aria-pressed"), "true");
       await fertilizerToggle.click();
       await page.getByRole("button", { name: "비료 설정", exact: true }).getByText("비료 끔", { exact: false }).waitFor();
@@ -134,7 +139,8 @@ async function main() {
       assert.equal(await fertilizer.getByRole("button", { name: "영양제 B", exact: true }).first().getAttribute("aria-pressed"), "true");
       await fertilizer.getByRole("button", { name: "영양제 B 목록에서 숨기기", exact: true }).first().click();
       await fertilizer.getByRole("button", { name: "별도 비료 C 목록에서 숨기기", exact: true }).first().click();
-      await fertilizer.getByRole("button", { name: "적용", exact: true }).click();
+      await fertilizer.getByRole("button", { name: "물통 저장", exact: true }).click();
+      await fertilizer.waitFor({ state: "hidden" });
       assert.equal(await page.getByRole("button", { name: "비료 설정", exact: true }).count(), 0);
       assert.equal(await page.locator('[data-screen="water"]').getByRole("checkbox", { checked: true }).count(), 0);
       await nav.getByRole("button", { name: "관찰일지", exact: true }).click();

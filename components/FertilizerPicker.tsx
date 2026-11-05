@@ -1,25 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { PlantDialog } from "@/components/PlantDialog";
 import { formatFertilizerBatches, formatFertilizerMix, type FertilizerBatch } from "@/lib/fertilizer";
+import { clearFertilizerDraft, emptyBatch, newFertilizerDraft, readFertilizerDraft, writeFertilizerDraft, type DraftBatch } from "@/lib/fertilizer-draft";
 
 const hiddenKey = "plant-log:hidden-fertilizers";
 const tagKey = (name: string) => name.trim().toLowerCase();
 
-type DraftBatch = FertilizerBatch & { id: string; amounts: Record<string, string> };
-const emptyBatch = (): DraftBatch => ({ id: crypto.randomUUID(), water: "", fertilizers: [], amounts: {} });
-
-export function FertilizerPicker({ selected, selectedIndex = 0, onSelect, onRemove, onClose }: { selected: FertilizerBatch[]; selectedIndex?: number; onSelect: (batches: FertilizerBatch[], index: number) => void; onRemove: (name: string) => void; onClose: () => void }) {
+export function FertilizerPicker({ selected, selectedIndex = 0, onSelect, onClose }: { selected: FertilizerBatch[]; selectedIndex?: number; onSelect: (batches: FertilizerBatch[], index: number) => Promise<void>; onClose: () => void }) {
+  const [initial] = useState(() => { const cached = readFertilizerDraft(); return { state: cached ?? newFertilizerDraft(selected, selectedIndex), restored: Boolean(cached) }; });
   const [hidden, setHidden] = useState<string[]>(() => {
     try { const data = JSON.parse(localStorage.getItem(hiddenKey) ?? "[]"); return Array.isArray(data) ? data.filter((item) => typeof item === "string") : []; }
     catch { return []; }
   });
-  const [options, setOptions] = useState<string[]>([]);
-  const [draft, setDraft] = useState("");
-  const [batches, setBatches] = useState<DraftBatch[]>(() => selected.length ? selected.map((batch) => ({ ...batch, id: crypto.randomUUID(), amounts: Object.fromEntries(batch.fertilizers.map((item) => [item.name, item.amount])) })) : [emptyBatch()]);
-  const [activeIndex, setActiveIndex] = useState(Math.min(selectedIndex, Math.max(0, selected.length - 1)));
+  const [options, setOptions] = useState(initial.state.options);
+  const [draft, setDraft] = useState(initial.state.name);
+  const [batches, setBatches] = useState<DraftBatch[]>(initial.state.batches);
+  const [activeIndex, setActiveIndex] = useState(initial.state.activeIndex);
+  const [saving, setSaving] = useState(false);
+  const [storageError, setStorageError] = useState(false);
+  const submitting = useRef(false);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
 
@@ -28,11 +30,16 @@ export function FertilizerPicker({ selected, selectedIndex = 0, onSelect, onRemo
     void fetch("/api/watering-logs?options=fertilizer", { signal: controller.signal }).then(async (response) => {
       const payload = await response.json();
       if (!response.ok || !Array.isArray(payload.options)) throw new Error();
-      setOptions(payload.options);
+      setOptions((current) => [...new Set([...current, ...payload.options])]);
       setStatus("ready");
     }).catch(() => { if (!controller.signal.aborted) setStatus("error"); });
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    const saved = writeFertilizerDraft({ version: 1, batches, activeIndex, options, name: draft });
+    if (!saved) void Promise.resolve().then(() => setStorageError(true));
+  }, [batches, activeIndex, options, draft]);
 
   function updateBatch(id: string, update: (batch: DraftBatch) => DraftBatch) {
     setBatches((current) => current.map((batch) => batch.id === id ? update(batch) : batch));
@@ -53,11 +60,30 @@ export function FertilizerPicker({ selected, selectedIndex = 0, onSelect, onRemo
     return batch.fertilizers.some((item) => !formatFertilizerMix({ water: batch.water, fertilizer: item.amount }));
   });
 
-  return <PlantDialog title="비료 선택" onClose={onClose}>
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className="status-chip" aria-pressed={!names.length} onClick={() => { setBatches([emptyBatch()]); setActiveIndex(0); }}>비료 없음</button>
+  async function save() {
+    if (submitting.current) return;
+    submitting.current = true; setSaving(true); setError("");
+    try {
+      await onSelect(activeBatches.map(({ water, fertilizers }) => ({ water, fertilizers })), Math.max(0, activeBatches.indexOf(activeBatch)));
+      clearFertilizerDraft(); onClose();
+    } catch (error) { setError(error instanceof Error ? error.message : "물통을 저장하지 못했어요."); }
+    finally { submitting.current = false; setSaving(false); }
+  }
+
+  return <PlantDialog title="비료 선택" onClose={() => { if (!saving) onClose(); }} closeDisabled={saving}>
+    <fieldset disabled={saving} className="min-w-0 space-y-4">
+      {initial.restored ? <p role="status" className="text-xs text-[#4263EB]">작성 중인 내용이 복원됐어요.</p> : null}
+      {storageError ? <p role="alert" className="text-xs text-red-700">기기의 저장 공간을 사용할 수 없어 새로고침하면 작성 중인 내용이 사라질 수 있어요.</p> : null}
+      <div className="status-chips" aria-label={`물통 ${activeIndex + 1} 비료 종류`} role="group">
+        <button type="button" className="status-chip" onClick={() => { setBatches([emptyBatch()]); setActiveIndex(0); }}>물통 전체 비우기</button>
         <button type="button" className="status-chip" disabled={batches.length >= 5} onClick={() => { setBatches((current) => [...current, emptyBatch()]); setActiveIndex(batches.length); }}><Plus size={15} aria-hidden="true" />물통 추가</button>
+        {tags.map((tag) => {
+          const chosen = activeBatch.fertilizers.some((item) => item.name === tag);
+          return <div className="fertilizer-tag" key={tag} data-active={chosen}>
+            <button type="button" aria-pressed={chosen} disabled={!chosen && names.length >= 20} onClick={() => updateBatch(activeBatch.id, (current) => ({ ...current, fertilizers: chosen ? current.fertilizers.filter((item) => item.name !== tag) : [...current.fertilizers, { name: tag, amount: current.amounts[tag] ?? "" }] }))}>{tag}</button>
+            <button type="button" aria-label={`${tag} 목록에서 숨기기`} title="이 브라우저의 목록에서 숨기기" onClick={() => { updateHidden([...hidden, tagKey(tag)]); setBatches((current) => current.map((item) => { const fertilizers = item.fertilizers.filter((value) => value.name !== tag); return { ...item, fertilizers, water: fertilizers.length ? item.water : "" }; })); }}><X size={15} aria-hidden="true" /></button>
+          </div>;
+        })}
       </div>
       {status === "loading" ? <p role="status" className="text-xs text-[#8B929B]">비료 목록을 불러오는 중이에요.</p> : null}
       {status === "error" ? <p role="alert" className="text-xs text-red-700">저장된 비료 목록을 불러오지 못했어요.</p> : null}
@@ -82,22 +108,13 @@ export function FertilizerPicker({ selected, selectedIndex = 0, onSelect, onRemo
         <legend className="text-sm font-semibold">물통 {index + 1}</legend>
         <div className="flex items-end gap-2">
           <label className="min-w-0 flex-1 text-xs">물 (mL)<input className="field mt-2" inputMode="decimal" maxLength={12} value={batch.water} onChange={(event) => updateBatch(batch.id, (current) => ({ ...current, water: event.target.value }))} /></label>
-          {batches.length > 1 ? <button type="button" className="icon-button shrink-0" aria-label={`물통 ${index + 1} 삭제`} title="이 물통 지우기" onClick={() => { setBatches((current) => current.filter((item) => item.id !== batch.id)); setActiveIndex(Math.max(0, index - 1)); }}><X size={18} /></button> : null}
-        </div>
-        <div className="status-chips" aria-label={`물통 ${index + 1} 비료 종류`} role="group">
-          {tags.map((tag) => {
-            const chosen = batch.fertilizers.some((item) => item.name === tag);
-            return <div className="fertilizer-tag" key={tag} data-active={chosen}>
-              <button type="button" aria-pressed={chosen} disabled={!chosen && names.length >= 20} onClick={() => updateBatch(batch.id, (current) => ({ ...current, fertilizers: chosen ? current.fertilizers.filter((item) => item.name !== tag) : [...current.fertilizers, { name: tag, amount: current.amounts[tag] ?? "" }] }))}>{tag}</button>
-              <button type="button" aria-label={`${tag} 목록에서 숨기기`} title="이 브라우저의 목록에서 숨기기" onClick={() => { updateHidden([...hidden, tagKey(tag)]); setBatches((current) => current.map((item) => { const fertilizers = item.fertilizers.filter((value) => value.name !== tag); return { ...item, fertilizers, water: fertilizers.length ? item.water : "" }; })); onRemove(tag); }}><X size={15} aria-hidden="true" /></button>
-            </div>;
-          })}
+          <button type="button" className="icon-button shrink-0" aria-label={`물통 ${index + 1} 삭제`} title="이 물통 지우기" onClick={() => { setBatches((current) => current.length === 1 ? [emptyBatch()] : current.filter((item) => item.id !== batch.id)); setActiveIndex(Math.max(0, index - 1)); }}><X size={18} /></button>
         </div>
         {batch.fertilizers.map((item) => <label key={item.name} className="block min-w-0 break-words text-xs">{item.name} (mL)<input className="field mt-2" inputMode="decimal" maxLength={12} value={item.amount} onChange={(event) => updateBatch(batch.id, (current) => ({ ...current, amounts: { ...current.amounts, [item.name]: event.target.value }, fertilizers: current.fertilizers.map((value) => value.name === item.name ? { ...value, amount: event.target.value } : value) }))} /></label>)}
       </fieldset>)}
       {activeBatch?.fertilizers.length ? <output className="block break-words text-xs font-semibold text-[#4263EB]">{formatFertilizerBatches([activeBatch], activeIndex)}</output> : null}
       {invalidMix ? <p className="text-xs text-red-700">물통마다 비료를 선택하고 물과 각 비료의 양을 모두 0보다 큰 숫자로 입력해주세요. 양을 기록하지 않으려면 해당 물통의 숫자를 모두 비워주세요.</p> : null}
-      <button type="button" className="primary-button" disabled={Boolean(draft.trim()) || invalidMix || summary.length > 4000 || Boolean(names.length && !activeBatch?.fertilizers.length)} onClick={() => { onSelect(activeBatches.map(({ water, fertilizers }) => ({ water, fertilizers })), Math.max(0, activeBatches.indexOf(activeBatch))); onClose(); }}>적용</button>
-    </div>
+      <button type="button" className="primary-button" disabled={saving || Boolean(draft.trim()) || invalidMix || summary.length > 4000 || Boolean(names.length && !activeBatch?.fertilizers.length)} onClick={() => { void save(); }}>{saving ? "저장 중..." : "물통 저장"}</button>
+    </fieldset>
   </PlantDialog>;
 }
