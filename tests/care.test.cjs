@@ -103,6 +103,35 @@ test("fertilizer uses the watering DB select property and leaves plain watering 
   assert.equal(calls.length, before + 1, "incompatible existing property is not changed");
 });
 
+test("mixed fertilizers keep all tags in one watering and one observation without changing old options", async () => {
+  const calls = [];
+  const observationId = "22222222-2222-4222-8222-222222222222";
+  process.env.NOTION_DATA_SOURCE_ID = observationId;
+  global.fetch = async (url, options) => {
+    const body = options.body && JSON.parse(options.body);
+    calls.push({ url, method: options.method, body });
+    if (url.endsWith("/query")) return json({ results: [returnedPage({ 이름: { title: [{ text: { content: "💧핑크" } }] }, 식물: { relation: [{ id: plantId }] }, 비료: { select: { name: "액체 A" } }, "사용 비료": { multi_select: [{ name: "액체 A" }, { name: "액체 B" }] }, "비료 비율": { rich_text: [{ plain_text: "A 1:100 / B 1:1000" }] } })] });
+    if (url.endsWith("/pages")) return json({ id: plantId });
+    return json({ properties: { 비료: { type: "select", select: { options: [{ name: "액체 A" }] } } } });
+  };
+  const ratio = "A 1:100 / B 1:1000";
+  const save = (fertilizers) => wateringApi.POST(new Request("http://localhost/api/watering-logs", { method: "POST", body: JSON.stringify({ plants: [{ id: plantId, name: "핑크" }], fertilizers, fertilizerRatio: ratio }) }));
+  assert.equal((await (await save([" 액체 A ", "액체 B", "액체 a"])).json()).successCount, 1);
+  const patch = calls.find((call) => call.method === "PATCH").body;
+  assert.deepEqual(patch, { properties: { "비료 비율": { rich_text: {} }, "사용 비료": { multi_select: {} } } });
+  const pages = calls.filter((call) => call.url.endsWith("/pages"));
+  assert.equal(pages.length, 2, "mixed fertilizer never duplicates watering events");
+  assert.deepEqual(pages[0].body.properties["사용 비료"].multi_select, [{ name: "액체 A" }, { name: "액체 B" }]);
+  assert.deepEqual(pages[1].body.properties.관찰태그.multi_select, [{ name: "액체 A" }, { name: "액체 B" }]);
+  assert.equal(pages[1].body.properties.관찰일지.rich_text[0].text.content, `비료 비율: ${ratio}`);
+  const today = await (await wateringApi.GET(new Request("http://localhost/api/watering-logs?date=2026-11-05"))).json();
+  assert.equal(today.plants[0].fertilizer, "액체 A + 액체 B");
+  assert.equal(today.plants[0].fertilizerRatio, ratio);
+  const before = calls.length;
+  for (const invalid of [[], ["A,B"], [null], Array(21).fill("A"), "A"]) assert.equal((await save(invalid)).status, 400);
+  assert.equal(calls.length, before, "invalid selections do not reach Notion");
+});
+
 test("fertilizer ratio supports arbitrary water volumes and rejects invalid or incomplete mixes", () => {
   assert.equal(formatFertilizerMix({ water: "1000", fertilizer: "10" }), "물:비료 1000mL : 10mL (비료:물 1:100)");
   assert.equal(formatFertilizerMix({ water: "750", fertilizer: "0.75" }), "물:비료 750mL : 0.75mL (비료:물 1:1000)");

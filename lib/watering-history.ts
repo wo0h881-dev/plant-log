@@ -6,6 +6,7 @@ type WateringPage = {
     relation?: Array<{ id: string }>;
     date?: { start: string } | null;
     select?: { name?: string } | null;
+    multi_select?: Array<{ name?: string }>;
     rich_text?: Array<{ plain_text?: string }>;
   }>;
 };

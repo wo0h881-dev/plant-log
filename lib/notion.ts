@@ -54,6 +54,7 @@ type CreateWateringLogPageParams = {
   wateredAt: string;
   note: string;
   fertilizer?: string;
+  fertilizers?: string[];
   fertilizerRatio?: string;
 };
 
@@ -180,21 +181,23 @@ export async function getDataSourceOptions(token: string, dataSourceId: string, 
   return (await getDataSourceOptionGroups(token, dataSourceId))[propertyName] ?? [];
 }
 
-export async function readWateringFertilizers(token: string, sourceId: string, createIfMissing = false, needsRatio = false) {
+export async function readWateringFertilizers(token: string, sourceId: string, createIfMissing = false, needsRatio = false, needsMultiple = false) {
   const url = `${NOTION_API_BASE}/data_sources/${sourceId}`;
   const headers = notionHeaders(token);
   const source = await readNotionJson<NotionDataSource>(await fetch(url, { headers, cache: "no-store" }));
   const property = source.properties?.["비료"];
   if (property && property.type !== "select") throw new Error("노션 물주기 기록의 ‘비료’ 속성을 선택 유형으로 확인해주세요.");
   const ratio = source.properties?.["비료 비율"];
+  const multiple = source.properties?.["사용 비료"];
+  if (multiple && multiple.type !== "multi_select") throw new Error("노션 물주기 기록의 ‘사용 비료’ 속성을 다중 선택 유형으로 확인해주세요.");
   if (needsRatio && ratio && ratio.type !== "rich_text") throw new Error("노션 물주기 기록의 ‘비료 비율’ 속성을 텍스트 유형으로 확인해주세요.");
-  const missing = { ...(!property && createIfMissing ? { 비료: { select: {} } } : {}), ...(needsRatio && !ratio ? { "비료 비율": { rich_text: {} } } : {}) };
+  const missing = { ...(!property && createIfMissing ? { 비료: { select: {} } } : {}), ...(needsRatio && !ratio ? { "비료 비율": { rich_text: {} } } : {}), ...(needsMultiple && !multiple ? { "사용 비료": { multi_select: {} } } : {}) };
   if (Object.keys(missing).length) {
     await readNotionJson(await fetch(url, {
       method: "PATCH", headers, body: JSON.stringify({ properties: missing }),
     }));
   }
-  return (property?.select?.options ?? []).flatMap((option) => option.name ? [option.name] : []);
+  return [...new Set([...(property?.select?.options ?? []), ...(multiple?.multi_select?.options ?? [])].flatMap((option) => option.name ? [option.name] : []))];
 }
 
 export async function getDatabasePropertyOptions(token: string, databaseId: string, propertyName: string) {
@@ -270,7 +273,7 @@ export async function createPlantLogPage({
             })),
           },
           관찰일지: {
-            rich_text: note ? [{ text: { content: note } }] : [],
+            rich_text: note ? Array.from({ length: Math.ceil(note.length / 1800) }, (_, index) => ({ text: { content: note.slice(index * 1800, (index + 1) * 1800) } })) : [],
           },
           관찰태그: {
             multi_select: tags.map((name) => ({ name })),
@@ -310,6 +313,7 @@ export async function createWateringLogPage({
   wateredAt,
   note,
   fertilizer,
+  fertilizers,
   fertilizerRatio,
 }: CreateWateringLogPageParams) {
   return readNotionJson<{ id: string; url?: string }>(
@@ -336,7 +340,8 @@ export async function createWateringLogPage({
             checkbox: true,
           },
           ...(fertilizer ? { 비료: { select: { name: fertilizer } } } : {}),
-          ...(fertilizerRatio ? { "비료 비율": { rich_text: [{ text: { content: fertilizerRatio } }] } } : {}),
+          ...(fertilizers?.length ? { "사용 비료": { multi_select: fertilizers.map((name) => ({ name })) } } : {}),
+          ...(fertilizerRatio ? { "비료 비율": { rich_text: Array.from({ length: Math.ceil(fertilizerRatio.length / 1800) }, (_, index) => ({ text: { content: fertilizerRatio.slice(index * 1800, (index + 1) * 1800) } })) } } : {}),
           메모: {
             rich_text: note ? [{ text: { content: note } }] : [],
           },

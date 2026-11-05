@@ -71,10 +71,11 @@ export function PlantLogForm() {
   const [commonMessage, setCommonMessage] = useState("");
   const [spaceOrigin, setSpaceOrigin] = useState<"profile" | "more">("profile");
   const [wateredDate, setWateredDate] = useState(getTodayValue);
-  const [fertilizer, setFertilizer] = useState("");
+  const [fertilizers, setFertilizers] = useState<string[]>([]);
+  const fertilizer = fertilizers.join(" + ");
   const [fertilizerEnabled, setFertilizerEnabled] = useState(false);
-  const [fertilizerMix, setFertilizerMix] = useState<FertilizerMix>({ water: "", fertilizer: "" });
-  const fertilizerRatio = formatFertilizerMix(fertilizerMix);
+  const [fertilizerMix, setFertilizerMix] = useState<Record<string, FertilizerMix>>({});
+  const fertilizerRatio = fertilizers.flatMap((name) => { const ratio = formatFertilizerMix(fertilizerMix[name] ?? { water: "", fertilizer: "" }); return ratio ? [fertilizers.length > 1 ? `${name}: ${ratio}` : ratio] : []; }).join("\n");
   const [observationRevision, setObservationRevision] = useState(0);
   const [fertilizerOpen, setFertilizerOpen] = useState(false);
   const [isWaterSaving, setIsWaterSaving] = useState(false);
@@ -378,6 +379,7 @@ export function PlantLogForm() {
               onOpenCalendar={openCalendarForPlant}
               wateredAt={wateredDate}
               fertilizer={fertilizerEnabled ? fertilizer : undefined}
+              fertilizers={fertilizerEnabled ? fertilizers : undefined}
               fertilizerRatio={fertilizerEnabled ? fertilizerRatio : undefined}
               onComplete={() => setFertilizerEnabled(false)}
               onSavingChange={setIsWaterSaving}
@@ -468,7 +470,7 @@ export function PlantLogForm() {
       </div></PlantDialog> : null}
       {cycleEditorOpen ? <BulkWateringCycleEditor plants={plants.filter((plant) => waterSelection.includes(plant.id))} onSaved={(plant) => { handlePlantRenamed(plant); setWaterSelection((current) => current.filter((id) => id !== plant.id)); }} onClose={() => setCycleEditorOpen(false)} /> : null}
       {commonOpen ? <RoomRecordDialog kind="common" locationId="" locationName="전체 식물" plants={plants} initialDate={observedDate} onSave={saveCommonNotice} onClose={() => setCommonOpen(false)} /> : null}
-      {fertilizerOpen ? <FertilizerPicker selected={fertilizer} selectedMix={fertilizerMix} onSelect={(name, mix) => { setFertilizer(name); setFertilizerMix(mix); setFertilizerEnabled(Boolean(name)); }} onRemove={(name) => { if (name === fertilizer) { setFertilizer(""); setFertilizerMix({ water: "", fertilizer: "" }); setFertilizerEnabled(false); } }} onClose={() => setFertilizerOpen(false)} /> : null}
+      {fertilizerOpen ? <FertilizerPicker selected={fertilizers} selectedMix={fertilizerMix} onSelect={(names, mix) => { setFertilizers(names); setFertilizerMix(mix); setFertilizerEnabled(Boolean(names.length)); }} onRemove={(name) => { const remaining = fertilizers.filter((value) => value !== name); setFertilizers(remaining); if (!remaining.length) setFertilizerEnabled(false); }} onClose={() => setFertilizerOpen(false)} /> : null}
       <nav className="bottom-nav" aria-label="주요 화면">
         <div className="grid grid-cols-5 gap-1">
           {tabs.flatMap(({ id, label, icon }, index) => {

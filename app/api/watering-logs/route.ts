@@ -82,7 +82,8 @@ export async function GET(request: Request) {
       const id = page.properties["식물"]?.relation?.[0]?.id ?? "";
       const name = readTitle(page);
       if (!name) continue;
-      const fertilizer = page.properties["비료"]?.select?.name;
+      const multiple = page.properties["사용 비료"]?.multi_select?.flatMap((option) => option.name ? [option.name] : []);
+      const fertilizer = multiple?.length ? multiple.join(" + ") : page.properties["비료"]?.select?.name;
       const fertilizerRatio = page.properties["비료 비율"]?.rich_text?.map((part) => part.plain_text ?? "").join("");
       const existing = uniquePlants.get(id || name);
       if (!existing || (!existing.fertilizer && fertilizer)) uniquePlants.set(id || name, { id, name, ...(fertilizer ? { fertilizer, fertilizerRatio } : {}) });
@@ -133,17 +134,23 @@ export async function POST(request: Request) {
       wateredAt?: string;
       note?: string;
       fertilizer?: string;
+      fertilizers?: string[];
       fertilizerRatio?: string;
     };
     const plants = payload.plants?.filter((plant) => plant.id && plant.name) ?? [];
     const wateredAt = payload.wateredAt || new Date().toISOString();
     const note = payload.note?.trim() ?? "물 줌";
-    if (payload.fertilizer !== undefined && (typeof payload.fertilizer !== "string" || !payload.fertilizer.trim() || payload.fertilizer.trim().length > 100 || /[,\r\n]/.test(payload.fertilizer))) {
+    const validName = (name: unknown): name is string => typeof name === "string" && Boolean(name.trim()) && name.trim().length <= 100 && !/[,\r\n]/.test(name);
+    if (payload.fertilizers !== undefined && (!Array.isArray(payload.fertilizers) || !payload.fertilizers.length || payload.fertilizers.length > 20 || !payload.fertilizers.every(validName))) {
+      return NextResponse.json({ message: "비료를 1~20개 선택하고 각 이름을 쉼표 없이 100자 이내로 입력해주세요." }, { status: 400 });
+    }
+    if (payload.fertilizers === undefined && payload.fertilizer !== undefined && !validName(payload.fertilizer)) {
       return NextResponse.json({ message: "비료 이름을 쉼표 없이 1~100자로 입력해주세요." }, { status: 400 });
     }
-    const fertilizer = payload.fertilizer?.trim();
-    if (payload.fertilizerRatio !== undefined && (typeof payload.fertilizerRatio !== "string" || payload.fertilizerRatio.trim().length > 100 || !fertilizer)) {
-      return NextResponse.json({ message: "비료를 선택하고 비율을 100자 이내로 입력해주세요." }, { status: 400 });
+    const fertilizers = [...new Map((payload.fertilizers ?? (payload.fertilizer ? [payload.fertilizer] : [])).map((name) => [name.trim().toLowerCase(), name.trim()])).values()];
+    const fertilizer = fertilizers[0];
+    if (payload.fertilizerRatio !== undefined && (typeof payload.fertilizerRatio !== "string" || payload.fertilizerRatio.trim().length > 4000 || !fertilizer)) {
+      return NextResponse.json({ message: "비료를 선택하고 비율을 4000자 이내로 입력해주세요." }, { status: 400 });
     }
     const fertilizerRatio = payload.fertilizerRatio?.trim();
 
@@ -158,8 +165,9 @@ export async function POST(request: Request) {
     if (fertilizer && (!observationSource || observationSource === wateringParentId || plants.some((plant) => !hasNotionPageId(plant.id)))) {
       return NextResponse.json({ message: "비료를 기록하려면 식물과 관찰일지 DB 연결을 확인해주세요." }, { status: 400 });
     }
-    const options = fertilizer ? await readWateringFertilizers(token, wateringParentId, true, Boolean(fertilizerRatio)) : [];
-    const selectedFertilizer = options.find((option) => option.trim().toLowerCase() === fertilizer?.toLowerCase()) ?? fertilizer;
+    const options = fertilizer ? await readWateringFertilizers(token, wateringParentId, true, Boolean(fertilizerRatio), Boolean(payload.fertilizers)) : [];
+    const selectedFertilizers = [...new Set(fertilizers.map((name) => options.find((option) => option.trim().toLowerCase() === name.toLowerCase()) ?? name))];
+    const selectedFertilizer = selectedFertilizers[0];
     const results: WateringResult[] = [];
 
     for (const plant of plants) {
@@ -172,13 +180,14 @@ export async function POST(request: Request) {
           wateredAt,
           note,
           fertilizer: selectedFertilizer,
+          ...(payload.fertilizers ? { fertilizers: selectedFertilizers } : {}),
           fertilizerRatio,
         });
 
         let observationWarning = false;
         if (selectedFertilizer && observationSource) {
           try {
-            await createPlantLogPage({ token, parentId: observationSource, plantId: plant.id, plantName: plant.name, plantCategory: typeof plant.category === "string" ? plant.category : "", createdAt: wateredAt, tags: [selectedFertilizer], photos: [], note: fertilizerRatio ? `비료 비율: ${fertilizerRatio}` : "비료 사용" });
+            await createPlantLogPage({ token, parentId: observationSource, plantId: plant.id, plantName: plant.name, plantCategory: typeof plant.category === "string" ? plant.category : "", createdAt: wateredAt, tags: selectedFertilizers, photos: [], note: fertilizerRatio ? `비료 비율: ${fertilizerRatio}` : "비료 사용" });
           } catch { observationWarning = true; }
         }
 

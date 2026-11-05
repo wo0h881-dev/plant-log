@@ -20,6 +20,7 @@ type BatchWateringProps = {
   onOpenCalendar?: (plant: Plant) => void;
   wateredAt?: string;
   fertilizer?: string;
+  fertilizers?: string[];
   fertilizerRatio?: string;
   onComplete?: () => void;
   onSavingChange?: (saving: boolean) => void;
@@ -50,6 +51,7 @@ export function BatchWatering({
   onOpenCalendar,
   wateredAt,
   fertilizer,
+  fertilizers,
   fertilizerRatio,
   onComplete,
   onSavingChange,
@@ -216,6 +218,7 @@ export function BatchWatering({
         body: JSON.stringify({
           wateredAt: wateredDate,
           ...(fertilizer ? { fertilizer } : {}),
+          ...(fertilizers?.length ? { fertilizers } : {}),
           ...(fertilizer && fertilizerRatio ? { fertilizerRatio } : {}),
           plants: selectedPlants.map(({ id, name, category }) => ({ id, name, category })),
         }),
