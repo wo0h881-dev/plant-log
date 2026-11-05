@@ -37,7 +37,7 @@ const { LOCATIONS, LOCATION_GROUPS, emptyLocationState, parseLocationState, reco
 const { locationTimeline } = require("../lib/plant-locations.ts");
 const { environmentAt, isEnvironment, formatLocationEnvironment } = require("../lib/location-environment.ts");
 const { canSelectPlant, matchesPlantSearch } = require("../lib/plant-search.ts");
-const { formatFertilizerMix } = require("../lib/fertilizer.ts");
+const { formatFertilizerMix, formatFertilizerBatches } = require("../lib/fertilizer.ts");
 const plantId = "11111111-1111-4111-8111-111111111111";
 const originalFetch = global.fetch;
 const envKeys = ["NOTION_TOKEN", "NOTION_PLANTS_DATA_SOURCE_ID", "NOTION_DATA_SOURCE_ID", "NOTION_DATABASE_ID", "NOTION_WATERING_DATA_SOURCE_ID", "NOTION_SETTINGS_DATA_SOURCE_ID", "NOTION_SETTINGS_DATABASE_ID"];
@@ -137,6 +137,15 @@ test("fertilizer ratio supports arbitrary water volumes and rejects invalid or i
   assert.equal(formatFertilizerMix({ water: "750", fertilizer: "0.75" }), "물:비료 750mL : 0.75mL (비료:물 1:1000)");
   assert.equal(formatFertilizerMix({ water: "250", fertilizer: "0" }), "");
   assert.equal(formatFertilizerMix({ water: "", fertilizer: "2" }), "");
+});
+
+test("fertilizer batches distinguish shared water from separate water and preserve per-ingredient ratios", () => {
+  assert.equal(formatFertilizerBatches([
+    { water: "1000", fertilizers: [{ name: "A", amount: "10" }, { name: "B", amount: "10" }, { name: "C", amount: "5" }] },
+    { water: "500", fertilizers: [{ name: "D", amount: "1" }] },
+  ]), "물통 1 · 물 1000mL + A 10mL + B 10mL + C 5mL (A 비료:물 1:100 / B 비료:물 1:100 / C 비료:물 1:200)\n물통 2 · 물 500mL + D 1mL (D 비료:물 1:500)");
+  assert.equal(formatFertilizerBatches([{ water: "", fertilizers: [{ name: "A", amount: "" }] }]), "물통 1 · A");
+  assert.equal(formatFertilizerBatches([{ water: "", fertilizers: [] }]), "");
 });
 
 test("plant list keeps cycle-day alerts and missing-date behavior", () => {

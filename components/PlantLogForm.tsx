@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } 
 import dynamic from "next/dynamic";
 import { AlertCircle, ArrowLeft, Check, House, Pencil, RefreshCcw, Sprout } from "lucide-react";
 import { FertilizerPicker } from "@/components/FertilizerPicker";
-import { formatFertilizerMix, type FertilizerMix } from "@/lib/fertilizer";
+import { formatFertilizerBatches, type FertilizerBatch } from "@/lib/fertilizer";
 import { PlantDialog } from "@/components/PlantDialog";
 import { RoomRecordDialog, type RoomRecordInput } from "@/components/RoomRecordDialog";
 import { HeaderDatePicker } from "@/components/HeaderDatePicker";
@@ -71,11 +71,11 @@ export function PlantLogForm() {
   const [commonMessage, setCommonMessage] = useState("");
   const [spaceOrigin, setSpaceOrigin] = useState<"profile" | "more">("profile");
   const [wateredDate, setWateredDate] = useState(getTodayValue);
-  const [fertilizers, setFertilizers] = useState<string[]>([]);
+  const [fertilizerBatches, setFertilizerBatches] = useState<FertilizerBatch[]>([]);
+  const fertilizers = [...new Set(fertilizerBatches.flatMap((batch) => batch.fertilizers.map((item) => item.name)))];
   const fertilizer = fertilizers.join(" + ");
   const [fertilizerEnabled, setFertilizerEnabled] = useState(false);
-  const [fertilizerMix, setFertilizerMix] = useState<Record<string, FertilizerMix>>({});
-  const fertilizerRatio = fertilizers.flatMap((name) => { const ratio = formatFertilizerMix(fertilizerMix[name] ?? { water: "", fertilizer: "" }); return ratio ? [fertilizers.length > 1 ? `${name}: ${ratio}` : ratio] : []; }).join("\n");
+  const fertilizerRatio = formatFertilizerBatches(fertilizerBatches);
   const [observationRevision, setObservationRevision] = useState(0);
   const [fertilizerOpen, setFertilizerOpen] = useState(false);
   const [isWaterSaving, setIsWaterSaving] = useState(false);
@@ -470,7 +470,7 @@ export function PlantLogForm() {
       </div></PlantDialog> : null}
       {cycleEditorOpen ? <BulkWateringCycleEditor plants={plants.filter((plant) => waterSelection.includes(plant.id))} onSaved={(plant) => { handlePlantRenamed(plant); setWaterSelection((current) => current.filter((id) => id !== plant.id)); }} onClose={() => setCycleEditorOpen(false)} /> : null}
       {commonOpen ? <RoomRecordDialog kind="common" locationId="" locationName="전체 식물" plants={plants} initialDate={observedDate} onSave={saveCommonNotice} onClose={() => setCommonOpen(false)} /> : null}
-      {fertilizerOpen ? <FertilizerPicker selected={fertilizers} selectedMix={fertilizerMix} onSelect={(names, mix) => { setFertilizers(names); setFertilizerMix(mix); setFertilizerEnabled(Boolean(names.length)); }} onRemove={(name) => { const remaining = fertilizers.filter((value) => value !== name); setFertilizers(remaining); if (!remaining.length) setFertilizerEnabled(false); }} onClose={() => setFertilizerOpen(false)} /> : null}
+      {fertilizerOpen ? <FertilizerPicker selected={fertilizerBatches} onSelect={(batches) => { setFertilizerBatches(batches); setFertilizerEnabled(batches.some((batch) => batch.fertilizers.length > 0)); }} onRemove={(name) => { setFertilizerBatches((current) => current.map((batch) => ({ ...batch, fertilizers: batch.fertilizers.filter((item) => item.name !== name) }))); if (fertilizers.every((value) => value === name)) setFertilizerEnabled(false); }} onClose={() => setFertilizerOpen(false)} /> : null}
       <nav className="bottom-nav" aria-label="주요 화면">
         <div className="grid grid-cols-5 gap-1">
           {tabs.flatMap(({ id, label, icon }, index) => {
