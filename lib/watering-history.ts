@@ -2,6 +2,7 @@ import { createNotionHeaders, readNotionJson, resolveDataSourceId } from "@/lib/
 
 type WateringPage = {
   id?: string;
+  url?: string;
   properties: Record<string, {
     title?: Array<{ plain_text?: string }>;
     relation?: Array<{ id: string }>;

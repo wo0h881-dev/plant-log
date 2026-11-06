@@ -34,7 +34,7 @@ async function main() {
           else if (url.searchParams.get("options") === "fertilizer") data = { options: watering ? ["완효성", ...watering.fertilizers] : ["완효성"] };
           else data = { plants: [] };
         } else if (url.pathname === "/api/plant-logs") { if (req.method() === "POST") observation = req.postData(); data = {}; }
-        else if (url.pathname === "/api/plant-details") data = { recentPlants: [], photos: [], observations: watering ? [{ id: "fertilizer-record", date: watering.wateredAt, tags: watering.fertilizers, note: `비료 비율: ${watering.fertilizerRatio}` }] : [] };
+        else if (url.pathname === "/api/plant-details") data = { recentPlants: [], photos: [], observations: [], fertilizerRecords: watering ? [{ id: "fertilizer-record", date: watering.wateredAt, tags: [], note: watering.fertilizerRatio }] : [] };
         else if (url.pathname === "/api/watering-stats") data = { wateringDays: 0, recentIntervals: 0 };
         await route.fulfill({ json: data });
       });
@@ -163,7 +163,7 @@ async function main() {
       await nav.getByRole("button", { name: "내 식물", exact: true }).click();
       await page.locator('.app-header').getByRole("searchbox").fill(plant.name);
       await page.locator('.app-header').getByRole("button", { name: /밤비노 핑크/ }).click();
-      await page.getByText(`비료 비율: ${watering.fertilizerRatio}`, { exact: true }).waitFor();
+      await page.locator(".editorial-journal").getByText(watering.fertilizerRatio, { exact: true }).waitFor();
       await page.getByRole("button", { name: "프로필 편집 메뉴", exact: true }).click();
       await page.getByRole("button", { name: "식물 이름 편집", exact: true }).click();
       await page.getByLabel("새 식물명", { exact: true }).fill("밤비노 핑크 1");

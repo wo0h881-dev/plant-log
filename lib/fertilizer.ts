@@ -31,3 +31,29 @@ export function formatFertilizerMix(mix: FertilizerMix) {
   const { water, fertilizer, divisor } = values;
   return `물:비료 ${water / 1000}mL : ${fertilizer / 1000}mL (비료:물 ${fertilizer / divisor}:${water / divisor})`;
 }
+export function formatFertilizerRecord(names: string[], ratio?: string) {
+  return [names.join(", "), ratio?.trim()].filter(Boolean).join("\n");
+}
+
+type FertilizerProperties = Record<string, {
+  select?: { name?: string } | null;
+  multi_select?: Array<{ name?: string }>;
+  rich_text?: Array<{ plain_text?: string }>;
+}>;
+
+export function readFertilizerRecord(properties: FertilizerProperties) {
+  const names = [...new Set(properties["사용 비료"]?.multi_select?.map(({ name }) => name?.trim() ?? "").filter(Boolean) ?? [])];
+  const legacyName = properties["비료"]?.select?.name?.trim();
+  if (!names.length && legacyName) names.push(legacyName);
+  const readText = (key: string) => properties[key]?.rich_text?.map(({ plain_text }) => plain_text ?? "").join("").trim() ?? "";
+  const ratio = readText("비료 비율");
+  const note = readText("비료 내용") || (names.length ? formatFertilizerRecord(names, ratio) : "");
+  return note ? { names, ratio, note } : null;
+}
+
+export function isFertilizerMirror(note: string, tags: string[], record: { names: string[]; ratio: string }) {
+  if (!tags.length || !tags.every((tag) => record.names.includes(tag))) return false;
+  if (note === "비료 사용") return true;
+  const ratio = note.startsWith("비료 비율: ") ? note.slice("비료 비율: ".length) : "";
+  return Boolean(ratio && `\n${record.ratio}\n`.includes(`\n${ratio}\n`));
+}

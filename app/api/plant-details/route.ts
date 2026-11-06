@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isFertilizerMirror, readFertilizerRecord } from "@/lib/fertilizer";
+import { readWateringHistory } from "@/lib/watering-history";
 import {
   createNotionHeaders,
   hasNotionPageId,
@@ -139,7 +141,7 @@ export async function GET(request: NextRequest) {
   const plantName = request.nextUrl.searchParams.get("plantName")?.trim() ?? "";
   const includeAllRecentPlants = request.nextUrl.searchParams.get("all") === "true";
 
-  if (!token || !observationDatabaseId) {
+  if (!token || (!observationDatabaseId && !configuredDataSourceId)) {
     return NextResponse.json(
       plantId ? { observations: [], photos: [] } : { recentPlants: [] },
       { headers: { "Cache-Control": "no-store" } },
@@ -151,7 +153,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const dataSourceId = configuredDataSourceId || (await resolveDataSourceId(token, observationDatabaseId));
+    const dataSourceId = configuredDataSourceId || (await resolveDataSourceId(token, observationDatabaseId!));
 
     if (!plantId) {
       const pages = includeAllRecentPlants
@@ -166,11 +168,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const relationPayload = await queryObservationPages(token, dataSourceId, {
+    const relationFilter = { property: "식물", relation: { contains: plantId } };
+    const [relationPayload, wateringPages] = await Promise.all([queryObservationPages(token, dataSourceId, {
       page_size: 20,
-      filter: { property: "식물", relation: { contains: plantId } },
+      filter: relationFilter,
       sorts: [{ property: "관찰일", direction: "descending" }],
-    });
+    }), readWateringHistory(relationFilter).catch(() => null)]);
     const payload = relationPayload.results.length || !plantName
       ? relationPayload
       : await queryObservationPages(token, dataSourceId, {
@@ -179,9 +182,22 @@ export async function GET(request: NextRequest) {
           sorts: [{ property: "관찰일", direction: "descending" }],
         });
 
+    const fertilizerRecords = (wateringPages ?? []).flatMap((page) => {
+      const record = readFertilizerRecord(page.properties);
+      if (!record || !page.id) return [];
+      return [{ ...record, id: `fertilizer-${page.id}`, date: page.properties["날짜"]?.date?.start ?? undefined, url: page.url }];
+    });
+    const observations = payload.results.filter((page) => {
+      if (page.properties["사진"]?.files?.length) return true;
+      const observation = parseObservation(page);
+      return !fertilizerRecords.some((record) => record.date?.slice(0, 10) === observation.date?.slice(0, 10) && isFertilizerMirror(observation.note, observation.tags, record));
+    }).slice(0, 5).map(parseObservation);
+
     return NextResponse.json(
       {
-        observations: payload.results.slice(0, 5).map(parseObservation),
+        observations,
+        fertilizerRecords: fertilizerRecords.slice(0, 5).map(({ id, date, note, url }) => ({ id, date, note, url, tags: [] })),
+        fertilizerUnavailable: wateringPages === null && Boolean(process.env.NOTION_WATERING_DATABASE_ID || process.env.NOTION_WATERING_DATA_SOURCE_ID),
         photos: parsePhotos(payload.results),
       },
       { headers: { "Cache-Control": "no-store" } },

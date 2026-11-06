@@ -70,6 +70,10 @@ async function main() {
       assert.equal(recentChecks, 0, "batch saves never append to a recent journal entry");
       await nav.getByRole("button", { name: "캘린더", exact: true }).click();
       const calendar = page.locator('[data-screen="more"]');
+      const combined = calendar.getByRole("button", { name: "밤비노 핑크 물주기 및 비료 기록", exact: true });
+      await combined.waitFor();
+      assert.deepEqual(await combined.locator(".tile-detail").allTextContents(), ["물줌", "영양제 A · 물 1000mL"]);
+      assert.equal(await calendar.locator(".calendar-event-tile").count(), 1);
       await calendar.getByRole("tab", { name: "분갈이", exact: true }).click();
       await page.keyboard.press("ArrowRight");
       assert.equal(await calendar.getByRole("tab", { name: "비료", exact: true }).getAttribute("aria-selected"), "true");

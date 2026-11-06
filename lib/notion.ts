@@ -1,3 +1,5 @@
+import { formatFertilizerRecord } from "@/lib/fertilizer";
+
 const NOTION_VERSION = "2026-03-11";
 const NOTION_API_BASE = "https://api.notion.com/v1";
 const NOTION_PAGE_ID_PATTERN = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
@@ -191,7 +193,9 @@ export async function readWateringFertilizers(token: string, sourceId: string, c
   const multiple = source.properties?.["사용 비료"];
   if (multiple && multiple.type !== "multi_select") throw new Error("노션 물주기 기록의 ‘사용 비료’ 속성을 다중 선택 유형으로 확인해주세요.");
   if (needsRatio && ratio && ratio.type !== "rich_text") throw new Error("노션 물주기 기록의 ‘비료 비율’ 속성을 텍스트 유형으로 확인해주세요.");
-  const missing = { ...(!property && createIfMissing ? { 비료: { select: {} } } : {}), ...(needsRatio && !ratio ? { "비료 비율": { rich_text: {} } } : {}), ...(needsMultiple && !multiple ? { "사용 비료": { multi_select: {} } } : {}) };
+  const details = source.properties?.["비료 내용"];
+  if (createIfMissing && details && details.type !== "rich_text") throw new Error("노션 물주기 기록의 ‘비료 내용’ 속성을 텍스트 유형으로 확인해주세요.");
+  const missing = { ...(!property && createIfMissing ? { 비료: { select: {} } } : {}), ...(!details && createIfMissing ? { "비료 내용": { rich_text: {} } } : {}), ...(needsRatio && !ratio ? { "비료 비율": { rich_text: {} } } : {}), ...(needsMultiple && !multiple ? { "사용 비료": { multi_select: {} } } : {}) };
   if (Object.keys(missing).length) {
     await readNotionJson(await fetch(url, {
       method: "PATCH", headers, body: JSON.stringify({ properties: missing }),
@@ -306,10 +310,14 @@ export async function createPlantLogPage({
 }
 
 function wateringFertilizerProperties(fertilizer?: string, fertilizers?: string[], fertilizerRatio?: string) {
+  const names = fertilizers?.length ? fertilizers : fertilizer ? [fertilizer] : [];
+  const details = formatFertilizerRecord(names, fertilizerRatio);
+  const richText = (text: string) => (text.match(/[\s\S]{1,1800}/gu) ?? []).map((content) => ({ text: { content } }));
   return {
     ...(fertilizer ? { 비료: { select: { name: fertilizer } } } : {}),
     ...(fertilizers?.length ? { "사용 비료": { multi_select: fertilizers.map((name) => ({ name })) } } : {}),
-    ...(fertilizerRatio ? { "비료 비율": { rich_text: Array.from({ length: Math.ceil(fertilizerRatio.length / 1800) }, (_, index) => ({ text: { content: fertilizerRatio.slice(index * 1800, (index + 1) * 1800) } })) } } : {}),
+    ...(fertilizerRatio ? { "비료 비율": { rich_text: richText(fertilizerRatio) } } : {}),
+    ...(names.length ? { "비료 내용": { rich_text: richText(details) } } : {}),
   };
 }
 

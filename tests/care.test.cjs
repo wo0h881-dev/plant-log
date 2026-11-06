@@ -30,6 +30,7 @@ const { locationStateFromPages } = require("../lib/notion-locations.ts");
 const coverApi = require("../app/api/plant-cover/route.ts");
 const observationApi = require("../app/api/plant-logs/route.ts");
 const calendarApi = require("../app/api/calendar/route.ts");
+const plantDetailsApi = require("../app/api/plant-details/route.ts");
 const wateringApi = require("../app/api/watering-logs/route.ts");
 const statsApi = require("../app/api/watering-stats/route.ts");
 const { isRecentObservation } = require("../lib/notion-observation.ts");
@@ -85,8 +86,21 @@ test("calendar exposes current and legacy fertilizer separately and hides only m
   assert.equal(response.status, 200);
   const { events } = await response.json();
   assert.equal(events.filter(({ type }) => type === "watering").length, 3);
-  assert.deepEqual(events.filter(({ type }) => type === "fertilizer").map(({ note }) => note), [`영양제 A, 영양제 B · ${ratio}`, "완효성"]);
+  assert.deepEqual(events.filter(({ type }) => type === "fertilizer").map(({ note }) => note), [`영양제 A, 영양제 B\n${ratio}`, "완효성"]);
   assert.deepEqual(events.filter(({ type }) => type === "observation").map(({ id }) => id), ["observation-added-note", "observation-added-photo", "observation-journal"]);
+});
+
+test("plant management timeline reads fertilizer independently of observation records", async () => {
+  const wateringSource = "22222222-2222-4222-8222-222222222222";
+  process.env.NOTION_WATERING_DATA_SOURCE_ID = wateringSource;
+  global.fetch = async (url) => json({ results: url.includes(wateringSource) ? [
+    { ...returnedPage({ 날짜: { date: { start: "2026-11-06" } }, "비료 내용": { rich_text: [{ plain_text: "영양제 A\n물 1000mL" }] } }), url: "https://www.notion.so/watering-page" },
+  ] : [] });
+  const response = await plantDetailsApi.GET({ nextUrl: new URL(`http://localhost/api/plant-details?plantId=${plantId}`) });
+  assert.equal(response.status, 200);
+  const { observations, fertilizerRecords } = await response.json();
+  assert.deepEqual(observations, []);
+  assert.deepEqual(fertilizerRecords, [{ id: `fertilizer-${plantId}`, date: "2026-11-06", note: "영양제 A\n물 1000mL", url: "https://www.notion.so/watering-page", tags: [] }]);
 });
 
 function wateringPage(lastWateredAt, cycle = 2) {
@@ -121,12 +135,11 @@ test("fertilizer uses the watering DB select property and leaves plain watering 
   assert.equal((await save("A,B")).status, 400);
   const ratio = formatFertilizerMix({ water: "1000", fertilizer: "10" });
   assert.equal((await (await save(" 액체 비료 ", ratio)).json()).successCount, 1);
-  assert.deepEqual(calls[2].body, { properties: { 비료: { select: {} }, "비료 비율": { rich_text: {} } } });
+  assert.deepEqual(calls[2].body, { properties: { 비료: { select: {} }, "비료 비율": { rich_text: {} }, "비료 내용": { rich_text: {} } } });
   assert.deepEqual(calls[3].body.properties.비료, { select: { name: "액체 비료" } });
   assert.equal(calls[3].body.properties["비료 비율"].rich_text[0].text.content, ratio);
-  assert.equal(calls[4].body.parent.data_source_id, observationId);
-  assert.deepEqual(calls[4].body.properties.관찰태그.multi_select, [{ name: "액체 비료" }]);
-  assert.equal(calls[4].body.properties.관찰일지.rich_text[0].text.content, `비료 비율: ${ratio}`);
+  assert.equal(calls[3].body.properties["비료 내용"].rich_text[0].text.content, `액체 비료\n${ratio}`);
+  assert.equal(calls.length, 4, "fertilizer does not write an observation");
   const options = await wateringApi.GET(new Request("http://localhost/api/watering-logs?options=fertilizer"));
   assert.deepEqual(await options.json(), { options: ["액체 비료"] });
   property = { type: "rich_text" };
@@ -135,7 +148,7 @@ test("fertilizer uses the watering DB select property and leaves plain watering 
   assert.equal(calls.length, before + 1, "incompatible existing property is not changed");
 });
 
-test("mixed fertilizers keep all tags in one watering and one observation without changing old options", async () => {
+test("mixed fertilizers are stored together only in the watering database", async () => {
   const calls = [];
   let saved = false;
   const observationId = "22222222-2222-4222-8222-222222222222";
@@ -151,12 +164,11 @@ test("mixed fertilizers keep all tags in one watering and one observation withou
   const save = (fertilizers) => wateringApi.POST(new Request("http://localhost/api/watering-logs", { method: "POST", body: JSON.stringify({ plants: [{ id: plantId, name: "핑크" }], fertilizers, fertilizerRatio: ratio }) }));
   assert.equal((await (await save([" 액체 A ", "액체 B", "액체 a"])).json()).successCount, 1);
   const patch = calls.find((call) => call.method === "PATCH").body;
-  assert.deepEqual(patch, { properties: { "비료 비율": { rich_text: {} }, "사용 비료": { multi_select: {} } } });
+  assert.deepEqual(patch, { properties: { "비료 내용": { rich_text: {} }, "비료 비율": { rich_text: {} }, "사용 비료": { multi_select: {} } } });
   const pages = calls.filter((call) => call.url.endsWith("/pages"));
-  assert.equal(pages.length, 2, "mixed fertilizer never duplicates watering events");
+  assert.equal(pages.length, 1);
   assert.deepEqual(pages[0].body.properties["사용 비료"].multi_select, [{ name: "액체 A" }, { name: "액체 B" }]);
-  assert.deepEqual(pages[1].body.properties.관찰태그.multi_select, [{ name: "액체 A" }, { name: "액체 B" }]);
-  assert.equal(pages[1].body.properties.관찰일지.rich_text[0].text.content, `비료 비율: ${ratio}`);
+  assert.equal(pages[0].body.properties["비료 내용"].rich_text[0].text.content, `액체 A, 액체 B\n${ratio}`);
   const today = await (await wateringApi.GET(new Request("http://localhost/api/watering-logs?date=2026-11-05"))).json();
   assert.equal(today.plants[0].fertilizer, "액체 A + 액체 B");
   assert.equal(today.plants[0].fertilizerRatio, ratio);
@@ -173,18 +185,16 @@ test("fertilizing an already watered plant adds fertilizer without duplicating o
     calls.push({ url, method: options.method, body });
     if (url.endsWith("/query")) return json({ results: [returnedPage({ 이름: { title: [{ text: { content: "💧핑크" } }] }, 식물: { relation: [{ id: plantId.replaceAll("-", "") }] }, "사용 비료": { multi_select: [{ name: "기존 A" }] }, "비료 비율": { rich_text: [{ plain_text: "기존 배합" }] } })] });
     if (url.endsWith(`/pages/${plantId}`) || url.endsWith("/pages")) return json({ id: plantId });
-    return json({ properties: { 비료: { type: "select", select: { options: [] } }, "사용 비료": { type: "multi_select", multi_select: { options: [] } }, "비료 비율": { type: "rich_text" } } });
+    return json({ properties: { 비료: { type: "select", select: { options: [] } }, "사용 비료": { type: "multi_select", multi_select: { options: [] } }, "비료 비율": { type: "rich_text" }, "비료 내용": { type: "rich_text" } } });
   };
   const response = await wateringApi.POST(new Request("http://localhost/api/watering-logs", { method: "POST", body: JSON.stringify({ plants: [{ id: plantId, name: "핑크" }], wateredAt: "2026-11-05", fertilizers: ["새 B"], fertilizerRatio: "새 배합" }) }));
   assert.equal((await response.json()).successCount, 1);
   const update = calls.find((call) => call.method === "PATCH").body.properties;
-  assert.deepEqual(Object.keys(update).sort(), ["비료", "비료 비율", "사용 비료"]);
+  assert.deepEqual(Object.keys(update).sort(), ["비료", "비료 내용", "비료 비율", "사용 비료"]);
   assert.deepEqual(update["사용 비료"].multi_select, [{ name: "기존 A" }, { name: "새 B" }]);
   assert.equal(update["비료 비율"].rich_text[0].text.content, "기존 배합\n새 배합");
   const created = calls.filter((call) => call.url.endsWith("/pages"));
-  assert.equal(created.length, 1, "only the fertilizer observation is created");
-  assert.deepEqual(created[0].body.properties.관찰태그.multi_select, [{ name: "새 B" }]);
-  assert.equal(created[0].body.properties.물줌, undefined);
+  assert.equal(created.length, 0);
 });
 
 test("fertilizer refuses to create a new watering event when existing records cannot be checked", async () => {

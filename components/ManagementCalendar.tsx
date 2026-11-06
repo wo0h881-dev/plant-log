@@ -121,6 +121,28 @@ export function ManagementCalendar({ plants, onSelectPlant, filter, onFilterChan
   }, [events, plantLookup, plantId, query, selectedPlant?.name]);
   const selectedEvents = eventsByDate.get(selectedDate) ?? [];
   const filteredEvents = selectedEvents.filter((event) => eventFilter === "all" || event.type === eventFilter);
+  const plantKey = (event: PlantCalendarEvent) => event.plantId ? `id:${event.plantId.replaceAll("-", "").toLowerCase()}` : `name:${event.plantName}`;
+  const fertilizerByPlant = new Map<string, PlantCalendarEvent[]>();
+  if (eventFilter === "all") {
+    for (const event of filteredEvents) {
+      if (event.type !== "fertilizer") continue;
+      const key = plantKey(event);
+      const group = fertilizerByPlant.get(key) ?? [];
+      group.push(event);
+      fertilizerByPlant.set(key, group);
+    }
+  }
+  const mergedPlantKeys = new Set<string>();
+  const mergedEventIds = new Set<string>();
+  const calendarCards = filteredEvents.map((event) => {
+    const key = plantKey(event);
+    const fertilizers = event.type === "watering" && !mergedPlantKeys.has(key) ? fertilizerByPlant.get(key) ?? [] : [];
+    if (fertilizers.length) {
+      mergedPlantKeys.add(key);
+      fertilizers.forEach((entry) => mergedEventIds.add(entry.id));
+    }
+    return { event, fertilizers };
+  }).filter(({ event }) => !mergedEventIds.has(event.id));
   const isLoading = loadedMonth !== month;
   const days = buildMonthDays(month);
   const [year, monthNumber] = month.split("-").map(Number);
@@ -169,7 +191,7 @@ export function ManagementCalendar({ plants, onSelectPlant, filter, onFilterChan
       {selectedPlant ? <PlantCareSummary key={selectedPlant.id} plant={selectedPlant} /> : null}
 
       <section className="section-divider">
-        <div className="mb-3 flex items-center justify-between"><h2 className="section-title">{formatSelectedDate(selectedDate)}</h2><span className="text-xs text-[#909090]">{filteredEvents.length}개</span></div>
+        <div className="mb-3 flex items-center justify-between"><h2 className="section-title">{formatSelectedDate(selectedDate)}</h2><span className="text-xs text-[#909090]">{calendarCards.length}개</span></div>
         <div className="calendar-filters" role="tablist" aria-label="관리 기록 종류">
           {calendarFilters.map(({ type, label }, index) => <button key={type} id={`calendar-filter-${type}`} type="button" role="tab" aria-selected={eventFilter === type} aria-controls="calendar-records" tabIndex={eventFilter === type ? 0 : -1} onClick={() => setEventFilter(type)} onKeyDown={(event) => {
             const count = calendarFilters.length;
@@ -181,11 +203,11 @@ export function ManagementCalendar({ plants, onSelectPlant, filter, onFilterChan
         {isLoading ? <div className="rounded-[22px] bg-white px-4 py-7 text-center text-sm text-[#909090]">기록을 불러오는 중...</div> : null}
         {!isLoading && error ? <div className="rounded-[22px] bg-red-50 px-4 py-4 text-sm text-red-700">{error}</div> : null}
         {!isLoading && !error && !filteredEvents.length ? <div className="rounded-[22px] bg-white px-4 py-7 text-center text-sm text-[#909090]">{eventFilter === "all" ? "이날의 관리 기록이 없어요." : "선택한 종류의 기록이 없어요."}</div> : null}
-        {!isLoading && !error && filteredEvents.length ? <div className="plant-icon-grid">{filteredEvents.map((event) => {
+        {!isLoading && !error && calendarCards.length ? <div className="plant-icon-grid">{calendarCards.map(({ event, fertilizers }) => {
           const plant = (event.plantId ? plantLookup.byId.get(event.plantId) : undefined) ?? plantLookup.byName.get(event.plantName);
-          const label = calendarKinds.find(({ type }) => type === event.type)?.label;
+          const label = fertilizers.length ? "물주기 및 비료" : calendarKinds.find(({ type }) => type === event.type)?.label;
           const detail = event.note?.trim() || (event.type === "watering" ? "물줌" : "");
-          return <button key={event.id} type="button" disabled={!plant} onClick={() => { if (plant) onSelectPlant(plant); }} className="plant-icon-tile calendar-event-tile" data-event-type={event.type} aria-label={`${plant?.name ?? event.plantName} ${label} 기록`}><PlantCoverThumbnail key={plant?.coverPhotoUrl ?? "no-cover"} src={plant?.coverPhotoUrl} /><span className="tile-name">{plant?.name ?? event.plantName}</span>{detail ? <span className="tile-detail tile-note">{detail}</span> : null}</button>;
+          return <button key={event.id} type="button" disabled={!plant} onClick={() => { if (plant) onSelectPlant(plant); }} className="plant-icon-tile calendar-event-tile" data-event-type={event.type} aria-label={`${plant?.name ?? event.plantName} ${label} 기록`}><PlantCoverThumbnail key={plant?.coverPhotoUrl ?? "no-cover"} src={plant?.coverPhotoUrl} /><span className="tile-name">{plant?.name ?? event.plantName}</span>{detail ? <span className="tile-detail tile-note">{detail}</span> : null}{fertilizers.map(({ id, note }) => <span key={id} className="tile-detail tile-note calendar-fertilizer-detail">{note}</span>)}</button>;
         })}</div> : null}
         </div>
       </section>

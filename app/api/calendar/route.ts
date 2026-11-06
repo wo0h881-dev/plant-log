@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createNotionHeaders, readNotionJson, resolveDataSourceId } from "@/lib/notion";
 import type { PlantCalendarEvent } from "@/types/plant";
+import { isFertilizerMirror, readFertilizerRecord } from "@/lib/fertilizer";
 
 const NOTION_API_BASE = "https://api.notion.com/v1";
 
@@ -94,16 +95,13 @@ function parseWateringEvents(pages: NotionPage[], fertilizerRecords: Map<string,
       plantName,
       note: readText(page.properties["메모"]),
     }];
-    const names = [...new Set(page.properties["사용 비료"]?.multi_select?.map((item) => item.name?.trim() ?? "").filter(Boolean) ?? [])];
-    const legacyName = page.properties["비료"]?.select?.name?.trim();
-    if (!names.length && legacyName) names.push(legacyName);
-    if (names.length) {
-      const ratio = readText(page.properties["비료 비율"]);
+    const fertilizer = readFertilizerRecord(page.properties);
+    if (fertilizer) {
       const key = plantDayKey(events[0]);
       const records = fertilizerRecords.get(key) ?? [];
-      records.push({ names, ratio });
+      records.push(fertilizer);
       fertilizerRecords.set(key, records);
-      events.push({ ...events[0], id: `fertilizer-${page.id}`, type: "fertilizer", note: [names.join(", "), ratio].filter(Boolean).join(" · ") });
+      events.push({ ...events[0], id: `fertilizer-${page.id}`, type: "fertilizer", note: fertilizer.note });
     }
     return events;
   });
@@ -123,12 +121,9 @@ function parseObservationEvents(pages: NotionPage[], fertilizerRecords: Map<stri
       note: readText(page.properties["관찰일지"]),
       tags: page.properties["관찰태그"]?.multi_select?.map((item) => item.name?.trim() ?? "").filter(Boolean),
     };
-    const mirrorRatio = event.note?.startsWith("비료 비율: ") ? event.note.slice("비료 비율: ".length) : "";
     // Fertilizer saves also create a journal entry; keep entries later enriched with photos or notes.
-    const tags = event.tags ?? [];
-    const isMirror = !page.properties["사진"]?.files?.length && tags.length && fertilizerRecords.get(plantDayKey(event))?.some(({ names, ratio }) =>
-      tags.every((tag) => names.includes(tag)) &&
-      (event.note === "비료 사용" || (mirrorRatio && `\n${ratio}\n`.includes(`\n${mirrorRatio}\n`))),
+    const isMirror = !page.properties["사진"]?.files?.length && fertilizerRecords.get(plantDayKey(event))?.some((record) =>
+      isFertilizerMirror(event.note ?? "", event.tags ?? [], record),
     );
     return isMirror ? [] : [event];
   });

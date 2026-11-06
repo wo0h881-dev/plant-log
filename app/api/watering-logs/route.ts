@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import {
   createWateringLogPage,
-  createPlantLogPage,
   hasNotionPageId,
   readWateringFertilizers,
   updateWateringLogFertilizers,
@@ -22,7 +21,6 @@ type WateringResult = {
   ok: boolean;
   pageId?: string;
   message?: string;
-  observationWarning?: boolean;
 };
 
 type RichText = { plain_text?: string };
@@ -163,10 +161,8 @@ export async function POST(request: Request) {
 
     const wateringParentId =
       configuredWateringDataSourceId || (await resolveDataSourceId(token, wateringDatabaseId!));
-    const observationDatabase = process.env.NOTION_DATABASE_ID;
-    const observationSource = fertilizer ? process.env.NOTION_DATA_SOURCE_ID || (observationDatabase ? await resolveDataSourceId(token, observationDatabase) : undefined) : undefined;
-    if (fertilizer && (!observationSource || observationSource === wateringParentId || plants.some((plant) => !hasNotionPageId(plant.id)))) {
-      return NextResponse.json({ message: "비료를 기록하려면 식물과 관찰일지 DB 연결을 확인해주세요." }, { status: 400 });
+    if (fertilizer && plants.some((plant) => !hasNotionPageId(plant.id))) {
+      return NextResponse.json({ message: "비료를 기록하려면 Notion 식물 DB에서 불러온 식물을 선택하세요." }, { status: 400 });
     }
     const existingPages = payload.fertilizers ? await readWateringHistory({ property: "날짜", date: { equals: wateredDay } }) : [];
     const options = fertilizer ? await readWateringFertilizers(token, wateringParentId, true, Boolean(fertilizerRatio), Boolean(payload.fertilizers)) : [];
@@ -198,19 +194,11 @@ export async function POST(request: Request) {
           fertilizerRatio,
         });
 
-        let observationWarning = false;
-        if (selectedFertilizer && observationSource) {
-          try {
-            await createPlantLogPage({ token, parentId: observationSource, plantId: plant.id, plantName: plant.name, plantCategory: typeof plant.category === "string" ? plant.category : "", createdAt: wateredAt, tags: selectedFertilizers, photos: [], note: fertilizerRatio ? `비료 비율: ${fertilizerRatio}` : "비료 사용" });
-          } catch { observationWarning = true; }
-        }
-
         results.push({
           plantId: plant.id,
           plantName: plant.name,
           ok: true,
           pageId: page.id,
-          ...(observationWarning ? { observationWarning } : {}),
         });
       } catch (error) {
         results.push({

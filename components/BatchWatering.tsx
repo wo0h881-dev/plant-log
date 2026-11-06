@@ -28,7 +28,7 @@ type BatchWateringProps = {
   onSelectionChange: (ids: string[]) => void;
 };
 
-type WateringResult = { plantId: string; plantName: string; ok: boolean; message?: string; observationWarning?: boolean };
+type WateringResult = { plantId: string; plantName: string; ok: boolean; message?: string };
 type WateringResponse = {
   successCount?: number;
   failureCount?: number;
@@ -360,7 +360,6 @@ export function BatchWatering({
 
       {message ? <div className={`rounded-2xl px-4 py-3 text-sm ${saveState === "error" ? "bg-red-50 text-red-700" : "bg-[#EEF2FF] text-[#4263EB]"}`}><div className="flex items-start gap-2">{saveState === "error" ? <AlertCircle size={17} className="mt-0.5 shrink-0" aria-hidden="true" /> : <Check size={17} className="mt-0.5 shrink-0" aria-hidden="true" />}<div><p className="font-semibold">{message}</p>{successfulResults.length ? <p className="mt-1">성공: {successfulResults.map((result) => result.plantName).join(", ")}</p> : null}{failedResults.length ? <p className="mt-1">실패: {failedResults.map((result) => result.plantName).join(", ")}</p> : null}</div></div></div> : null}
 
-      {results.some((result) => result.observationWarning) ? <p role="alert" className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900">물주기는 저장했지만 관찰일지를 확인하지 못했어요: {results.filter((result) => result.observationWarning).map((result) => result.plantName).join(", ")}. 노션 관찰일지를 확인해주세요.</p> : null}
       {selectedWateringCount ? <div className="save-dock"><button type="button" onClick={saveWateringLogs} disabled={saveState === "saving"} className="primary-button">{saveState === "saving" ? "저장 중..." : failedResults.length ? `실패한 ${selectedWateringCount}개 다시 저장` : `${selectedWateringCount}개 ${fertilizer ? "비료" : "물주기"} 저장`}</button></div> : null}
     </fieldset>
   );
