@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { AlertCircle, ArrowLeft, Check, House, Pencil, RefreshCcw, Sprout } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, House, Pencil, RefreshCcw, Sprout, X } from "lucide-react";
 import { FertilizerPicker } from "@/components/FertilizerPicker";
 import { useFertilizerRecipes } from "@/components/useFertilizerRecipes";
 import { formatFertilizerBatches } from "@/lib/fertilizer";
@@ -20,6 +20,7 @@ import { PlantOverview } from "@/components/PlantOverview";
 import { PlantSelect } from "@/components/PlantSelect";
 import { RecentObservedPlants } from "@/components/RecentObservedPlants";
 import { fallbackPlants } from "@/lib/plants";
+import { canSelectPlant } from "@/lib/plant-search";
 import type { Plant, RecentObservedPlant, SaveState } from "@/types/plant";
 
 const RECENT_PLANTS_KEY = "plant-log:recent-plants";
@@ -53,6 +54,8 @@ export function PlantLogForm() {
   const [isPlantsLoading, setIsPlantsLoading] = useState(true);
   const [isRecentPlantsLoading, setIsRecentPlantsLoading] = useState(true);
   const [selectedPlantId, setSelectedPlantId] = useState("");
+  const [batchObservation, setBatchObservation] = useState(false);
+  const [observationPlantIds, setObservationPlantIds] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<RecordTab>("water");
   const [visitedTabs, setVisitedTabs] = useState<RecordTab[]>(["water"]);
   const scrollPositions = useRef<Partial<Record<RecordTab, number>>>({});
@@ -189,6 +192,8 @@ export function PlantLogForm() {
     });
   }, [isPlantsLoading, plants]);
   const selectedPlant = plants.find((plant) => plant.id === selectedPlantId);
+  const selectedIds = new Set(observationPlantIds);
+  const observationPlants = batchObservation ? plants.filter((plant) => selectedIds.has(plant.id) && canSelectPlant(plant)) : [];
   const selectedPlantLabel = selectedPlant ? formatPlantName(selectedPlant) : "";
   const profilePlant = plants.find((plant) => plant.id === profilePlantId);
   const calendarPlant = plants.find((plant) => plant.id === calendarFilter.plantId);
@@ -198,7 +203,7 @@ export function PlantLogForm() {
     [temperature, -50, 80], [humidity, 0, 100],
   ] as const).every(([value, min, max]) => !value.trim() || (Number.isFinite(Number(value)) && Number(value) >= min && Number(value) <= max));
   const canSaveObservation = Boolean(
-    selectedPlant &&
+    (batchObservation ? observationPlants.length > 0 : selectedPlant) &&
     (photos.length || selectedTags.length || note.trim()) &&
     (!isRepotting || repotSoils.length) &&
     (!isEnvironment || isEnvironmentValid) &&
@@ -207,6 +212,10 @@ export function PlantLogForm() {
   );
 
   function selectPlant(plant: Plant) {
+    if (batchObservation) {
+      setObservationPlantIds((ids) => ids.includes(plant.id) ? ids : [...ids, plant.id]);
+      return;
+    }
     if (plant.id !== selectedPlantId) {
       setRepotSoils([]);
       setRepotReason("");
@@ -248,10 +257,8 @@ export function PlantLogForm() {
     changeTab("more");
   }
 
-  function storeRecentPlant() {
-    if (!selectedPlant) return;
-    const label = formatPlantName(selectedPlant);
-    const next = [label, ...recentPlants.filter((item) => item !== label)].slice(0, 5);
+  function storeRecentPlants(saved: Plant[]) {
+    const next = [...new Set([...saved.map(formatPlantName), ...recentPlants])].slice(0, 5);
     setRecentPlants(next);
     try { window.localStorage.setItem(RECENT_PLANTS_KEY, JSON.stringify(next)); } catch { /* A saved observation must not fail because recent-selection storage is unavailable. */ }
   }
@@ -273,7 +280,9 @@ export function PlantLogForm() {
 
   async function saveObservation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canSaveObservation || !selectedPlant || observationSubmitting.current) return;
+    if (!canSaveObservation || observationSubmitting.current) return;
+    if (batchObservation) { await saveBatchObservations(); return; }
+    if (!selectedPlant) return;
     observationSubmitting.current = true;
     setObservationSaveState("saving");
     setObservationMessage("");
@@ -295,17 +304,13 @@ export function PlantLogForm() {
     await persistObservation();
   }
 
-  async function persistObservation(appendToPageId?: string) {
-    if (!selectedPlant || observationSubmitting.current) return;
-    observationSubmitting.current = true;
-    setObservationSaveState("saving");
-    setObservationMessage("");
+  function observationFormData(plant: Plant, appendToPageId?: string) {
     const formData = new FormData();
     if (appendToPageId) formData.append("appendToPageId", appendToPageId);
-    photos.forEach((photo) => formData.append("photos", photo));
-    formData.append("plantId", selectedPlant.id);
-    formData.append("plantName", selectedPlant.name);
-    formData.append("plantCategory", selectedPlant.category);
+    if (!batchObservation) photos.forEach((photo) => formData.append("photos", photo));
+    formData.append("plantId", plant.id);
+    formData.append("plantName", plant.name);
+    formData.append("plantCategory", plant.category);
     formData.append("note", note.trim());
     formData.append("createdAt", observedDate);
     formData.append("observationTags", JSON.stringify(selectedTags));
@@ -317,33 +322,84 @@ export function PlantLogForm() {
     }
     if (isRepotting) {
       formData.append("repotSoils", JSON.stringify(repotSoils));
-      formData.append("repotPreviousSoils", JSON.stringify(selectedPlant.currentSoils ?? []));
+      formData.append("repotPreviousSoils", JSON.stringify(plant.currentSoils ?? []));
       formData.append("repotReason", repotReason.trim());
     }
+    return formData;
+  }
+
+  async function postObservation(formData: FormData) {
+    const response = await fetch("/api/plant-logs", { method: "POST", body: formData });
+    const payload = await response.json() as { message?: string; warning?: string };
+    if (!response.ok) throw new Error(payload.message ?? "관찰일지 저장에 실패했습니다.");
+    return payload;
+  }
+
+  function clearObservationDraft() {
+    setPhotos([]);
+    setSelectedTags([]);
+    setRepotSoils([]);
+    setRepotReason("");
+    setNote("");
+    setTemperature(""); setHumidity(""); setTemperatureAbove(false); setHumidityAbove(false);
+    setSelectedPlantId("");
+    setObservationPlantIds([]);
+    setQuery("");
+    setRecentObservationChoice(null);
+  }
+
+  function refreshAfterObservation(saved: Plant[]) {
+    storeRecentPlants(saved);
+    refreshRecentPlants();
+    setObservationRevision((value) => value + 1);
+    setCalendarRevision((value) => value + 1);
+    if (isRepotting) refreshPlants();
+  }
+
+  async function saveBatchObservations() {
+    observationSubmitting.current = true;
+    setObservationSaveState("saving");
+    setObservationMessage("");
+    const saved: Plant[] = [];
+    const failed: Plant[] = [];
+    const warnings: string[] = [];
     try {
-      const response = await fetch("/api/plant-logs", { method: "POST", body: formData });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.message ?? "관찰일지 저장에 실패했습니다.");
-      storeRecentPlant();
-      setPhotos([]);
-      setSelectedTags([]);
-      setRepotSoils([]);
-      setRepotReason("");
-      setNote("");
-      setTemperature(""); setHumidity(""); setTemperatureAbove(false); setHumidityAbove(false);
-      setSelectedPlantId("");
-      setQuery("");
-      setRecentObservationChoice(null);
+      for (const plant of observationPlants) {
+        try {
+          const { warning } = await postObservation(observationFormData(plant));
+          saved.push(plant);
+          if (warning) warnings.push(`${plant.name}: ${warning}`);
+        } catch {
+          failed.push(plant);
+        }
+      }
+      if (saved.length) refreshAfterObservation(saved);
+      if (failed.length) setObservationPlantIds(failed.map((plant) => plant.id));
+      else clearObservationDraft();
+      setObservationSaveState(failed.length || warnings.length ? "error" : "success");
+      setObservationMessage([
+        `${saved.length}개 식물의 관찰일지를 저장했어요.`,
+        failed.length ? `저장 실패: ${failed.map((plant) => plant.name).join(", ")}. 실패한 식물만 다시 저장할 수 있어요.` : "",
+        ...warnings,
+      ].filter(Boolean).join(" "));
+    } finally { observationSubmitting.current = false; }
+  }
+
+  async function persistObservation(appendToPageId?: string) {
+    if (!selectedPlant || observationSubmitting.current) return;
+    observationSubmitting.current = true;
+    setObservationSaveState("saving");
+    setObservationMessage("");
+    try {
+      const payload = await postObservation(observationFormData(selectedPlant, appendToPageId));
+      refreshAfterObservation([selectedPlant]);
+      clearObservationDraft();
       setObservationSaveState(payload.warning ? "error" : "success");
       setObservationMessage(
         payload.warning ?? (appendToPageId ? "기존 관찰일지에 추가했습니다." : isRepotting
           ? "관찰일지와 분갈이 기록을 Notion에 저장했습니다."
           : "관찰일지를 Notion에 저장했습니다."),
       );
-      refreshRecentPlants();
-      setObservationRevision((value) => value + 1);
-      setCalendarRevision((value) => value + 1);
-      if (isRepotting) refreshPlants();
     } catch (error) {
       setObservationSaveState("error");
       setObservationMessage(error instanceof Error ? error.message : "관찰일지 저장에 실패했습니다.");
@@ -416,9 +472,27 @@ export function PlantLogForm() {
             {commonMessage ? <p role="status" className="mb-4 text-sm text-[#4263EB]">{commonMessage}</p> : null}
             <form onSubmit={saveObservation} className="space-y-6">
               <fieldset disabled={observationSaveState === "saving" || Boolean(recentObservationChoice)} className="space-y-6" aria-busy={observationSaveState === "saving"}>
-              <PlantPhotoUploader files={photos} onChange={setPhotos} onCaptureDateChange={(date) => setObservedDate(date ?? getTodayValue())} onBusyChange={setIsCompressing} />
+              <label className="flex min-h-10 items-center gap-2 text-sm font-semibold">
+                <input type="checkbox" checked={batchObservation} disabled={isCompressing || photos.length > 0} onChange={(event) => {
+                  const multiple = event.target.checked;
+                  if (multiple) setObservationPlantIds(selectedPlant && canSelectPlant(selectedPlant) ? [selectedPlant.id] : []);
+                  else { setSelectedPlantId(observationPlants[0]?.id ?? ""); setObservationPlantIds([]); }
+                  setBatchObservation(multiple);
+                  setQuery("");
+                  setObservationMessage("");
+                }} className="size-5 accent-[#4263EB]" />
+                여러 식물 선택
+              </label>
+              {photos.length ? <p className="text-xs text-[#626B76]">사진이 있는 일지는 한 식물씩 저장할 수 있어요.</p> : null}
+              {!batchObservation ? <PlantPhotoUploader files={photos} onChange={setPhotos} onCaptureDateChange={(date) => setObservedDate(date ?? getTodayValue())} onBusyChange={setIsCompressing} /> : null}
               <section className="space-y-6">
-                <PlantSelect plants={plants} value={selectedPlantLabel} query={query} recentPlants={recentPlants} onQueryChange={(value) => { setQuery(value); if (value !== selectedPlant?.name) setSelectedPlantId(""); }} onSelect={selectPlant} variant="row" />
+                <PlantSelect key={batchObservation ? "batch" : "single"} plants={plants} value={selectedPlantLabel} query={query} recentPlants={recentPlants} onQueryChange={(value) => { setQuery(value); if (!batchObservation && value !== selectedPlant?.name) setSelectedPlantId(""); }} onSelect={selectPlant} variant="row" multiple={batchObservation ? {
+                  ids: observationPlants.map((plant) => plant.id),
+                  toggle: (plant) => setObservationPlantIds((ids) => ids.includes(plant.id) ? ids.filter((id) => id !== plant.id) : [...ids, plant.id]),
+                } : undefined} />
+                {batchObservation && observationPlants.length ? <div className="flex flex-wrap gap-2" aria-label="선택한 식물">
+                  {observationPlants.map((plant) => <button key={plant.id} type="button" className="status-chip max-w-full" aria-label={`${plant.name} 선택 해제`} onClick={() => setObservationPlantIds((ids) => ids.filter((id) => id !== plant.id))}><span className="min-w-0 break-words">{plant.name}</span><X size={14} className="shrink-0" aria-hidden="true" /></button>)}
+                </div> : null}
                 <section className="observation-note">
                   <div className="mb-3 flex items-center justify-between gap-3"><label htmlFor="observation-note" className="section-title">메모</label>
                   <ObservationTagPicker tags={observationTags} selected={selectedTags} onToggle={toggleTag}>
@@ -432,14 +506,14 @@ export function PlantLogForm() {
                       <h2 className="flex items-center gap-2 text-[15px] font-extrabold"><RefreshCcw size={17} aria-hidden="true" />분갈이 기록</h2>
                       <span className="text-[11px] font-semibold text-[#777B74]">{observedDate}</span>
                     </div>
-                    <div>
+                    {!batchObservation ? <div>
                       <p className="mb-2 text-xs font-bold text-[#777B74]">기존 흙</p>
                       <div className="flex flex-wrap gap-2">
                         {selectedPlant?.currentSoils?.length
                           ? selectedPlant.currentSoils.map((soil) => <span key={soil} className="rounded-full bg-white px-3 py-2 text-xs font-bold text-[#555A53]">{soil}</span>)
                           : <span className="rounded-full bg-white px-3 py-2 text-xs font-bold text-[#909090]">미기록</span>}
                       </div>
-                    </div>
+                    </div> : null}
                     <div>
                       <p className="mb-2 text-xs font-bold text-[#777B74]">분갈이 후 흙</p>
                       <div className="flex flex-wrap gap-2">
@@ -461,7 +535,7 @@ export function PlantLogForm() {
                   {selectedTags.length ? <div className="status-chips mt-3">{selectedTags.map((tag) => <button key={tag} type="button" className="status-chip" aria-pressed="true" onClick={() => toggleTag(tag)} title={`${tag} 선택 해제`}>{tag}</button>)}</div> : null}
                 </section>
                 <StatusMessage state={observationSaveState} message={observationMessage} />
-                {photos.length || selectedTags.length || note.trim() ? <div className={`save-dock ${activeTab !== "observation" ? "hidden" : ""}`}><button type="submit" disabled={!canSaveObservation} className="primary-button">{observationSaveState === "saving" ? "저장 중..." : "관찰일지 저장"}</button></div> : null}
+                {photos.length || selectedTags.length || note.trim() ? <div className={`save-dock ${activeTab !== "observation" ? "hidden" : ""}`}><button type="submit" disabled={!canSaveObservation} className="primary-button">{observationSaveState === "saving" ? "저장 중..." : batchObservation && observationPlants.length ? `${observationPlants.length}개 식물 관찰일지 저장` : "관찰일지 저장"}</button></div> : null}
               </section>
               </fieldset>
             </form>

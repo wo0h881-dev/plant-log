@@ -13,6 +13,7 @@ type NotionProperty = {
   multi_select?: Array<{ name?: string }>;
   relation?: Array<{ id?: string }>;
   date?: { start?: string | null } | null;
+  files?: unknown[];
 };
 type NotionPage = { id: string; properties: Record<string, NotionProperty> };
 type QueryResponse = { results: NotionPage[]; has_more?: boolean; next_cursor?: string | null };
@@ -65,22 +66,27 @@ async function queryAllPages(token: string, dataSourceId: string, dateProperty: 
 
 async function queryConfiguredDatabase(
   token: string,
-  databaseId: string,
+  databaseId: string | undefined,
   configuredDataSourceId: string | undefined,
   dateProperty: string,
   start: string,
   end: string,
 ) {
-  const dataSourceId = configuredDataSourceId || (await resolveDataSourceId(token, databaseId));
+  const dataSourceId = configuredDataSourceId || (databaseId ? await resolveDataSourceId(token, databaseId) : undefined);
+  if (!dataSourceId) return [];
   return queryAllPages(token, dataSourceId, dateProperty, start, end);
 }
 
-function parseWateringEvents(pages: NotionPage[]): PlantCalendarEvent[] {
+function plantDayKey(event: Pick<PlantCalendarEvent, "plantId" | "plantName" | "date">) {
+  return JSON.stringify([event.date, event.plantId ? event.plantId.replaceAll("-", "").toLowerCase() : event.plantName]);
+}
+
+function parseWateringEvents(pages: NotionPage[], fertilizerRecords: Map<string, Array<{ names: string[]; ratio: string }>>): PlantCalendarEvent[] {
   return pages.flatMap((page) => {
     const date = page.properties["날짜"]?.date?.start?.slice(0, 10);
     const plantName = readText(page.properties["이름"]).replace(/^💧\s*/, "");
     if (!date || !plantName) return [];
-    return [{
+    const events: PlantCalendarEvent[] = [{
       id: `watering-${page.id}`,
       type: "watering" as const,
       date,
@@ -88,15 +94,27 @@ function parseWateringEvents(pages: NotionPage[]): PlantCalendarEvent[] {
       plantName,
       note: readText(page.properties["메모"]),
     }];
+    const names = [...new Set(page.properties["사용 비료"]?.multi_select?.map((item) => item.name?.trim() ?? "").filter(Boolean) ?? [])];
+    const legacyName = page.properties["비료"]?.select?.name?.trim();
+    if (!names.length && legacyName) names.push(legacyName);
+    if (names.length) {
+      const ratio = readText(page.properties["비료 비율"]);
+      const key = plantDayKey(events[0]);
+      const records = fertilizerRecords.get(key) ?? [];
+      records.push({ names, ratio });
+      fertilizerRecords.set(key, records);
+      events.push({ ...events[0], id: `fertilizer-${page.id}`, type: "fertilizer", note: [names.join(", "), ratio].filter(Boolean).join(" · ") });
+    }
+    return events;
   });
 }
 
-function parseObservationEvents(pages: NotionPage[]): PlantCalendarEvent[] {
+function parseObservationEvents(pages: NotionPage[], fertilizerRecords: Map<string, Array<{ names: string[]; ratio: string }>>): PlantCalendarEvent[] {
   return pages.flatMap((page) => {
     const date = page.properties["관찰일"]?.date?.start?.slice(0, 10);
     const plantName = readText(page.properties["식물명"]);
     if (!date || !plantName) return [];
-    return [{
+    const event: PlantCalendarEvent = {
       id: `observation-${page.id}`,
       type: "observation" as const,
       date,
@@ -104,7 +122,15 @@ function parseObservationEvents(pages: NotionPage[]): PlantCalendarEvent[] {
       plantName,
       note: readText(page.properties["관찰일지"]),
       tags: page.properties["관찰태그"]?.multi_select?.map((item) => item.name?.trim() ?? "").filter(Boolean),
-    }];
+    };
+    const mirrorRatio = event.note?.startsWith("비료 비율: ") ? event.note.slice("비료 비율: ".length) : "";
+    // Fertilizer saves also create a journal entry; keep entries later enriched with photos or notes.
+    const tags = event.tags ?? [];
+    const isMirror = !page.properties["사진"]?.files?.length && tags.length && fertilizerRecords.get(plantDayKey(event))?.some(({ names, ratio }) =>
+      tags.every((tag) => names.includes(tag)) &&
+      (event.note === "비료 사용" || (mirrorRatio && `\n${ratio}\n`.includes(`\n${mirrorRatio}\n`))),
+    );
+    return isMirror ? [] : [event];
   });
 }
 
@@ -142,17 +168,12 @@ export async function GET(request: NextRequest) {
 
   try {
     const [observationPages, wateringPages, settingsPages] = await Promise.all([
-      observationDatabaseId
-        ? queryConfiguredDatabase(token, observationDatabaseId, process.env.NOTION_DATA_SOURCE_ID, "관찰일", start, end)
-        : Promise.resolve([]),
-      wateringDatabaseId
-        ? queryConfiguredDatabase(token, wateringDatabaseId, process.env.NOTION_WATERING_DATA_SOURCE_ID, "날짜", start, end)
-        : Promise.resolve([]),
-      settingsDatabaseId
-        ? queryConfiguredDatabase(token, settingsDatabaseId, process.env.NOTION_SETTINGS_DATA_SOURCE_ID, "날짜", start, end)
-        : Promise.resolve([]),
+      queryConfiguredDatabase(token, observationDatabaseId, process.env.NOTION_DATA_SOURCE_ID, "관찰일", start, end),
+      queryConfiguredDatabase(token, wateringDatabaseId, process.env.NOTION_WATERING_DATA_SOURCE_ID, "날짜", start, end),
+      queryConfiguredDatabase(token, settingsDatabaseId, process.env.NOTION_SETTINGS_DATA_SOURCE_ID, "날짜", start, end),
     ]);
-    const events = [...parseWateringEvents(wateringPages), ...parseObservationEvents(observationPages), ...parseRepottingEvents(settingsPages)]
+    const fertilizerRecords = new Map<string, Array<{ names: string[]; ratio: string }>>();
+    const events = [...parseWateringEvents(wateringPages, fertilizerRecords), ...parseObservationEvents(observationPages, fertilizerRecords), ...parseRepottingEvents(settingsPages)]
       .sort((a, b) => a.date.localeCompare(b.date));
     return NextResponse.json({ events }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

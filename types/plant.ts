@@ -51,7 +51,7 @@ export type RecentObservedPlant = {
 
 export type PlantCalendarEvent = {
   id: string;
-  type: "watering" | "observation" | "repotting";
+  type: "watering" | "observation" | "repotting" | "fertilizer";
   date: string;
   plantId?: string;
   plantName: string;

@@ -17,13 +17,14 @@ type PlantSelectProps = {
   variant?: "row" | "search";
   showPhotos?: boolean;
   includeDead?: boolean;
+  multiple?: { ids: readonly string[]; toggle: (plant: Plant) => void };
 };
 
 function formatPlantName(plant: Plant) {
   return `${plant.category} - ${plant.name}`;
 }
 
-export function PlantSelect({ plants, value, query, recentPlants, onQueryChange, onSelect, variant = "row", showPhotos = true, includeDead = false }: PlantSelectProps) {
+export function PlantSelect({ plants, value, query, recentPlants, onQueryChange, onSelect, variant = "row", showPhotos = true, includeDead = false, multiple }: PlantSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -32,6 +33,7 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
   const selectablePlants = useMemo(() => plants.filter((plant) => canSelectPlant(plant, includeDead)), [plants, includeDead]);
   const filteredPlants = useMemo(() => !isOpen ? [] : !normalizedQuery ? selectablePlants : selectablePlants.filter((plant) => matchesPlantSearch(plant, normalizedQuery)), [isOpen, selectablePlants, normalizedQuery]);
   const selectedPlant = plants.find((plant) => formatPlantName(plant) === value);
+  const checkedIds = new Set(multiple?.ids);
 
   function openList() {
     // Mobile Safari needs focus within the original tap, not a timer callback.
@@ -70,7 +72,11 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
         aria-label="식물 검색"
         data-expanded={isOpen}
         aria-controls={isOpen ? `${inputId}-results` : undefined}
-        onKeyDown={(event) => { if (event.key === "Escape" && !event.nativeEvent.isComposing) { inputRef.current?.blur(); setIsOpen(false); } }}
+        onKeyDown={(event) => {
+          if (event.nativeEvent.isComposing) return;
+          if (variant === "row" && event.key === "Enter") event.preventDefault();
+          if (event.key === "Escape") { inputRef.current?.blur(); setIsOpen(false); }
+        }}
         className="field pl-11 pr-11"
       />
       {query ? (
@@ -89,8 +95,8 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
           {!isOpen ? (
             <button type="button" onClick={openList} aria-expanded={false} className="flex min-h-14 w-full items-center gap-3 rounded-lg bg-[#F5F6F8] px-4 text-left">
               <span className="min-w-0 flex-1">
-                <span className={`block truncate text-sm font-bold ${selectedPlant ? "text-[#151515]" : "text-[#909090]"}`}>{selectedPlant?.name ?? "식물을 선택하세요"}</span>
-                {selectedPlant ? <span className="mt-0.5 block truncate text-[11px] text-[#909090]">{selectedPlant.category}</span> : null}
+                <span className={`block truncate text-sm font-bold ${selectedPlant || checkedIds.size ? "text-[#151515]" : "text-[#909090]"}`}>{multiple ? (checkedIds.size ? `${checkedIds.size}개 식물 선택됨` : "식물을 체크하세요") : selectedPlant?.name ?? "식물을 선택하세요"}</span>
+                {!multiple && selectedPlant ? <span className="mt-0.5 block truncate text-[11px] text-[#909090]">{selectedPlant.category}</span> : null}
               </span>
               <ChevronRight size={19} className="shrink-0 text-[#777B74]" aria-hidden="true" />
             </button>
@@ -100,7 +106,7 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
 
       {isOpen ? (
         <div id={`${inputId}-results`} className="absolute inset-x-0 z-[44] mt-2 rounded-lg border border-[#ECEEF1] bg-white p-2 shadow-lg shadow-black/5">
-          {!normalizedQuery && recentPlants.length ? (
+          {!multiple && !normalizedQuery && recentPlants.length ? (
             <div className="mb-2 flex gap-2 overflow-x-auto px-1 pb-1">
               {recentPlants.map((plantName) => {
                 const plant = selectablePlants.find((item) => formatPlantName(item) === plantName);
@@ -111,15 +117,18 @@ export function PlantSelect({ plants, value, query, recentPlants, onQueryChange,
           <div className="max-h-64 space-y-1 overflow-y-auto">
             {filteredPlants.length ? filteredPlants.map((plant) => {
               const isSelected = formatPlantName(plant) === value;
-              return (
-                <button key={plant.id} type="button" onClick={() => choosePlant(plant)} className={`flex min-h-12 w-full items-center gap-3 rounded-md px-2.5 text-left transition ${isSelected ? "bg-[#EEF2FF] text-[#4263EB]" : "text-[#191F28] active:bg-[#F5F6F8]"}`}>
+              const rowClass = `flex min-h-12 w-full items-center gap-3 rounded-md px-2.5 text-left transition ${(multiple ? checkedIds.has(plant.id) : isSelected) ? "bg-[#EEF2FF] text-[#4263EB]" : "text-[#191F28] active:bg-[#F5F6F8]"}`;
+              const content = <>
                   {showPhotos ? <PlantCoverThumbnail key={plant.coverPhotoUrl ?? "no-cover"} src={plant.coverPhotoUrl} /> : null}
                   <span className="min-w-0 flex-1 break-words text-sm font-medium">{plant.name}</span>
-                  <span className="max-w-[35%] shrink-0 break-words text-right text-[11px] text-[#909090]">{plant.category}</span>{isSelected ? <Check size={14} className="shrink-0" aria-hidden="true" /> : null}
-                </button>
-              );
+                  <span className="max-w-[35%] shrink-0 break-words text-right text-[11px] text-[#909090]">{plant.category}</span>
+              </>;
+              return multiple
+                ? <label key={plant.id} className={rowClass}><input type="checkbox" checked={checkedIds.has(plant.id)} onChange={() => multiple.toggle(plant)} className="size-5 shrink-0 accent-[#4263EB]" />{content}</label>
+                : <button key={plant.id} type="button" onClick={() => choosePlant(plant)} className={rowClass}>{content}{isSelected ? <Check size={14} className="shrink-0" aria-hidden="true" /> : null}</button>;
             }) : <p className="py-6 text-center text-sm text-[#909090]">검색 결과가 없어요.</p>}
           </div>
+          {multiple ? <button type="button" className="mt-2 min-h-10 w-full rounded-md bg-[#EEF2FF] text-sm font-semibold text-[#4263EB]" onClick={() => { inputRef.current?.blur(); setIsOpen(false); }}>선택 완료 ({checkedIds.size})</button> : null}
         </div>
       ) : null}
     </section>

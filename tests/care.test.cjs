@@ -29,6 +29,7 @@ const locationsApi = require("../app/api/location-logs/route.ts");
 const { locationStateFromPages } = require("../lib/notion-locations.ts");
 const coverApi = require("../app/api/plant-cover/route.ts");
 const observationApi = require("../app/api/plant-logs/route.ts");
+const calendarApi = require("../app/api/calendar/route.ts");
 const wateringApi = require("../app/api/watering-logs/route.ts");
 const statsApi = require("../app/api/watering-stats/route.ts");
 const { isRecentObservation } = require("../lib/notion-observation.ts");
@@ -59,6 +60,34 @@ const createForm = (values) => { const form = new FormData(); Object.entries(val
 function returnedPage(properties) {
   return { id: plantId, properties: Object.fromEntries(Object.entries(properties).map(([key, value]) => [key, { type: Object.keys(value)[0], ...value, ...(value.title ? { title: value.title.map((item) => ({ plain_text: item.text.content })) } : {}) }])) };
 }
+
+test("calendar exposes current and legacy fertilizer separately and hides only mirrored journal entries", async () => {
+  const wateringSource = "22222222-2222-4222-8222-222222222222";
+  process.env.NOTION_WATERING_DATA_SOURCE_ID = wateringSource;
+  const date = { date: { start: "2026-11-06" } };
+  const relation = { relation: [{ id: plantId }] };
+  const name = { title: [{ text: { content: "밤비노 핑크" } }] };
+  const note = (plain_text) => ({ rich_text: [{ plain_text }] });
+  const watering = (id, fertilizer) => ({ ...returnedPage({ 날짜: date, 식물: relation, 이름: name, ...fertilizer }), id });
+  const observation = (id, text, extra = {}) => ({ ...returnedPage({ 관찰일: date, 식물: relation, 식물명: name, 관찰일지: note(text), 관찰태그: { multi_select: [{ name: "영양제 A" }] }, ...extra }), id });
+  const ratio = "물통 1 · 물 1000mL + 영양제 A 2mL";
+  global.fetch = async (url) => json({ results: url.includes(wateringSource) ? [
+    watering("modern", { "사용 비료": { multi_select: [{ name: "영양제 A" }, { name: "영양제 B" }] }, "비료 비율": note(ratio) }),
+    watering("legacy", { 비료: { select: { name: "완효성" } } }),
+    watering("plain", {}),
+  ] : [
+    observation("mirror", `비료 비율: ${ratio}`),
+    observation("added-note", `비료 비율: ${ratio}\n\n새 잎을 확인했어요.`),
+    observation("added-photo", `비료 비율: ${ratio}`, { 사진: { files: [{}] } }),
+    observation("journal", "새 잎"),
+  ] });
+  const response = await calendarApi.GET({ nextUrl: new URL("http://localhost/api/calendar?month=2026-11") });
+  assert.equal(response.status, 200);
+  const { events } = await response.json();
+  assert.equal(events.filter(({ type }) => type === "watering").length, 3);
+  assert.deepEqual(events.filter(({ type }) => type === "fertilizer").map(({ note }) => note), [`영양제 A, 영양제 B · ${ratio}`, "완효성"]);
+  assert.deepEqual(events.filter(({ type }) => type === "observation").map(({ id }) => id), ["observation-added-note", "observation-added-photo", "observation-journal"]);
+});
 
 function wateringPage(lastWateredAt, cycle = 2) {
   return returnedPage({
