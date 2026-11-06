@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Droplets, NotebookPen, RefreshCcw } from "lucide-react";
 import type { Plant, PlantCalendarEvent } from "@/types/plant";
 import { PlantSelect } from "@/components/PlantSelect";
@@ -14,6 +14,8 @@ type ManagementCalendarProps = {
   filter: { plantId: string; query: string };
   onFilterChange: (filter: { plantId: string; query: string }) => void;
   hideSearch?: boolean;
+  active?: boolean;
+  revision?: number;
 };
 
 function toDateValue(date: Date) {
@@ -46,18 +48,21 @@ function formatSelectedDate(date: string) {
   return new Intl.DateTimeFormat("ko-KR", { month: "long", day: "numeric", weekday: "short" }).format(new Date(`${date}T12:00:00`));
 }
 
-export function ManagementCalendar({ plants, onSelectPlant, filter, onFilterChange, hideSearch = false }: ManagementCalendarProps) {
+export function ManagementCalendar({ plants, onSelectPlant, filter, onFilterChange, hideSearch = false, active = true, revision = 0 }: ManagementCalendarProps) {
   const today = toDateValue(new Date());
   const [month, setMonth] = useState(getMonthValue);
   const [selectedDate, setSelectedDate] = useState(today);
   const [events, setEvents] = useState<PlantCalendarEvent[]>([]);
   const [loadedMonth, setLoadedMonth] = useState("");
+  const loadedKey = useRef("");
   const [error, setError] = useState("");
   const [eventFilter, setEventFilter] = useState<"all" | PlantCalendarEvent["type"]>("all");
   const { query, plantId } = filter;
   const selectedPlant = plants.find((plant) => plant.id === plantId);
 
   useEffect(() => {
+    const key = `${month}:${revision}`;
+    if (!active || loadedKey.current === key) return;
     const controller = new AbortController();
     fetch(`/api/calendar?month=${month}`, { signal: controller.signal })
       .then(async (response) => {
@@ -66,30 +71,46 @@ export function ManagementCalendar({ plants, onSelectPlant, filter, onFilterChan
         return payload;
       })
       .then((payload) => {
+        if (controller.signal.aborted) return;
         setEvents(payload.events ?? []);
         setError("");
         setLoadedMonth(month);
+        loadedKey.current = key;
       })
       .catch((fetchError) => {
-        if (fetchError instanceof DOMException && fetchError.name === "AbortError") return;
+        if (controller.signal.aborted) return;
+        loadedKey.current = "";
         setEvents([]);
         setError(fetchError instanceof Error ? fetchError.message : "관리 기록을 불러오지 못했습니다.");
         setLoadedMonth(month);
       });
     return () => controller.abort();
-  }, [month]);
+  }, [active, month, revision]);
+
+  const plantLookup = useMemo(() => {
+    const byId = new Map<string, Plant>();
+    const byName = new Map<string, Plant>();
+    for (const plant of plants) {
+      byId.set(plant.id, plant);
+      if (!byName.has(plant.name)) byName.set(plant.name, plant);
+    }
+    return { byId, byName };
+  }, [plants]);
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, PlantCalendarEvent[]>();
     for (const event of events) {
-      const plant = event.plantId ? plants.find((item) => item.id === event.plantId) : plants.find((item) => item.name === event.plantName);
+      const plant = event.plantId ? plantLookup.byId.get(event.plantId) : plantLookup.byName.get(event.plantName);
       const matches = plantId
         ? (event.plantId ? event.plantId === plantId : event.plantName === selectedPlant?.name)
         : (!query.trim() || !plant || canSelectPlant(plant)) && matchesPlantSearch(plant ?? { name: event.plantName, category: "" }, query);
-      if (matches) map.set(event.date, [...(map.get(event.date) ?? []), event]);
+      if (!matches) continue;
+      const dayEvents = map.get(event.date);
+      if (dayEvents) dayEvents.push(event);
+      else map.set(event.date, [event]);
     }
     return map;
-  }, [events, plants, plantId, query, selectedPlant?.name]);
+  }, [events, plantLookup, plantId, query, selectedPlant?.name]);
   const selectedEvents = eventsByDate.get(selectedDate) ?? [];
   const filteredEvents = selectedEvents.filter((event) => eventFilter === "all" || event.type === eventFilter);
   const isLoading = loadedMonth !== month;

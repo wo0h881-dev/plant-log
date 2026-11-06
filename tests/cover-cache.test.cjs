@@ -25,18 +25,18 @@ function runtime(storageFails = false) {
   });
   context.importScripts = () => vm.runInContext(helper, context);
   vm.runInContext(worker, context);
-  async function image(url) {
+  async function requestResource(url, destination = "") {
     const waits = [];
     let response;
     const request = new Request(url, { headers: { Accept: "image/webp" } });
-    Object.defineProperty(request, "destination", { value: "image" });
+    Object.defineProperty(request, "destination", { value: destination });
     handlers.fetch({ request, respondWith: (promise) => { response = promise; }, waitUntil: (promise) => { waits.push(promise); } });
     if (!response) return;
     const value = await response;
     await Promise.all(waits);
     return value.text();
   }
-  return { context, image, saved, requests: () => networkRequests };
+  return { context, image: (url) => requestResource(url, "image"), requestResource, saved, requests: () => networkRequests };
 }
 
 test("only opted-in small cover icons get a persistent key", () => {
@@ -62,5 +62,15 @@ test("signature refresh reuses the icon but a changed cover fetches a new one", 
 test("disabled cache storage never prevents the photo from loading", async () => {
   const app = runtime(true);
   assert.equal(await app.image(icon(source)), "image-bytes");
+  assert.equal(app.requests(), 1);
+});
+
+test("service worker leaves API requests to the network and reuses versioned app assets", async () => {
+  const app = runtime();
+  assert.equal(await app.requestResource(`${origin}/api/fertilizer-recipes`), undefined);
+  assert.equal(app.saved.size, 0);
+  const asset = `${origin}/_next/static/chunks/app-versioned.js`;
+  await app.requestResource(asset, "script");
+  await app.requestResource(asset, "script");
   assert.equal(app.requests(), 1);
 });

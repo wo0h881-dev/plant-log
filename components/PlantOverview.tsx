@@ -70,9 +70,9 @@ export function PlantOverview({ plant, categories, onOpenCalendar, onPlantRename
         if (!response.ok) throw new Error(payload.message ?? "최근 기록을 불러오지 못했습니다.");
         return payload;
       })
-      .then((payload) => { setObservations(payload.observations ?? []); setPhotos(payload.photos ?? []); })
+      .then((payload) => { if (!controller.signal.aborted) { setObservations(payload.observations ?? []); setPhotos(payload.photos ?? []); setError(""); } })
       .catch((fetchError) => {
-        if (fetchError instanceof DOMException && fetchError.name === "AbortError") return;
+        if (controller.signal.aborted) return;
         setError(fetchError instanceof Error ? fetchError.message : "최근 기록을 불러오지 못했습니다.");
       })
       .finally(() => { if (!controller.signal.aborted) setIsLoading(false); });

@@ -20,11 +20,11 @@ export function PlantCareSummary({ plant, onOpenCalendar, vertical = false, onSt
       .then(async (response) => {
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.message ?? "물주기 기록을 불러오지 못했습니다.");
-        if (!controller.signal.aborted) { setStats(payload as WateringStats); onStatsLoaded?.(payload as WateringStats); }
+        if (!controller.signal.aborted) { setStats(payload as WateringStats); setError(""); onStatsLoaded?.(payload as WateringStats); }
       })
       .catch((reason) => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "물주기 기록을 불러오지 못했습니다."); });
     return () => controller.abort();
-  }, [plant.id, onStatsLoaded]);
+  }, [plant.id, plant.lastWateredAt, onStatsLoaded]);
 
   return <section className={vertical ? "profile-care" : "mt-6"} aria-label={`${plant.name} 관리 정보`}>
     <div className="care-overview">

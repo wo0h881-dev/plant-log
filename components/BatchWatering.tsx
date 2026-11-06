@@ -138,17 +138,19 @@ export function BatchWatering({
     return photos;
   }, [recentPlants]);
   const failedPhotoUrlSet = useMemo(() => new Set(failedPhotoUrls), [failedPhotoUrls]);
-  const getPlantPhoto = useCallback((plant: Pick<Plant, "id" | "category" | "name">) => {
-    const matchingPlant = plants.find((item) => item.id === plant.id || item.name === plant.name);
-    const candidates = [
-      recentPhotoByPlant.get(plant.id),
-      recentPhotoByPlant.get(`${plant.category}:${plant.name}`),
-      recentPhotoByPlant.get(plant.name),
-      matchingPlant?.coverPhotoUrl,
-    ];
-    return candidates.find((url) => url && !failedPhotoUrlSet.has(url));
-  }, [failedPhotoUrlSet, plants, recentPhotoByPlant]);
-  const dueHeroPhoto = isPhotoLoading || isTodayLoading ? undefined : duePlants.map(getPlantPhoto).find(Boolean);
+  const dueHeroPhoto = useMemo(() => {
+    if (isPhotoLoading || isTodayLoading) return;
+    for (const plant of duePlants) {
+      const candidates = [
+        recentPhotoByPlant.get(plant.id),
+        recentPhotoByPlant.get(`${plant.category}:${plant.name}`),
+        recentPhotoByPlant.get(plant.name),
+        plant.coverPhotoUrl,
+      ];
+      const photo = candidates.find((url) => url && !failedPhotoUrlSet.has(url));
+      if (photo) return photo;
+    }
+  }, [isPhotoLoading, isTodayLoading, duePlants, recentPhotoByPlant, failedPhotoUrlSet]);
   const cachedHeroPhoto = useSyncExternalStore(
     subscribeToCachedHeroPhoto,
     readCachedWateringHeroPhoto,

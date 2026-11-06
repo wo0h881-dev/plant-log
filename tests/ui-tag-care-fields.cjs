@@ -26,7 +26,7 @@ async function main() {
       await page.goto(base, { waitUntil: "domcontentloaded", timeout: 90000 });
       await page.waitForFunction(() => !document.querySelector(".header-date").disabled);
       assert.equal(await page.locator(".header-date-pill").evaluate((el) => getComputedStyle(el).paddingLeft), "10px");
-      assert.equal(await page.locator(".header-cycle-button").evaluate((el) => getComputedStyle(el).paddingLeft), "11px");
+      assert.equal(await page.getByRole("button", { name: "관수주기 편집", exact: true }).evaluate((el) => getComputedStyle(el).paddingLeft), "11px");
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
       const nav = page.getByRole("navigation", { name: "주요 화면" });
       await nav.getByRole("button", { name: "관찰일지", exact: true }).click();

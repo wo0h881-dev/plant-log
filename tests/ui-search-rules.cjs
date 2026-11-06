@@ -14,6 +14,7 @@ async function main() {
       const page = await browser.newPage({ viewport: { width, height: 900 }, serviceWorkers: "block", timezoneId: "Asia/Seoul", isMobile: width < 400, hasTouch: width < 400 });
       page.setDefaultTimeout(30000);
       const errors = []; page.on("pageerror", (error) => errors.push(error.message));
+      let optionsRequests = 0, plantRequests = 0, calendarRequests = 0, observationSaved = false;
       await page.clock.install({ time: new Date("2026-10-27T03:00:00Z") });
       const plants = [
         { id: "11111111-1111-4111-8111-111111111111", name: "밤비노 핑크", category: "알로카시아", coverPhotoUrl: "/fixture/cover.png" },
@@ -25,28 +26,42 @@ async function main() {
       await page.route("**/_next/image?**", (route) => route.fulfill({ contentType: "image/svg+xml", body: svg }));
       await page.route("**/api/**", (route) => {
         const url = new URL(route.request().url()); let data = {};
-        if (["/api/plants", "/api/space-plants"].includes(url.pathname)) data = { source: "notion", plants };
+        if (["/api/plants", "/api/space-plants"].includes(url.pathname)) {
+          if (url.pathname === "/api/plants") plantRequests++;
+          data = { source: "notion", plants };
+        }
         else if (url.pathname === "/api/location-logs") data = { source: "notion", state: { version: 1, positions: {}, history: [], commonCare: [], environments: [] } };
         else if (url.pathname === "/api/watering-logs") data = { plants: [] };
         else if (url.pathname === "/api/watering-stats") data = { wateringDays: 1, recentIntervals: 0, wateringDates: ["2026-10-26"] };
         else if (url.pathname === "/api/plant-details") data = { recentPlants: [], photos: [], observations: [{ id: "obs", date: "2026-10-27", note: "기존 관찰 기록 유지", tags: ["신엽"] }] };
-        else if (url.pathname === "/api/options") data = { categoryOptions: ["알로카시아", "사망"] };
-        else if (url.pathname === "/api/calendar") data = { events: [
+        else if (url.pathname === "/api/options") { optionsRequests++; data = { categoryOptions: ["알로카시아", "사망"] }; }
+        else if (url.pathname === "/api/plant-logs" && route.request().method() === "POST") observationSaved = true;
+        else if (url.pathname === "/api/calendar") { calendarRequests++; data = { events: [
           { id: "old-record", type: "observation", date: "2026-10-27", plantId: plants[1].id, plantName: plants[1].name, note: "과거 기록 보존" },
           { id: "legacy", type: "observation", date: "2026-10-27", plantName: plants[1].name, note: "관계형 없는 과거 기록 보존" },
-        ] };
+          ...(observationSaved ? [{ id: "new-record", type: "observation", date: "2026-10-27", plantId: plants[0].id, plantName: plants[0].name, note: "방금 저장한 기록" }] : []),
+        ] }; }
         return route.fulfill({ json: data });
       });
       await page.goto(base, { waitUntil: "domcontentloaded", timeout: 90000 });
       const nav = page.getByRole("navigation", { name: "주요 화면" });
       const water = page.locator('[data-screen="water"]');
       await water.getByRole("checkbox").waitFor();
+      assert.equal(optionsRequests, 0, "the watering screen does not load unused observation options");
       assert.equal(await water.getByRole("checkbox").count(), 1);
       await water.getByRole("searchbox").fill("떠난");
       assert.equal(await water.getByRole("checkbox").count(), 0);
       await nav.getByRole("button", { name: "관찰일지", exact: true }).click();
       const obs = page.locator('[data-screen="observation"]');
       await obs.getByRole("button", { name: "식물을 선택하세요", exact: true }).click();
+      const observationSearch = obs.getByRole("searchbox");
+      if (width < 400) await observationSearch.tap();
+      else await observationSearch.click();
+      assert.ok(await observationSearch.isVisible(), "tapping an open search input must keep it open");
+      await page.keyboard.type("ㅂㅂㄴ");
+      await obs.getByRole("button", { name: /밤비노 핑크/ }).click();
+      await obs.getByRole("button", { name: /밤비노 핑크/ }).click();
+      assert.equal(await observationSearch.inputValue(), "", "reopening the selector starts a fresh search");
       assert.equal(await obs.getByRole("button", { name: /떠난 식물/ }).count(), 0, "dead recent chips are hidden too");
       await obs.getByRole("searchbox").fill("떠난");
       assert.equal(await obs.getByRole("button", { name: /떠난 식물/ }).count(), 0);
@@ -57,10 +72,25 @@ async function main() {
       assert.equal(await page.locator(".calendar-event-tile").count(), 0);
       await headerSearch.fill(""); await page.keyboard.press("Escape");
       await page.getByText("과거 기록 보존", { exact: true }).waitFor();
+      const loadedCalendarRequests = calendarRequests;
+      const loadedPlantRequests = plantRequests;
+      await nav.getByRole("button", { name: "관찰일지", exact: true }).click();
+      await obs.getByRole("button", { name: "식물을 선택하세요", exact: true }).click();
+      await observationSearch.fill("ㅂㅂㄴ");
+      await obs.getByRole("button", { name: /밤비노 핑크/ }).click();
+      await obs.getByLabel("메모", { exact: true }).fill("방금 저장한 기록");
+      await obs.getByRole("button", { name: "관찰일지 저장", exact: true }).click();
+      await obs.getByText("관찰일지를 Notion에 저장했습니다.", { exact: true }).waitFor();
+      assert.equal(plantRequests, loadedPlantRequests, "plain observation saves do not reload the plant catalog");
+      assert.equal(calendarRequests, loadedCalendarRequests, "hidden calendar does not fetch");
+      await nav.getByRole("button", { name: "캘린더", exact: true }).click();
+      await page.getByText("방금 저장한 기록", { exact: true }).waitFor();
+      assert.equal(calendarRequests, loadedCalendarRequests + 1);
       await nav.getByRole("button", { name: "내 식물", exact: true }).click();
       await headerSearch.fill("떠난");
       await page.locator(".app-header").getByRole("button", { name: /떠난 식물/ }).click();
       await page.locator(".editorial-journal").getByText("기존 관찰 기록 유지", { exact: true }).waitFor();
+      assert.equal(optionsRequests, 1, "observation and profile share the loaded options");
       assert.equal((await page.locator(".editorial-journal").innerText()).includes("물줌"), false);
       await nav.getByRole("button", { name: "빠른 작업", exact: true }).click();
       await page.getByRole("button", { name: "새 식물 추가", exact: true }).click();

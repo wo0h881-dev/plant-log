@@ -3,7 +3,8 @@ const HERO_PHOTO_URL_KEY = "plant-log:watering-hero-photo";
 
 export function readCachedWateringHeroPhoto() {
   if (typeof window === "undefined") return undefined;
-  return window.localStorage.getItem(HERO_PHOTO_URL_KEY) || undefined;
+  try { return window.localStorage.getItem(HERO_PHOTO_URL_KEY) || undefined; }
+  catch { return undefined; }
 }
 
 export async function cacheWateringHeroPhoto(url: string) {

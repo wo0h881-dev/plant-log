@@ -1,6 +1,6 @@
 importScripts("/cover-icon-cache.js");
 
-const CACHE_NAME = "plant-log-v23";
+const CACHE_NAME = "plant-log-v24";
 const HERO_CACHE_NAME = "plant-log-watering-hero-v1";
 const COVER_ICON_CACHE_NAME = "plant-log-cover-icons-v1";
 const APP_SHELL = ["/", "/icon.svg", "/cover-icon-cache.js"];
@@ -38,7 +38,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME && key !== HERO_CACHE_NAME && key !== COVER_ICON_CACHE_NAME).map((key) => caches.delete(key)))),
+      .then((keys) => Promise.all(keys.filter((key) => /^plant-log-v\d+$/.test(key) && key !== CACHE_NAME).map((key) => caches.delete(key)))),
   );
   self.clients.claim();
 });
@@ -49,6 +49,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin === self.location.origin && requestUrl.pathname.startsWith("/api/")) return;
   const iconKey = globalThis.PlantCoverIconCache.keyFor(event.request.url, self.location.origin);
   if (event.request.destination === "image" && iconKey) {
     const response = cachedCoverIcon(event, iconKey);
@@ -67,15 +68,14 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (requestUrl.pathname.startsWith("/_next/static/")) {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
-          return response;
-        })
-        .catch(() => caches.match(event.request)),
-    );
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE_NAME).catch(() => undefined);
+      const cached = await cache?.match(event.request).catch(() => undefined);
+      if (cached) return cached;
+      const response = await fetch(event.request);
+      if (response.ok && cache) await cache.put(event.request, response.clone()).catch(() => undefined);
+      return response;
+    })());
     return;
   }
 

@@ -58,6 +58,7 @@ export function PlantLogForm() {
   const scrollPositions = useRef<Partial<Record<RecordTab, number>>>({});
   const observationSubmitting = useRef(false);
   const profileLinkHandled = useRef(false);
+  const plantRequest = useRef<AbortController | null>(null);
   const [query, setQuery] = useState("");
   const [profileQuery, setProfileQuery] = useState("");
   const [profilePlantId, setProfilePlantId] = useState("");
@@ -81,6 +82,7 @@ export function PlantLogForm() {
   const [fertilizerEnabled, setFertilizerEnabled] = useState(false);
   const fertilizerRatio = activeFertilizerBatch ? formatFertilizerBatches([activeFertilizerBatch], fertilizerBatchIndex) : "";
   const [observationRevision, setObservationRevision] = useState(0);
+  const [calendarRevision, setCalendarRevision] = useState(0);
   const [fertilizerOpen, setFertilizerOpen] = useState(false);
   const [isWaterSaving, setIsWaterSaving] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
@@ -120,23 +122,28 @@ export function PlantLogForm() {
   }
 
   const refreshPlants = useCallback(() => {
-    fetch("/api/plants")
+    plantRequest.current?.abort();
+    const controller = new AbortController();
+    plantRequest.current = controller;
+    fetch("/api/plants", { signal: controller.signal })
       .then(async (response) => {
+        if (!response.ok) throw new Error();
         const payload = await response.json() as PlantsResponse;
         if (payload.source === "fallback" && process.env.NODE_ENV === "development" && new URLSearchParams(window.location.search).has("plant")) {
-          const preview = await fetch("/api/space-plants?full=1");
+          const preview = await fetch("/api/space-plants?full=1", { signal: controller.signal });
           if (preview.ok) return await preview.json() as PlantsResponse;
         }
         return payload;
       })
       .then((payload) => {
-        const nextPlants = payload.plants.length ? payload.plants : fallbackPlants;
+        if (controller.signal.aborted || payload.source !== "notion" || !Array.isArray(payload.plants)) return;
+        const nextPlants = payload.plants;
         setPlants(nextPlants);
         setSelectedPlantId((current) => nextPlants.some((plant) => plant.id === current) ? current : "");
         setProfilePlantId((current) => nextPlants.some((plant) => plant.id === current) ? current : "");
       })
-      .catch(() => setPlants(fallbackPlants))
-      .finally(() => setIsPlantsLoading(false));
+      .catch(() => undefined)
+      .finally(() => { if (!controller.signal.aborted) setIsPlantsLoading(false); });
   }, []);
 
   const refreshRecentPlants = useCallback(() => {
@@ -161,9 +168,13 @@ export function PlantLogForm() {
       .catch(() => undefined);
   }, []);
 
-  useEffect(() => { refreshPlants(); }, [refreshPlants]);
+  useEffect(() => {
+    refreshPlants();
+    return () => plantRequest.current?.abort();
+  }, [refreshPlants]);
   useEffect(() => { refreshRecentPlants(); }, [refreshRecentPlants]);
-  useEffect(() => { refreshOptions(); }, [refreshOptions]);
+  const needsOptions = visitedTabs.includes("observation") || visitedTabs.includes("profile");
+  useEffect(() => { if (needsOptions) refreshOptions(); }, [needsOptions, refreshOptions]);
   useEffect(() => {
     if (isPlantsLoading || profileLinkHandled.current) return;
     profileLinkHandled.current = true;
@@ -201,7 +212,7 @@ export function PlantLogForm() {
       setRepotReason("");
     }
     setSelectedPlantId(plant.id);
-    setQuery(plant.name);
+    setQuery("");
     setObservationMessage("");
   }
 
@@ -216,7 +227,6 @@ export function PlantLogForm() {
     const previous = plants.find((plant) => plant.id === updated.id);
     setPlants((current) => current.map((plant) => plant.id === updated.id ? updated : plant));
     if (profilePlantId === updated.id) setProfileQuery(updated.name);
-    if (selectedPlantId === updated.id) setQuery(updated.name);
     setRecentObservedPlants((current) => current.map((recent) => recent.plantId === updated.id ? { ...recent, plantName: updated.name, plantCategory: updated.category } : recent));
     if (calendarFilter.plantId === updated.id) setCalendarFilter({ plantId: updated.id, query: updated.name });
     if (previous) {
@@ -331,7 +341,9 @@ export function PlantLogForm() {
           : "관찰일지를 Notion에 저장했습니다."),
       );
       refreshRecentPlants();
-      refreshPlants();
+      setObservationRevision((value) => value + 1);
+      setCalendarRevision((value) => value + 1);
+      if (isRepotting) refreshPlants();
     } catch (error) {
       setObservationSaveState("error");
       setObservationMessage(error instanceof Error ? error.message : "관찰일지 저장에 실패했습니다.");
@@ -384,7 +396,7 @@ export function PlantLogForm() {
               recentPlants={recentObservedPlants}
               isLoading={isPlantsLoading}
               isPhotoLoading={isPlantsLoading || isRecentPlantsLoading}
-              onWateringSaved={() => { refreshPlants(); if (fertilizerEnabled && fertilizer) { refreshRecentPlants(); setObservationRevision((value) => value + 1); } }}
+              onWateringSaved={() => { refreshPlants(); setCalendarRevision((value) => value + 1); if (fertilizerEnabled && fertilizer) { refreshRecentPlants(); setObservationRevision((value) => value + 1); } }}
               onSelectPlant={openPlantFromCalendar}
               onOpenCalendar={openCalendarForPlant}
               wateredAt={wateredDate}
@@ -468,7 +480,7 @@ export function PlantLogForm() {
         ) : null}
         </section> : null}
 
-        {visitedTabs.includes("more") ? <section data-screen="more" hidden={activeTab !== "more"}><ManagementCalendar plants={plants} onSelectPlant={openPlantFromCalendar} filter={calendarFilter} onFilterChange={setCalendarFilter} hideSearch /></section> : null}
+        {visitedTabs.includes("more") ? <section data-screen="more" hidden={activeTab !== "more"}><ManagementCalendar plants={plants} onSelectPlant={openPlantFromCalendar} filter={calendarFilter} onFilterChange={setCalendarFilter} revision={calendarRevision} active={activeTab === "more"} hideSearch /></section> : null}
         {visitedTabs.includes("spaces") ? <section data-screen="spaces" hidden={activeTab !== "spaces"}><PlantSpaces embedded /></section> : null}
       </div>
 
