@@ -6,7 +6,7 @@ import {
   updateWateringLogFertilizers,
   resolveDataSourceId,
 } from "@/lib/notion";
-import { readWateringHistory } from "@/lib/watering-history";
+import { readLastFertilizedDates, readWateringHistory } from "@/lib/watering-history";
 import { normalizeDay, type WateredPlant } from "@/lib/watering";
 
 type WateringPlant = {
@@ -53,7 +53,16 @@ function readTitle(page: WateringLogPage) {
 export async function GET(request: Request) {
   const token = process.env.NOTION_TOKEN;
   const wateringDatabaseId = process.env.NOTION_WATERING_DATABASE_ID;
-  if (new URL(request.url).searchParams.get("options") === "fertilizer") {
+  const params = new URL(request.url).searchParams;
+  if (params.get("view") === "last-fertilized") {
+    try {
+      const dates = await readLastFertilizedDates(getSeoulDateValue());
+      return NextResponse.json({ dates }, { headers: { "Cache-Control": "no-store" } });
+    } catch {
+      return NextResponse.json({ message: "최근 비료 기록을 불러오지 못했어요." }, { status: 502 });
+    }
+  }
+  if (params.get("options") === "fertilizer") {
     const source = process.env.NOTION_WATERING_DATA_SOURCE_ID;
     if (!token || (!source && !wateringDatabaseId)) return NextResponse.json({ message: "물주기 기록 DB 연결을 확인해주세요." }, { status: 503 });
     try {
@@ -63,7 +72,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: error instanceof Error ? error.message : "비료 목록을 불러오지 못했어요." }, { status: 502 });
     }
   }
-  const requestedDate = new URL(request.url).searchParams.get("date") || getSeoulDateValue();
+  const requestedDate = params.get("date") || getSeoulDateValue();
 
   if (!token || (!wateringDatabaseId && !process.env.NOTION_WATERING_DATA_SOURCE_ID)) {
     return NextResponse.json({ plants: [], wateredAt: requestedDate }, { headers: { "Cache-Control": "no-store" } });

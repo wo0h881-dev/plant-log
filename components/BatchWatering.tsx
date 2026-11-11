@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AlertCircle, Check, ChevronDown, Sprout, X } from "lucide-react";
 import { matchesPlantSearch } from "@/lib/plant-search";
-import { canShowInWateringList, isWateredToday, seoulDate, type WateredPlant } from "@/lib/watering";
+import { canShowInWateringList, isWateredToday, normalizeDay, seoulDate, wateringPlantKey, type WateredPlant } from "@/lib/watering";
 import { cacheWateringHeroPhoto, clearCachedWateringHeroPhoto, readCachedWateringHeroPhoto } from "@/lib/watering-hero-cache";
 import type { Plant, RecentObservedPlant, SaveState } from "@/types/plant";
 import { PlantCoverThumbnail } from "@/components/PlantCoverThumbnail";
@@ -68,6 +68,8 @@ export function BatchWatering({
   const [todayWateredPlants, setTodayWateredPlants] = useState<WateredPlant[]>([]);
   const [isTodayLoading, setIsTodayLoading] = useState(true);
   const [todayWateringError, setTodayWateringError] = useState(false);
+  const [fertilizedDates, setFertilizedDates] = useState<Record<string, string>>({});
+  const [fertilizerHistoryStatus, setFertilizerHistoryStatus] = useState<"loading" | "ready" | "error">("loading");
   const [failedPhotoUrls, setFailedPhotoUrls] = useState<string[]>([]);
   const [loadedHeroPhoto, setLoadedHeroPhoto] = useState<string>();
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -99,6 +101,26 @@ export function BatchWatering({
   useEffect(() => {
     refreshTodayWatered();
   }, [refreshTodayWatered]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/watering-logs?view=last-fertilized", { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error();
+        const { dates } = await response.json() as { dates: Record<string, string> };
+        if (controller.signal.aborted) return;
+        setFertilizedDates((current) => {
+          const next = { ...current };
+          for (const [id, day] of Object.entries(dates)) {
+            if (day > (next[id] ?? "")) next[id] = day;
+          }
+          return next;
+        });
+        setFertilizerHistoryStatus("ready");
+      })
+      .catch(() => { if (!controller.signal.aborted) setFertilizerHistoryStatus("error"); });
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => { if (!isTodayLoading) onTodayWateredChange?.(todayWateredPlants); }, [todayWateredPlants, onTodayWateredChange, isTodayLoading]);
 
@@ -248,6 +270,17 @@ export function BatchWatering({
           : `${successCount}개 식물의 ${fertilizer ? "비료" : "물주기"}를 저장했습니다.`;
       setMessage(summary);
 
+      const fertilizedDay = normalizeDay(wateredDate);
+      if (fertilizer && succeededIds.length && fertilizedDay && fertilizedDay <= today) {
+        setFertilizedDates((current) => {
+          const next = { ...current };
+          for (const id of succeededIds.map(wateringPlantKey)) {
+            if (fertilizedDay > (next[id] ?? "")) next[id] = fertilizedDay;
+          }
+          return next;
+        });
+      }
+
       if (wateredDate === today && succeededIds.length) {
         const succeededPlants = selectedPlants.filter((plant) => succeededIds.includes(plant.id));
         setTodayWateredPlants((current) => {
@@ -270,6 +303,10 @@ export function BatchWatering({
     const daysText = typeof plant.daysSinceWatered === "number"
       ? `${plant.daysSinceWatered}일 전 물줌`
       : "물준 기록 없음";
+    const lastFertilized = fertilizedDates[wateringPlantKey(plant.id)];
+    const fertilizerText = lastFertilized
+      ? lastFertilized === today ? "비료 오늘" : `비료 ${Math.round((Date.parse(today) - Date.parse(lastFertilized)) / 86_400_000)}일 전`
+      : fertilizerHistoryStatus === "ready" ? "비료 기록 없음" : "";
 
     return (
       <div key={plant.id} className="water-row transition-colors" data-selected={isSelected}>
@@ -291,6 +328,7 @@ export function BatchWatering({
               ? `주기 ${plant.wateringCycleDays}일 · ${daysText}`
               : fertilizer && isWateredToday(plant, todayWateredPlants, today) ? "오늘 물줌 · 비료 추가 가능" : daysText}
           </span>
+          {fertilizerText ? <span className="mt-0.5 block text-[11px] text-[#636B79]" title={lastFertilized}>{fertilizerText}</span> : null}
         </span>
         <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-md border transition ${isSelected ? "border-[#4263EB] bg-[#4263EB] text-white" : "border-[#D6DAE0] bg-white text-transparent"}`}>
           <Check size={16} strokeWidth={3} aria-hidden="true" />

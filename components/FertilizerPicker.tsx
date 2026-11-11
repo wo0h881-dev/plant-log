@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { PlantDialog } from "@/components/PlantDialog";
-import { formatFertilizerBatches, formatFertilizerMix, type FertilizerBatch } from "@/lib/fertilizer";
+import { fertilizerBatchName, fertilizerBatchNameLimit, formatFertilizerBatches, formatFertilizerMix, type FertilizerBatch } from "@/lib/fertilizer";
 import { clearFertilizerDraft, emptyBatch, newFertilizerDraft, readFertilizerDraft, writeFertilizerDraft, type DraftBatch } from "@/lib/fertilizer-draft";
 
 const hiddenKey = "plant-log:hidden-fertilizers";
@@ -64,7 +64,7 @@ export function FertilizerPicker({ selected, selectedIndex = 0, onSelect, onClos
     if (submitting.current) return;
     submitting.current = true; setSaving(true); setError("");
     try {
-      await onSelect(activeBatches.map(({ water, fertilizers }) => ({ water, fertilizers })), Math.max(0, activeBatches.indexOf(activeBatch)));
+      await onSelect(activeBatches.map(({ name, water, fertilizers }) => ({ ...(name?.trim() ? { name: name.trim() } : {}), water, fertilizers })), Math.max(0, activeBatches.indexOf(activeBatch)));
       clearFertilizerDraft(); onClose();
     } catch (error) { setError(error instanceof Error ? error.message : "물통을 저장하지 못했어요."); }
     finally { submitting.current = false; setSaving(false); }
@@ -74,7 +74,7 @@ export function FertilizerPicker({ selected, selectedIndex = 0, onSelect, onClos
     <fieldset disabled={saving} className="min-w-0 space-y-4">
       {initial.restored ? <p role="status" className="text-xs text-[#4263EB]">작성 중인 내용이 복원됐어요.</p> : null}
       {storageError ? <p role="alert" className="text-xs text-red-700">기기의 저장 공간을 사용할 수 없어 새로고침하면 작성 중인 내용이 사라질 수 있어요.</p> : null}
-      <div className="status-chips" aria-label={`물통 ${activeIndex + 1} 비료 종류`} role="group">
+      <div className="status-chips" aria-label={`${fertilizerBatchName(activeBatch, activeIndex)} 비료 종류`} role="group">
         <button type="button" className="status-chip" onClick={() => { setBatches([emptyBatch()]); setActiveIndex(0); }}>물통 전체 비우기</button>
         <button type="button" className="status-chip" disabled={batches.length >= 5} onClick={() => { setBatches((current) => [...current, emptyBatch()]); setActiveIndex(batches.length); }}><Plus size={15} aria-hidden="true" />물통 추가</button>
         {tags.map((tag) => {
@@ -102,13 +102,14 @@ export function FertilizerPicker({ selected, selectedIndex = 0, onSelect, onClos
       {error ? <p role="alert" className="text-xs text-red-700">{error}</p> : null}
       <h3 className="text-sm font-semibold">비율 만들기</h3>
       <div role="tablist" aria-label="편집할 물통" className="flex gap-2 overflow-x-auto pb-1">
-        {batches.map((batch, index) => <button key={batch.id} type="button" role="tab" aria-selected={activeIndex === index} aria-controls={`fertilizer-batch-${batch.id}`} className="status-chip shrink-0" data-active={activeIndex === index} onClick={() => setActiveIndex(index)}>물통 {index + 1}</button>)}
+        {batches.map((batch, index) => <button key={batch.id} type="button" role="tab" aria-selected={activeIndex === index} aria-controls={`fertilizer-batch-${batch.id}`} className="status-chip max-w-44 shrink-0" title={fertilizerBatchName(batch, index)} data-active={activeIndex === index} onClick={() => setActiveIndex(index)}><span className="truncate">{fertilizerBatchName(batch, index)}</span></button>)}
       </div>
       {batches.map((batch, index) => <fieldset id={`fertilizer-batch-${batch.id}`} key={batch.id} hidden={activeIndex !== index} className="min-w-0 space-y-3 border-t border-[#ECEEF2] pt-4">
-        <legend className="text-sm font-semibold">물통 {index + 1}</legend>
+        <legend className="max-w-full break-all text-sm font-semibold">{fertilizerBatchName(batch, index)}</legend>
+        <label className="block text-xs">물통 이름<input className="field mt-2" maxLength={fertilizerBatchNameLimit} placeholder={`물통 ${index + 1}`} value={batch.name ?? ""} onChange={(event) => updateBatch(batch.id, (current) => ({ ...current, name: event.target.value }))} /></label>
         <div className="flex items-end gap-2">
           <label className="min-w-0 flex-1 text-xs">물 (mL)<input className="field mt-2" inputMode="decimal" maxLength={12} value={batch.water} onChange={(event) => updateBatch(batch.id, (current) => ({ ...current, water: event.target.value }))} /></label>
-          <button type="button" className="icon-button shrink-0" aria-label={`물통 ${index + 1} 삭제`} title="이 물통 지우기" onClick={() => { setBatches((current) => current.length === 1 ? [emptyBatch()] : current.filter((item) => item.id !== batch.id)); setActiveIndex(Math.max(0, index - 1)); }}><X size={18} /></button>
+          <button type="button" className="icon-button shrink-0" aria-label={`${fertilizerBatchName(batch, index)} 삭제`} title="이 물통 지우기" onClick={() => { setBatches((current) => current.length === 1 ? [emptyBatch()] : current.filter((item) => item.id !== batch.id)); setActiveIndex(Math.max(0, index - 1)); }}><X size={18} /></button>
         </div>
         {batch.fertilizers.map((item) => <label key={item.name} className="block min-w-0 break-words text-xs">{item.name} (mL)<input className="field mt-2" inputMode="decimal" maxLength={12} value={item.amount} onChange={(event) => updateBatch(batch.id, (current) => ({ ...current, amounts: { ...current.amounts, [item.name]: event.target.value }, fertilizers: current.fertilizers.map((value) => value.name === item.name ? { ...value, amount: event.target.value } : value) }))} /></label>)}
       </fieldset>)}

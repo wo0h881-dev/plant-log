@@ -1,6 +1,7 @@
 import type { Plant } from "@/types/plant";
 
 export type WateredPlant = { id: string; name: string; fertilizer?: string; fertilizerRatio?: string };
+export const wateringPlantKey = (id: string) => id.replaceAll("-", "").toLowerCase();
 export type WateringStats = {
   lastWateredAt?: string;
   daysSinceWatered?: number;
@@ -32,9 +33,9 @@ export function canShowInWateringList(plant: Plant) {
 }
 
 export function isWateredToday(plant: Plant, watered: WateredPlant[], today = seoulDate()) {
-  const id = plant.id.replaceAll("-", "").toLowerCase();
+  const id = wateringPlantKey(plant.id);
   return normalizeDay(plant.lastWateredAt ?? "") === today || watered.some((item) =>
-    item.id ? item.id.replaceAll("-", "").toLowerCase() === id : item.name === plant.name,
+    item.id ? wateringPlantKey(item.id) === id : item.name === plant.name,
   );
 }
 

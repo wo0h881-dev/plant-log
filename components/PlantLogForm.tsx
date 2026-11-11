@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { AlertCircle, ArrowLeft, Check, House, Pencil, RefreshCcw, Sprout, X } from "lucide-react";
 import { FertilizerPicker } from "@/components/FertilizerPicker";
 import { useFertilizerRecipes } from "@/components/useFertilizerRecipes";
-import { formatFertilizerBatches } from "@/lib/fertilizer";
+import { fertilizerBatchName, formatFertilizerBatches } from "@/lib/fertilizer";
 import { PlantDialog } from "@/components/PlantDialog";
 import { RoomRecordDialog, type RoomRecordInput } from "@/components/RoomRecordDialog";
 import { HeaderDatePicker } from "@/components/HeaderDatePicker";
@@ -438,10 +438,10 @@ export function PlantLogForm() {
         {visitedTabs.includes("water") ? (
           <section data-screen="water" hidden={activeTab !== "water"}>
             <div className="mb-5 flex items-center justify-between gap-3">
-              <p className="text-xs text-[#8B929B]">오늘 돌볼 식물들을 확인해요.</p>
-              {fertilizerBatches.length ? <div className="space-y-2">
+              <p className="min-w-0 flex-1 text-xs text-[#8B929B]">오늘 돌볼 식물들을 확인해요.</p>
+              {fertilizerBatches.length ? <div className="min-w-0 max-w-[65%] space-y-2">
                 <div role="tablist" aria-label="사용할 물통" className="flex gap-2 overflow-x-auto pb-1">
-                  {fertilizerBatches.map((batch, index) => <button key={index} type="button" role="tab" aria-selected={fertilizerBatchIndex === index} data-active={fertilizerEnabled && fertilizerBatchIndex === index} className="status-chip shrink-0" disabled={isWaterSaving || !batch.fertilizers.length} onClick={() => { fertilizerRecipes.select(index); setFertilizerEnabled(true); setWaterSelection([]); }}>물통 {index + 1}</button>)}
+                  {fertilizerBatches.map((batch, index) => <button key={index} type="button" role="tab" aria-selected={fertilizerBatchIndex === index} data-active={fertilizerEnabled && fertilizerBatchIndex === index} className="status-chip max-w-44 shrink-0" title={fertilizerBatchName(batch, index)} disabled={isWaterSaving || !batch.fertilizers.length} onClick={() => { fertilizerRecipes.select(index); setFertilizerEnabled(true); setWaterSelection([]); }}><span className="truncate">{fertilizerBatchName(batch, index)}</span></button>)}
                 </div>
                 <button type="button" className="status-chip" data-active={fertilizerEnabled} aria-label="비료 설정" title="비료 종류와 비율 변경" disabled={isWaterSaving} onClick={() => setFertilizerOpen(true)}>{fertilizerEnabled ? "비료" : "비료 끔"} · {activeFertilizerBatch?.water ? `물 ${activeFertilizerBatch.water}mL · ` : ""}{fertilizers.length}종</button>
               </div> : null}

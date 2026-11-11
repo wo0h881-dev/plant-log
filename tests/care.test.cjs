@@ -32,6 +32,7 @@ const observationApi = require("../app/api/plant-logs/route.ts");
 const calendarApi = require("../app/api/calendar/route.ts");
 const plantDetailsApi = require("../app/api/plant-details/route.ts");
 const wateringApi = require("../app/api/watering-logs/route.ts");
+const { readLastFertilizedDates } = require("../lib/watering-history.ts");
 const statsApi = require("../app/api/watering-stats/route.ts");
 const { isRecentObservation } = require("../lib/notion-observation.ts");
 const { parseNotionPlantPage, parseNotionPlantPages } = require("../lib/plants.ts");
@@ -61,6 +62,33 @@ const createForm = (values) => { const form = new FormData(); Object.entries(val
 function returnedPage(properties) {
   return { id: plantId, properties: Object.fromEntries(Object.entries(properties).map(([key, value]) => [key, { type: Object.keys(value)[0], ...value, ...(value.title ? { title: value.title.map((item) => ({ plain_text: item.text.content })) } : {}) }])) };
 }
+
+test("latest fertilizer dates batch-query current and legacy records across pages", async () => {
+  const secondId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const page = (start, id, fertilizer = {}) => returnedPage({ 날짜: { date: { start } }, 식물: { relation: [{ id }] }, ...fertilizer });
+  const legacy = { 비료: { select: { name: "A" } } };
+  const current = { "사용 비료": { multi_select: [{ name: "B" }] } };
+  let queries = 0;
+  global.fetch = async (url, options) => {
+    if (!options.method) return json({ properties: { 비료: { type: "select" }, "사용 비료": { type: "multi_select" } } });
+    assert.deepEqual(new URL(url).searchParams.getAll("filter_properties"), ["식물", "날짜", "비료", "사용 비료"]);
+    const { filter, start_cursor } = JSON.parse(options.body);
+    assert.deepEqual(filter.and[1], { or: [{ property: "비료", select: { is_not_empty: true } }, { property: "사용 비료", multi_select: { is_not_empty: true } }] });
+    queries++;
+    return start_cursor
+      ? json({ results: [page("2026-11-07", plantId, legacy), page("2026-11-02", secondId, legacy)] })
+      : json({ results: [page("2026-11-12", plantId, legacy), page("2026-11-10", plantId), page("2026-11-08T17:00:00Z", plantId, current)], has_more: true, next_cursor: "next" });
+  };
+  assert.deepEqual(await readLastFertilizedDates("2026-11-11"), { [plantId.replaceAll("-", "")]: "2026-11-09", [secondId.replaceAll("-", "")]: "2026-11-02" });
+  assert.equal(queries, 2);
+});
+
+test("latest fertilizer endpoint works before the fertilizer fields have been created", async () => {
+  global.fetch = async (url) => { assert.ok(!url.includes("/query")); return json({ properties: {} }); };
+  const response = await wateringApi.GET(new Request("http://localhost/api/watering-logs?view=last-fertilized"));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { dates: {} });
+});
 
 test("calendar exposes current and legacy fertilizer separately and hides only mirrored journal entries", async () => {
   const wateringSource = "22222222-2222-4222-8222-222222222222";
@@ -225,6 +253,10 @@ test("fertilizer batches distinguish shared water from separate water and preser
 test("fertilizer recipes validate saved ratios but allow name-only recipes", () => {
   const valid = { version: 1, index: 0, batches: [{ water: "1000", fertilizers: [{ name: "A", amount: "10" }] }] };
   assert.deepEqual(parseFertilizerRecipes(valid), valid);
+  const renamed = parseFertilizerRecipes({ ...valid, batches: [{ ...valid.batches[0], name: "  성장용  " }] });
+  assert.deepEqual(renamed.batches, [{ ...valid.batches[0], name: "성장용" }]);
+  assert.match(formatFertilizerBatches(renamed.batches), /^성장용 · /);
+  assert.equal(parseFertilizerRecipes({ ...valid, batches: [{ ...valid.batches[0], name: "a\nb" }] }), null);
   assert.equal(parseFertilizerRecipes({ ...valid, index: 3 }), null);
   assert.equal(parseFertilizerRecipes({ ...valid, batches: [{ water: "1000", fertilizers: [{ name: "A", amount: "" }] }] }), null);
   assert.ok(parseFertilizerRecipes({ ...valid, batches: [{ water: "", fertilizers: [{ name: "A", amount: "" }] }] }));

@@ -1,4 +1,4 @@
-import { formatFertilizerBatches, formatFertilizerMix, type FertilizerBatch } from "@/lib/fertilizer";
+import { fertilizerBatchNameLimit, formatFertilizerBatches, formatFertilizerMix, type FertilizerBatch } from "@/lib/fertilizer";
 
 export type FertilizerRecipes = { version: 1; batches: FertilizerBatch[]; index: number };
 export const emptyFertilizerRecipes = (): FertilizerRecipes => ({ version: 1, batches: [], index: 0 });
@@ -12,6 +12,7 @@ export function parseFertilizerRecipes(value: unknown): FertilizerRecipes | null
   let count = 0;
   for (const batch of state.batches) {
     if (!batch || typeof batch.water !== "string" || batch.water.length > 12 || !Array.isArray(batch.fertilizers)) return null;
+    if (batch.name !== undefined && (typeof batch.name !== "string" || batch.name.length > fertilizerBatchNameLimit || /[\r\n]/.test(batch.name))) return null;
     count += batch.fertilizers.length;
     if (count > 20) return null;
     const names = new Set<string>();
@@ -23,7 +24,10 @@ export function parseFertilizerRecipes(value: unknown): FertilizerRecipes | null
     if (hasAmount && (!batch.fertilizers.length || batch.fertilizers.some((item) => !formatFertilizerMix({ water: batch.water, fertilizer: item.amount })))) return null;
   }
   if (formatFertilizerBatches(state.batches).length > 4000) return null;
-  return { version: 1, index: state.index, batches: state.batches.map((batch) => ({ water: batch.water, fertilizers: batch.fertilizers.map(({ name, amount }) => ({ name, amount })) })) };
+  return { version: 1, index: state.index, batches: state.batches.map((batch) => {
+    const name = batch.name?.trim();
+    return { ...(name ? { name } : {}), water: batch.water, fertilizers: batch.fertilizers.map(({ name, amount }) => ({ name, amount })) };
+  }) };
 }
 
 export function readRecipeCache(): FertilizerRecipes {

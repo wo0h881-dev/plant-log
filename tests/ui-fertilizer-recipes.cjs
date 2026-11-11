@@ -13,6 +13,7 @@ async function main() {
   let revision = 0; let failSave = true; let waterCount = 0;
   const methods = [];
   const plant = { id: "11111111-1111-4111-8111-111111111111", name: "밤비노 핑크", category: "알로카시아", wateringCycleDays: 2, isWateringDue: true };
+  const threeDaysAgo = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() - 3 * 86_400_000));
   async function device(width) {
     const page = await browser.newPage({ viewport: { width, height: 844 }, serviceWorkers: "block" });
     page.setDefaultTimeout(30000);
@@ -30,6 +31,7 @@ async function main() {
       } else if (url.pathname === "/api/plants") data = { plants: [plant], source: "notion" };
       else if (url.pathname === "/api/watering-logs") {
         if (request.method() === "POST") { waterCount++; data = { successCount: 1, results: [{ plantId: plant.id, plantName: plant.name, ok: true }] }; }
+        else if (url.searchParams.get("view") === "last-fertilized") data = { dates: { [plant.id.replaceAll("-", "")]: threeDaysAgo } };
         else data = url.searchParams.has("options") ? { options: ["A", "B"] } : { plants: [] };
       } else if (url.pathname === "/api/plant-details") data = { recentPlants: [], photos: [], observations: [] };
       await route.fulfill({ json: data });
@@ -48,10 +50,12 @@ async function main() {
   };
   try {
     const { page, errors } = await device(390);
+    await page.getByRole("checkbox", { name: /밤비노 핑크.*비료 3일 전/ }).first().waitFor();
     let dialog = await open(page);
     await dialog.getByRole("button", { name: "A", exact: true }).click();
     await dialog.getByLabel("물 (mL)", { exact: true }).fill("1000");
     await dialog.getByLabel("A (mL)", { exact: true }).fill("0.");
+    await dialog.getByLabel("물통 이름", { exact: true }).fill("성장용");
     await dialog.getByLabel("새 비료 이름").fill("작성 중 비료");
     await page.mouse.click(2, 2);
     await dialog.waitFor({ state: "hidden" });
@@ -60,6 +64,7 @@ async function main() {
     dialog = await open(page);
     assert.equal(await dialog.getByLabel("물 (mL)", { exact: true }).inputValue(), "1000");
     assert.equal(await dialog.getByLabel("A (mL)", { exact: true }).inputValue(), "0.");
+    assert.equal(await dialog.getByLabel("물통 이름", { exact: true }).inputValue(), "성장용");
     assert.equal(await dialog.getByLabel("새 비료 이름").inputValue(), "작성 중 비료");
     await dialog.getByLabel("새 비료 이름").fill("");
     await dialog.getByLabel("A (mL)", { exact: true }).fill("10");
@@ -72,7 +77,7 @@ async function main() {
     await dialog.getByRole("button", { name: "A", exact: true }).click();
     await dialog.getByRole("group", { name: "물통 2", exact: true }).getByLabel("물 (mL)", { exact: true }).fill("500");
     await dialog.getByRole("group", { name: "물통 2", exact: true }).getByLabel("A (mL)", { exact: true }).fill("1");
-    await dialog.getByRole("tab", { name: "물통 1", exact: true }).click();
+    await dialog.getByRole("tab", { name: "성장용", exact: true }).click();
     await dialog.getByRole("button", { name: "물통 저장", exact: true }).click();
     await dialog.getByText("시험용 저장 실패", { exact: true }).waitFor();
     assert.equal(await dialog.getByLabel("A (mL)", { exact: true }).first().inputValue(), "10");
@@ -80,6 +85,8 @@ async function main() {
     await dialog.getByRole("button", { name: "물통 저장", exact: true }).click();
     await dialog.waitFor({ state: "hidden" });
     assert.equal(state.batches.length, 2);
+    assert.equal(state.batches[0].name, "성장용");
+    assert.equal(state.batches[0].fertilizers.length, 2);
     assert.equal(await page.evaluate(() => localStorage.getItem("plant-log:fertilizer-draft:v1")), null);
     await page.locator('[data-screen="water"]').getByRole("checkbox").first().click();
     await page.getByRole("button", { name: /비료 저장/ }).click();
@@ -95,15 +102,20 @@ async function main() {
     await dialog.waitFor({ state: "hidden" });
     assert.equal(state.batches.length, 1);
     const second = await device(320);
+    await second.page.getByRole("tablist", { name: "사용할 물통" }).getByRole("tab", { name: "성장용", exact: true }).waitFor();
     const secondDialog = await open(second.page);
+    const renamedTank = "봄여름 새잎 성장용 비료 물통";
+    await secondDialog.getByLabel("물통 이름", { exact: true }).fill(renamedTank);
     await secondDialog.getByLabel("물 (mL)", { exact: true }).fill("750");
     await secondDialog.getByRole("button", { name: "물통 저장", exact: true }).click();
     await secondDialog.waitFor({ state: "hidden" });
     await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("tablist", { name: "사용할 물통" }).getByRole("tab", { name: renamedTank, exact: true }).waitFor();
+    assert.equal(await second.page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     await page.getByRole("button", { name: "비료 설정", exact: true }).waitFor();
     assert.ok((await page.getByRole("button", { name: "비료 설정", exact: true }).textContent()).includes("750mL"));
     dialog = await open(page);
-    await dialog.getByRole("button", { name: "물통 1 삭제", exact: true }).click();
+    await dialog.getByRole("button", { name: `${renamedTank} 삭제`, exact: true }).click();
     await dialog.getByRole("button", { name: "물통 저장", exact: true }).click();
     await dialog.waitFor({ state: "hidden" });
     await page.reload({ waitUntil: "domcontentloaded" });
